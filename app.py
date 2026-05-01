@@ -824,10 +824,9 @@ async function loadFrecuentes() {
 // ─── VENTAS (orden cronológico de ingreso) ────────────────────────────────────
 async function loadVentas() {
   const data = await fetchAPI('/api/prospectos/ventas');
-  // Mostrar en orden inverso: últimas entradas primero
-  const reversed = [...data].reverse();
-  state.data['ventas'] = reversed;
-  state.filtered['ventas'] = reversed;
+  // Orden de ingreso: primeras entradas primero (como en la hoja)
+  state.data['ventas'] = data;
+  state.filtered['ventas'] = data;
   state.page['ventas'] = 1;
   const countEl = document.getElementById('ventas-count');
   if (countEl) countEl.textContent = `${data.length} registros`;
