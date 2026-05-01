@@ -445,6 +445,56 @@ def api_frecuentes():
     return jsonify(filter_ventas_cols(data))
 
 
+@app.route('/api/prospectos/clientes-frecuentes')
+def api_clientes_frecuentes():
+    """Agrupa ventas por cliente: suma montos, cuenta pedidos, ordena mayor a menor."""
+    ventas = get_data('ventas')
+
+    def parse_monto(v):
+        try:
+            return float(str(v).replace(',', '').replace('$', '').strip() or 0)
+        except:
+            return 0.0
+
+    clientes: dict = defaultdict(lambda: {
+        'total_monto': 0.0,
+        'num_pedidos': 0,
+        'esquema': '',
+        'facturas': [],
+        'ultimo_pedido': '',
+    })
+
+    for row in ventas:
+        cliente = str(row.get('Cliente', '')).strip()
+        if not cliente:
+            continue
+        monto   = parse_monto(row.get('Monto', 0))
+        factura = str(row.get('Num Factura', '')).strip()
+        fecha   = str(row.get('Fecha', '')).strip()
+        esquema = str(row.get('ESQUEMA', '')).strip()
+
+        clientes[cliente]['total_monto']  += monto
+        clientes[cliente]['num_pedidos']  += 1
+        clientes[cliente]['esquema']       = esquema or clientes[cliente]['esquema']
+        if factura:
+            clientes[cliente]['facturas'].append(factura)
+        if fecha and fecha > clientes[cliente]['ultimo_pedido']:
+            clientes[cliente]['ultimo_pedido'] = fecha
+
+    result = []
+    for nombre, d in clientes.items():
+        result.append({
+            'Cliente':       nombre,
+            'Esquema':       d['esquema'],
+            'Pedidos':       d['num_pedidos'],
+            'Total Monto':   round(d['total_monto'], 2),
+            'Ultimo Pedido': d['ultimo_pedido'],
+        })
+
+    result.sort(key=lambda x: x['Total Monto'], reverse=True)
+    return jsonify(result)
+
+
 @app.route('/api/prospectos/ciudades')
 def api_ciudades():
     contactos = get_data('contactos')
@@ -972,23 +1022,70 @@ async function loadDashboard() {
 
 // ─── FRECUENTES ─────────────────────────────────────────────────────────────
 async function loadFrecuentes() {
-  // Mostrar hoja FRECUENTES tal cual, en orden de ingreso (sin agrupación)
-  const data = await fetchAPI('/api/prospectos/frecuentes');
-  state.data['frecuentes'] = data;
-  state.filtered['frecuentes'] = data;
-  state.page['frecuentes'] = 1;
+  const data = await fetchAPI('/api/prospectos/clientes-frecuentes');
 
-  // KPIs simples
+  // ── KPIs ──
+  const totalClientes = data.length;
+  const totalMonto    = data.reduce((s, r) => s + (r['Total Monto'] || 0), 0);
+  const totalPedidos  = data.reduce((s, r) => s + (r['Pedidos'] || 0), 0);
+  const top           = data[0] || {};
+
   document.getElementById('frec-cards').innerHTML = `
-    <div class="card"><div class="label">Total Registros</div><div class="value">${data.length}</div><div class="sub">Clientes frecuentes</div></div>
+    <div class="card"><div class="label">Clientes</div><div class="value">${totalClientes}</div><div class="sub">Con al menos 1 pedido</div></div>
+    <div class="card green"><div class="label">Facturación Total</div><div class="value">$${fmtMonto(totalMonto)}</div><div class="sub">Suma de todos</div></div>
+    <div class="card"><div class="label">Total Pedidos</div><div class="value">${totalPedidos}</div><div class="sub">Facturas emitidas</div></div>
+    <div class="card orange"><div class="label">Top Cliente</div><div class="value" style="font-size:1em">${top['Cliente'] || '—'}</div><div class="sub">$${fmtMonto(top['Total Monto'] || 0)}</div></div>
   `;
 
-  // Ocultar chart box si existe
-  const chartBox = document.querySelector('#sec-frecuentes .chart-box');
-  if (chartBox) chartBox.style.display = 'none';
+  // ── Tabla agrupada ──
+  const pageSize = 50;
+  const page     = state.page['frecuentes'] || 1;
+  const slice    = data.slice((page-1)*pageSize, page*pageSize);
 
-  // Tabla directa en orden de ingreso (tal cual la hoja)
-  renderTable('frecuentes', 'frec-top-table', 'frec-pag');
+  let html = `<table><thead><tr>
+    <th>#</th><th>Cliente</th><th>Esquema</th><th>Pedidos</th>
+    <th style="text-align:right">Total Facturado</th><th>Último Pedido</th>
+  </tr></thead><tbody>`;
+
+  slice.forEach((r, i) => {
+    const rank = (page-1)*pageSize + i + 1;
+    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}`;
+    html += `<tr>
+      <td style="font-weight:700;color:var(--blue)">${medal}</td>
+      <td><strong>${r['Cliente']}</strong></td>
+      <td><span class="tag default">${r['Esquema'] || '—'}</span></td>
+      <td style="text-align:center;font-weight:700">${r['Pedidos']}</td>
+      <td style="text-align:right;font-weight:800;color:var(--green)">$${fmtMonto(r['Total Monto'])}</td>
+      <td style="color:#888;font-size:.85em">${r['Ultimo Pedido'] || '—'}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('frec-top-table').innerHTML = html;
+
+  // Paginación
+  const totalPages = Math.ceil(data.length / pageSize);
+  let pag = `<span class="pag-info">${data.length} clientes</span>`;
+  if (totalPages > 1) {
+    if (page > 1) pag += `<button onclick="frecPage(${page-1})">‹</button>`;
+    for (let p = Math.max(1,page-2); p <= Math.min(totalPages,page+2); p++) {
+      pag += `<button class="${p===page?'active':''}" onclick="frecPage(${p})">${p}</button>`;
+    }
+    if (page < totalPages) pag += `<button onclick="frecPage(${page+1})">›</button>`;
+  }
+  document.getElementById('frec-pag').innerHTML = pag;
+
+  // Guardar data para paginación
+  state.data['frecuentes-raw'] = data;
+}
+
+function frecPage(p) {
+  state.page['frecuentes'] = p;
+  state.data['frecuentes'] = state.data['frecuentes-raw'];
+  loadFrecuentes();
+}
+
+function fmtMonto(n) {
+  return Number(n).toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
 // ─── VENTAS (orden cronológico de ingreso) ────────────────────────────────────
