@@ -261,7 +261,14 @@ def api_mensajes():
 @app.route('/api/prospectos/frecuentes')
 def api_frecuentes():
     data = get_data('frecuentes')
-    return jsonify(data)
+    # Filtrar solo columnas relevantes y eliminar duplicadas/vacías
+    COLS = ['Fecha', 'Cliente', 'ESQUEMA', 'MES', 'Monto ', 'Monto', 'Envio Costo', 'Num Factura', 'Cotizacion PDF', 'PAGO']
+    result = []
+    for row in data:
+        clean = {k: v for k, v in row.items() if k in COLS or (k.strip() and k not in ['VACIO', 'COUNTA de Cliente', 'SUM de Monto ', 'Ultima Compra'])}
+        if any(v for v in clean.values()):  # ignorar filas vacías
+            result.append(clean)
+    return jsonify(result)
 
 
 @app.route('/api/prospectos/ciudades')
@@ -881,13 +888,22 @@ function renderTable(key, tableId, pagId) {
     return;
   }
 
-  const cols = Object.keys(slice[0]).filter(k => !k.startsWith('_'));
-  // Priorizar columnas importantes para mostrar primero
-  const priority = ['TIENDA','Tienda','Nombre','nombre','Ciudad','ciudad','Teléfono','telefono','Resultado','resultado','Fecha'];
-  const sortedCols = [
-    ...priority.filter(p => cols.includes(p)),
-    ...cols.filter(c => !priority.includes(c)),
-  ].slice(0, 18);
+  const allCols = Object.keys(slice[0]).filter(k => !k.startsWith('_'));
+
+  // Columnas fijas para ventas/frecuentes (en orden exacto de la hoja)
+  const VENTAS_COLS = ['Fecha','Cliente','ESQUEMA','MES','Monto ','Monto','Envio Costo','Num Factura','Cotizacion PDF','PAGO'];
+  const isVentas = key === 'ventas' || key === 'frecuentes';
+
+  let sortedCols;
+  if (isVentas) {
+    // Mostrar solo columnas relevantes en el orden exacto indicado
+    sortedCols = VENTAS_COLS.filter(c => allCols.includes(c));
+    // Agregar cualquier columna extra no vacía que no esté en la lista fija
+    allCols.filter(c => !VENTAS_COLS.includes(c) && c.trim() !== '').forEach(c => sortedCols.push(c));
+  } else {
+    // Para otras secciones: orden exacto de la hoja, sin reordenar
+    sortedCols = allCols.filter(c => c.trim() !== '').slice(0, 20);
+  }
 
   let html = `<table><thead><tr>${sortedCols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>`;
   slice.forEach(row => {
