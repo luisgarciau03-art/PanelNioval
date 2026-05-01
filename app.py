@@ -791,10 +791,7 @@ tr:hover td{background:var(--blue3)}
   </div>
 
   <div class="nav-group">
-    <div class="nav-label">Clientes Prospectos</div>
-    <div class="nav-item active" onclick="showSection('dashboard')">
-      <span class="icon">📊</span> Dashboard
-    </div>
+    <div class="nav-label">Ventas</div>
     <div class="nav-item" onclick="showSection('frecuentes')">
       <span class="icon">⭐</span> Clientes Frecuentes
     </div>
@@ -803,6 +800,13 @@ tr:hover td{background:var(--blue3)}
     </div>
     <div class="nav-item" onclick="showSection('ventas')">
       <span class="icon">💰</span> Ventas
+    </div>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-label">Clientes Prospectos</div>
+    <div class="nav-item active" onclick="showSection('dashboard')">
+      <span class="icon">📊</span> Dashboard
     </div>
     <div class="nav-item" onclick="showSection('contactos')">
       <span class="icon">📋</span> Lista de Contactos
