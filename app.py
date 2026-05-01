@@ -495,6 +495,81 @@ def api_clientes_frecuentes():
     return jsonify(result)
 
 
+@app.route('/api/prospectos/ventas-dashboard')
+def api_ventas_dashboard():
+    """Métricas de ventas agrupadas por mes, con desglose por esquema y top clientes."""
+    ventas = get_data('ventas')
+
+    def parse_monto(v):
+        try:
+            return float(str(v).replace(',', '').replace('$', '').strip() or 0)
+        except:
+            return 0.0
+
+    def parse_fecha(f):
+        for fmt in ('%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d'):
+            try:
+                return datetime.strptime(str(f).strip()[:10], fmt)
+            except:
+                pass
+        return None
+
+    meses: dict = defaultdict(lambda: {
+        'monto': 0.0, 'pedidos': 0,
+        'clientes': set(), 'esquemas': defaultdict(float),
+    })
+
+    total_general = 0.0
+    total_pedidos = 0
+
+    for row in ventas:
+        cliente = str(row.get('Cliente', '')).strip()
+        monto   = parse_monto(row.get('Monto', 0))
+        fecha   = parse_fecha(row.get('Fecha', ''))
+        esquema = str(row.get('ESQUEMA', '')).strip() or 'Sin esquema'
+        factura = str(row.get('Num Factura', '')).strip()
+
+        if not fecha or not cliente:
+            continue
+
+        clave = fecha.strftime('%Y-%m')   # para ordenar
+        label = fecha.strftime('%b %Y')    # para mostrar
+
+        meses[clave]['label']    = label
+        meses[clave]['monto']   += monto
+        meses[clave]['pedidos'] += 1
+        meses[clave]['clientes'].add(cliente)
+        meses[clave]['esquemas'][esquema] += monto
+
+        total_general += monto
+        total_pedidos += 1
+
+    # Convertir sets a listas para JSON
+    resultado = []
+    for clave in sorted(meses.keys()):
+        d = meses[clave]
+        resultado.append({
+            'clave':         clave,
+            'mes':           d['label'],
+            'monto':         round(d['monto'], 2),
+            'pedidos':       d['pedidos'],
+            'clientes':      len(d['clientes']),
+            'ticket_prom':   round(d['monto'] / d['pedidos'], 2) if d['pedidos'] else 0,
+            'por_esquema':   dict(d['esquemas']),
+        })
+
+    mejor_mes = max(resultado, key=lambda x: x['monto']) if resultado else {}
+
+    return jsonify({
+        'por_mes':        resultado,
+        'total_general':  round(total_general, 2),
+        'total_pedidos':  total_pedidos,
+        'promedio_mes':   round(total_general / len(resultado), 2) if resultado else 0,
+        'mejor_mes':      mejor_mes.get('mes', '—'),
+        'mejor_mes_monto': mejor_mes.get('monto', 0),
+    })
+
+
 @app.route('/api/prospectos/ciudades')
 def api_ciudades():
     contactos = get_data('contactos')
@@ -723,6 +798,9 @@ tr:hover td{background:var(--blue3)}
     <div class="nav-item" onclick="showSection('frecuentes')">
       <span class="icon">⭐</span> Clientes Frecuentes
     </div>
+    <div class="nav-item" onclick="showSection('ventas-dash')">
+      <span class="icon">📈</span> Dashboard Ventas
+    </div>
     <div class="nav-item" onclick="showSection('ventas')">
       <span class="icon">💰</span> Ventas
     </div>
@@ -793,6 +871,31 @@ tr:hover td{background:var(--blue3)}
         </div>
         <div class="tbl-wrap" id="frec-top-table"><div class="loading"><div class="spinner"></div></div></div>
         <div class="pagination" id="frec-pag"></div>
+      </div>
+    </div>
+
+    <!-- ═══ DASHBOARD VENTAS ═══ -->
+    <div class="section" id="sec-ventas-dash">
+      <div class="cards" id="vdash-cards">
+        <div class="loading"><div class="spinner"></div><br>Cargando...</div>
+      </div>
+      <div class="charts">
+        <div class="chart-box full">
+          <h3>💰 Facturación Mensual</h3>
+          <canvas id="chartVentasMonto" height="90"></canvas>
+        </div>
+        <div class="chart-box">
+          <h3>📦 Pedidos por Mes</h3>
+          <canvas id="chartVentasPedidos" height="160"></canvas>
+        </div>
+        <div class="chart-box">
+          <h3>🎯 Ticket Promedio por Mes</h3>
+          <canvas id="chartVentasTicket" height="160"></canvas>
+        </div>
+      </div>
+      <div class="table-box">
+        <h3>📅 Desglose por Mes</h3>
+        <div class="tbl-wrap" id="vdash-table"></div>
       </div>
     </div>
 
@@ -901,6 +1004,7 @@ const state = {
 const SECTION_TITLES = {
   dashboard:   '📊 Dashboard Prospectos',
   frecuentes:  '⭐ Dashboard Clientes Frecuentes',
+  'ventas-dash': '📈 Dashboard de Ventas',
   ventas:      '💰 Ventas',
   contactos:   '📋 Lista de Contactos',
   ciudades:    '🗺️ Ciudades por Interés',
@@ -934,6 +1038,7 @@ async function loadSection(name) {
     case 'dashboard':   await loadDashboard(); break;
     case 'frecuentes':  await loadFrecuentes(); break;
     // filterTable('frecuentes') → frec-top-table / frec-pag manejado en loadFrecuentes
+    case 'ventas-dash': await loadVentasDash(); break;
     case 'ventas':      await loadVentas(); break;
     case 'contactos':   await loadContactos(); break;
     case 'ciudades':    await loadCiudades(); break;
@@ -1086,6 +1191,144 @@ function frecPage(p) {
 
 function fmtMonto(n) {
   return Number(n).toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+// ─── DASHBOARD VENTAS ────────────────────────────────────────────────────────
+async function loadVentasDash() {
+  const d = await fetchAPI('/api/prospectos/ventas-dashboard');
+  const meses = d.por_mes || [];
+
+  // ── KPIs ──
+  document.getElementById('vdash-cards').innerHTML = `
+    <div class="card green">
+      <div class="label">Facturación Total</div>
+      <div class="value" style="font-size:1.4em">$${fmtMonto(d.total_general)}</div>
+      <div class="sub">Todas las ventas</div>
+    </div>
+    <div class="card">
+      <div class="label">Total Pedidos</div>
+      <div class="value">${d.total_pedidos}</div>
+      <div class="sub">Facturas emitidas</div>
+    </div>
+    <div class="card orange">
+      <div class="label">Promedio Mensual</div>
+      <div class="value" style="font-size:1.3em">$${fmtMonto(d.promedio_mes)}</div>
+      <div class="sub">Por mes</div>
+    </div>
+    <div class="card purple">
+      <div class="label">Mejor Mes</div>
+      <div class="value" style="font-size:1.1em">${d.mejor_mes}</div>
+      <div class="sub">$${fmtMonto(d.mejor_mes_monto)}</div>
+    </div>
+    <div class="card">
+      <div class="label">Meses Activos</div>
+      <div class="value">${meses.length}</div>
+      <div class="sub">Con ventas</div>
+    </div>
+  `;
+
+  const labels  = meses.map(m => m.mes);
+  const montos  = meses.map(m => m.monto);
+  const pedidos = meses.map(m => m.pedidos);
+  const tickets = meses.map(m => m.ticket_prom);
+
+  // ── Chart: Facturación mensual ──
+  destroyChart('chartVentasMonto');
+  charts['chartVentasMonto'] = new Chart(
+    document.getElementById('chartVentasMonto').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Facturación $',
+        data: montos,
+        backgroundColor: montos.map((v,i) =>
+          v === Math.max(...montos) ? '#00CC47' : 'rgba(0,71,204,0.7)'),
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => '$'+fmtMonto(v) } }
+      }
+    }
+  });
+
+  // ── Chart: Pedidos por mes ──
+  destroyChart('chartVentasPedidos');
+  charts['chartVentasPedidos'] = new Chart(
+    document.getElementById('chartVentasPedidos').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Pedidos',
+        data: pedidos,
+        backgroundColor: 'rgba(0,71,204,0.75)',
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+  });
+
+  // ── Chart: Ticket promedio ──
+  destroyChart('chartVentasTicket');
+  charts['chartVentasTicket'] = new Chart(
+    document.getElementById('chartVentasTicket').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Ticket Promedio $',
+        data: tickets,
+        borderColor: '#e67e22',
+        backgroundColor: 'rgba(230,126,34,.1)',
+        fill: true, tension: .4, pointRadius: 4,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => '$'+fmtMonto(v) } }
+      }
+    }
+  });
+
+  // ── Tabla desglose por mes ──
+  const maxMonto = Math.max(...montos, 1);
+  let html = `<table><thead><tr>
+    <th>Mes</th><th style="text-align:right">Facturación</th>
+    <th style="text-align:center">Pedidos</th><th style="text-align:center">Clientes</th>
+    <th style="text-align:right">Ticket Prom.</th><th>Distribución</th>
+  </tr></thead><tbody>`;
+
+  meses.forEach(m => {
+    const barW = Math.round((m.monto / maxMonto) * 140);
+    const esqs = Object.entries(m.por_esquema)
+      .sort((a,b) => b[1]-a[1])
+      .map(([k,v]) => `<span class="tag default" style="font-size:.7em">${k}: $${fmtMonto(v)}</span>`)
+      .join(' ');
+    const isMejor = m.mes === d.mejor_mes;
+    html += `<tr ${isMejor ? 'style="background:#f0fff4"' : ''}>
+      <td><strong ${isMejor ? 'style="color:var(--green)"' : ''}>${m.mes} ${isMejor ? '⭐' : ''}</strong></td>
+      <td style="text-align:right;font-weight:800;color:var(--green)">$${fmtMonto(m.monto)}</td>
+      <td style="text-align:center;font-weight:700">${m.pedidos}</td>
+      <td style="text-align:center">${m.clientes}</td>
+      <td style="text-align:right;color:#888">$${fmtMonto(m.ticket_prom)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <div style="background:var(--green);height:8px;border-radius:4px;width:${barW}px;min-width:2px"></div>
+          ${esqs}
+        </div>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('vdash-table').innerHTML = html;
 }
 
 // ─── VENTAS (orden cronológico de ingreso) ────────────────────────────────────
