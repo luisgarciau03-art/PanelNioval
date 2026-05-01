@@ -1081,16 +1081,15 @@ function renderCell(col, val, row) {
   // Columna PAGO con imagen Drive
   if (col === 'PAGO') {
     if (val.startsWith('http')) {
+      // Ya tiene imagen — solo ver, NO permite subir
       const fileId = val.match(/\/d\/([^/]+)\//)?.[1] || '';
       const thumb = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w120` : '';
-      const factura = row ? (row['Num Factura'] || '') : '';
       return `<span style="display:flex;align-items:center;gap:6px">
         ${thumb ? `<img src="${thumb}" style="height:40px;border-radius:4px;cursor:pointer;border:1px solid #dde" onclick="verImagen('${val}','${thumb}')" title="Ver imagen">` : ''}
         <a href="${val}" target="_blank" style="color:var(--blue);font-size:.78em">Ver →</a>
-        <button class="btn-upload-pago" onclick="abrirUpload('${factura}', this)" title="Reemplazar">🔄</button>
       </span>`;
     }
-    // Es un nombre de archivo (no URL) → botón de upload
+    // Tiene nombre de archivo pero no URL → permitir subir
     const factura = row ? (row['Num Factura'] || '') : '';
     return `<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
       <span style="font-size:.75em;color:#888;max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${val}">${val.slice(0,20)}…</span>
