@@ -56,6 +56,47 @@ def get_gs_client():
     return _gs_client
 
 
+def get_worksheet(key: str):
+    """Obtiene el worksheet correcto por GID, con fallback a nombre y primera hoja."""
+    client = get_gs_client()
+    sp = client.open_by_key(SHEET_IDS[key])
+    gid = SHEET_GIDS.get(key)
+    # 1. Por GID
+    if gid is not None:
+        for ws in sp.worksheets():
+            if ws.id == gid:
+                return ws
+    # 2. Por nombre
+    NAMES = {
+        'ventas': 'Ventas', 'contactos': 'LISTA DE CONTACTOS',
+        'respuestas': 'Respuestas de formulario 1',
+        'mensajes': 'Mensajes', 'seguimiento': 'Seguimiento',
+    }
+    name = NAMES.get(key)
+    if name:
+        try:
+            return sp.worksheet(name)
+        except Exception:
+            pass
+    # 3. Primera hoja
+    return sp.get_worksheet(0)
+
+
+def values_to_records(rows: list) -> list:
+    """Convierte lista de listas (get_all_values) en lista de dicts."""
+    if not rows or len(rows) < 2:
+        return []
+    headers = [str(h).strip() for h in rows[0]]
+    records = []
+    for row in rows[1:]:
+        # Ignorar filas completamente vacías
+        if not any(str(c).strip() for c in row):
+            continue
+        padded = list(row) + [''] * (len(headers) - len(row))
+        records.append({headers[i]: str(padded[i]).strip() for i in range(len(headers))})
+    return records
+
+
 def get_data(key: str, force: bool = False) -> list:
     now = time.time()
     if not force and key in _cache:
@@ -63,22 +104,11 @@ def get_data(key: str, force: bool = False) -> list:
         if now - ts < CACHE_TTL:
             return data
     try:
-        client = get_gs_client()
-        sp = client.open_by_key(SHEET_IDS[key])
-        gid = SHEET_GIDS.get(key)
-        # Buscar hoja por GID primero
-        ws = None
-        if gid is not None:
-            try:
-                ws = sp.get_worksheet_by_id(gid)
-            except Exception:
-                ws = None
-        # Fallback: primera hoja
-        if ws is None:
-            ws = sp.get_worksheet(0)
-        data = ws.get_all_records(numericise_ignore=['all'])
+        ws = get_worksheet(key)
+        rows = ws.get_all_values()
+        data = values_to_records(rows)
         _cache[key] = (data, now)
-        print(f"[OK] {key} -> {len(data)} filas desde '{ws.title}'")
+        print(f"[OK] {key} -> {len(data)} filas desde '{ws.title}' (gid={ws.id})")
         return data
     except Exception as e:
         print(f"[ERROR] get_data({key}): {e}")
@@ -100,6 +130,29 @@ def api_debug():
         except Exception as e:
             result[key] = {'error': str(e)}
     return jsonify(result)
+
+
+@app.route('/api/test/<key>')
+def api_test(key):
+    """Test directo de una hoja: muestra primeras 3 filas y encabezados"""
+    if key not in SHEET_IDS:
+        return jsonify({'error': 'key no válido'}), 400
+    try:
+        ws = get_worksheet(key)
+        rows = ws.get_all_values()
+        headers = rows[0] if rows else []
+        sample = rows[1:4] if len(rows) > 1 else []
+        records = values_to_records(rows)
+        return jsonify({
+            'worksheet': ws.title,
+            'gid': ws.id,
+            'total_rows_raw': len(rows),
+            'total_records': len(records),
+            'headers': headers,
+            'sample': sample,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 
 def str_val(v) -> str:
