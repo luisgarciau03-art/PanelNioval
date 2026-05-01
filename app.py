@@ -7,7 +7,9 @@ Deploy: Railway  |  Auth: GOOGLE_CREDENTIALS_JSON env var o archivo .json local
 from flask import Flask, jsonify, render_template_string, request
 import gspread
 from google.oauth2.service_account import Credentials
-import os, json, time
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+import os, json, time, io
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
@@ -35,8 +37,11 @@ SHEET_GIDS = {
 }
 
 _cache: dict = {}
-CACHE_TTL = 300  # 5 minutos
+CACHE_TTL = 300
 _gs_client = None
+_drive_service = None
+_pago_folder_id = None
+PAGO_FOLDER_NAME = 'NIOVAL_PAGOS'
 
 # ─── GOOGLE SHEETS ───────────────────────────────────────────────────────────
 def get_gs_client():
@@ -57,6 +62,49 @@ def get_gs_client():
         )
     _gs_client = gspread.authorize(creds)
     return _gs_client
+
+
+def get_drive_service():
+    global _drive_service
+    if _drive_service:
+        return _drive_service
+    scopes = [
+        'https://www.googleapis.com/auth/drive',
+        'https://www.googleapis.com/auth/spreadsheets',
+    ]
+    creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
+    if creds_json:
+        info = json.loads(creds_json)
+        creds = Credentials.from_service_account_info(info, scopes=scopes)
+    else:
+        creds = Credentials.from_service_account_file(
+            'bubbly-subject-412101-c969f4a975c5.json', scopes=scopes
+        )
+    _drive_service = build('drive', 'v3', credentials=creds)
+    return _drive_service
+
+
+def get_pago_folder_id():
+    """Crea o reutiliza la carpeta NIOVAL_PAGOS en Drive."""
+    global _pago_folder_id
+    if _pago_folder_id:
+        return _pago_folder_id
+    drive = get_drive_service()
+    # Buscar carpeta existente
+    q = f"name='{PAGO_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+    results = drive.files().list(q=q, fields='files(id,name)').execute()
+    files = results.get('files', [])
+    if files:
+        _pago_folder_id = files[0]['id']
+    else:
+        # Crear carpeta
+        meta = {'name': PAGO_FOLDER_NAME, 'mimeType': 'application/vnd.google-apps.folder'}
+        folder = drive.files().create(body=meta, fields='id').execute()
+        _pago_folder_id = folder['id']
+        # Hacerla accesible con link
+        drive.permissions().create(fileId=_pago_folder_id, body={'type': 'anyone', 'role': 'reader'}).execute()
+    print(f'[Drive] Carpeta PAGO: {_pago_folder_id}')
+    return _pago_folder_id
 
 
 def get_worksheet(key: str):
@@ -171,6 +219,74 @@ def api_refresh():
     else:
         _cache.pop(key, None)
     return jsonify({'ok': True})
+
+
+@app.route('/api/ventas/upload-pago', methods=['POST'])
+def upload_pago():
+    """Sube imagen de comprobante a Drive y actualiza la celda PAGO en el sheet."""
+    try:
+        num_factura = request.form.get('num_factura', '').strip()
+        if not num_factura:
+            return jsonify({'ok': False, 'error': 'num_factura requerido'}), 400
+        if 'imagen' not in request.files:
+            return jsonify({'ok': False, 'error': 'imagen requerida'}), 400
+
+        archivo = request.files['imagen']
+        nombre_archivo = f"PAGO_{num_factura}_{archivo.filename}"
+        contenido = archivo.read()
+        mimetype = archivo.mimetype or 'image/jpeg'
+
+        # 1. Subir a Google Drive
+        drive = get_drive_service()
+        folder_id = get_pago_folder_id()
+        meta = {'name': nombre_archivo, 'parents': [folder_id]}
+        media = MediaIoBaseUpload(io.BytesIO(contenido), mimetype=mimetype)
+        file_drive = drive.files().create(body=meta, media_body=media, fields='id').execute()
+        file_id = file_drive['id']
+
+        # Hacer público (acceso con link)
+        drive.permissions().create(fileId=file_id, body={'type': 'anyone', 'role': 'reader'}).execute()
+        url_drive = f'https://drive.google.com/file/d/{file_id}/view'
+        url_thumb = f'https://drive.google.com/thumbnail?id={file_id}&sz=w400'
+
+        # 2. Actualizar celda PAGO en el sheet Ventas
+        ws = get_worksheet('ventas')
+        rows = ws.get_all_values()
+        headers = rows[0] if rows else []
+
+        # Encontrar índices de columnas Num Factura y PAGO
+        try:
+            col_factura = headers.index('Num Factura') + 1  # 1-based
+        except ValueError:
+            col_factura = None
+        try:
+            col_pago = headers.index('PAGO') + 1
+        except ValueError:
+            col_pago = 13  # columna M por defecto
+
+        fila_actualizada = None
+        if col_factura:
+            for i, row in enumerate(rows[1:], start=2):
+                val = row[col_factura - 1] if len(row) >= col_factura else ''
+                if str(val).strip() == num_factura:
+                    ws.update_cell(i, col_pago, url_drive)
+                    fila_actualizada = i
+                    break
+
+        # Invalidar cache
+        _cache.pop('ventas', None)
+
+        return jsonify({
+            'ok': True,
+            'url': url_drive,
+            'thumb': url_thumb,
+            'file_id': file_id,
+            'fila': fila_actualizada,
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 @app.route('/api/prospectos/stats')
@@ -483,6 +599,8 @@ tr:hover td{background:var(--blue3)}
 .pag-info{font-size:.78em;color:#aaa}
 
 .section-header{font-size:1.05em;font-weight:700;color:var(--blue);margin-bottom:18px;padding-bottom:8px;border-bottom:2px solid var(--blue3)}
+.btn-upload-pago{background:var(--blue3);border:1px solid var(--blue);color:var(--blue);padding:3px 9px;border-radius:6px;cursor:pointer;font-size:.75em;font-weight:600;white-space:nowrap;transition:all .2s}
+.btn-upload-pago:hover{background:var(--blue);color:#fff}
 </style>
 </head>
 <body>
@@ -914,7 +1032,7 @@ function renderTable(key, tableId, pagId) {
   slice.forEach(row => {
     html += '<tr>' + sortedCols.map(c => {
       const v = row[c] !== undefined ? row[c] : '';
-      return `<td>${renderCell(c, String(v))}</td>`;
+      return `<td>${renderCell(c, String(v), row)}</td>`;
     }).join('') + '</tr>';
   });
   html += '</tbody></table>';
@@ -938,8 +1056,15 @@ function goPage(key, tableId, pagId, p) {
   renderTable(key, tableId, pagId);
 }
 
-function renderCell(col, val) {
-  if (!val || val === 'undefined') return '<span style="color:#ccc">—</span>';
+function renderCell(col, val, row) {
+  if (!val || val === 'undefined') {
+    // Columna PAGO vacía → mostrar botón de upload
+    if (col === 'PAGO' && row) {
+      const factura = row['Num Factura'] || '';
+      return `<button class="btn-upload-pago" onclick="abrirUpload('${factura}', this)" title="Subir comprobante">📎 Subir</button>`;
+    }
+    return '<span style="color:#ccc">—</span>';
+  }
   const colLow = col.toLowerCase();
   const valUp  = val.toUpperCase();
 
@@ -952,6 +1077,26 @@ function renderCell(col, val) {
   if (colLow.includes('estado') && (valUp.includes('BUZON') || valUp.includes('BUZÓN'))) return `<span class="tag buzon">Buzón</span>`;
   if (colLow.includes('estado') && valUp.includes('INCORRECTO')) return `<span class="tag tel-inc">Tel. Incorrecto</span>`;
   if (colLow.includes('estado') && valUp === 'RESPONDIO') return `<span class="tag aprobado">Respondió</span>`;
+
+  // Columna PAGO con imagen Drive
+  if (col === 'PAGO') {
+    if (val.startsWith('http')) {
+      const fileId = val.match(/\/d\/([^/]+)\//)?.[1] || '';
+      const thumb = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w120` : '';
+      const factura = row ? (row['Num Factura'] || '') : '';
+      return `<span style="display:flex;align-items:center;gap:6px">
+        ${thumb ? `<img src="${thumb}" style="height:40px;border-radius:4px;cursor:pointer;border:1px solid #dde" onclick="verImagen('${val}','${thumb}')" title="Ver imagen">` : ''}
+        <a href="${val}" target="_blank" style="color:var(--blue);font-size:.78em">Ver →</a>
+        <button class="btn-upload-pago" onclick="abrirUpload('${factura}', this)" title="Reemplazar">🔄</button>
+      </span>`;
+    }
+    // Es un nombre de archivo (no URL) → botón de upload
+    const factura = row ? (row['Num Factura'] || '') : '';
+    return `<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <span style="font-size:.75em;color:#888;max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${val}">${val.slice(0,20)}…</span>
+      <button class="btn-upload-pago" onclick="abrirUpload('${factura}', this)" title="Subir imagen">📎 Subir</button>
+    </span>`;
+  }
 
   if (val.startsWith('http')) return `<a href="${val}" target="_blank" style="color:var(--blue);font-size:.8em">Ver →</a>`;
   if (val.length > 80) return `<span title="${val.replace(/"/g,'&quot;')}">${val.slice(0,78)}…</span>`;
@@ -1065,9 +1210,144 @@ async function refreshData() {
   loadSection(state.currentSection);
 }
 
+// ─── UPLOAD PAGO ─────────────────────────────────────────────────────────────
+function abrirUpload(numFactura, btn) {
+  const modal = document.getElementById('modal-upload');
+  document.getElementById('upload-factura').value = numFactura;
+  document.getElementById('upload-preview').innerHTML = '';
+  document.getElementById('upload-status').textContent = '';
+  document.getElementById('upload-file').value = '';
+  document.getElementById('upload-factura-display').textContent = numFactura || '(sin factura)';
+  modal.style.display = 'flex';
+  state._uploadBtn = btn;
+}
+
+function cerrarUpload() {
+  document.getElementById('modal-upload').style.display = 'none';
+}
+
+function previewImagen(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('upload-preview').innerHTML =
+      `<img src="${e.target.result}" style="max-height:160px;border-radius:8px;border:1px solid #dde;margin-top:8px">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function subirComprobante() {
+  const fileInput = document.getElementById('upload-file');
+  const numFactura = document.getElementById('upload-factura').value;
+  const statusEl = document.getElementById('upload-status');
+  const btnSubir = document.getElementById('btn-subir');
+
+  if (!fileInput.files[0]) {
+    statusEl.textContent = '⚠️ Selecciona una imagen primero';
+    statusEl.style.color = 'orange';
+    return;
+  }
+
+  btnSubir.disabled = true;
+  statusEl.textContent = '⏳ Subiendo...';
+  statusEl.style.color = '#0047CC';
+
+  const form = new FormData();
+  form.append('imagen', fileInput.files[0]);
+  form.append('num_factura', numFactura);
+
+  try {
+    const res = await fetch('/api/ventas/upload-pago', { method: 'POST', body: form });
+    const data = await res.json();
+
+    if (data.ok) {
+      statusEl.textContent = '✅ Comprobante subido correctamente';
+      statusEl.style.color = 'green';
+      // Actualizar preview con la imagen de Drive
+      if (data.thumb) {
+        document.getElementById('upload-preview').innerHTML =
+          `<img src="${data.thumb}" style="max-height:160px;border-radius:8px;border:1px solid #dde;margin-top:8px">
+           <div style="margin-top:6px"><a href="${data.url}" target="_blank" style="color:var(--blue);font-size:.82em">Ver en Drive →</a></div>`;
+      }
+      // Actualizar celda en la tabla sin recargar todo
+      if (state._uploadBtn) {
+        const td = state._uploadBtn.closest('td');
+        if (td && data.url) {
+          const fileId = data.url.match(/\/d\/([^/]+)\//)?.[1] || '';
+          const thumb = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w120` : '';
+          td.innerHTML = `<span style="display:flex;align-items:center;gap:6px">
+            ${thumb ? `<img src="${thumb}" style="height:40px;border-radius:4px;cursor:pointer;border:1px solid #dde" onclick="verImagen('${data.url}','${thumb}')">` : ''}
+            <a href="${data.url}" target="_blank" style="color:var(--blue);font-size:.78em">Ver →</a>
+          </span>`;
+        }
+      }
+      // Invalidar cache
+      fetch('/api/refresh', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({key:'ventas'}) });
+      setTimeout(cerrarUpload, 2000);
+    } else {
+      statusEl.textContent = '❌ Error: ' + (data.error || 'desconocido');
+      statusEl.style.color = 'red';
+      btnSubir.disabled = false;
+    }
+  } catch (e) {
+    statusEl.textContent = '❌ Error de red: ' + e.message;
+    statusEl.style.color = 'red';
+    btnSubir.disabled = false;
+  }
+}
+
+function verImagen(url, thumb) {
+  const m = document.getElementById('modal-imagen');
+  document.getElementById('img-full').src = thumb || url;
+  document.getElementById('img-link').href = url;
+  m.style.display = 'flex';
+}
+
+function cerrarImagen() {
+  document.getElementById('modal-imagen').style.display = 'none';
+}
+
 // ─── INIT ────────────────────────────────────────────────────────────────────
 loadSection('dashboard');
 </script>
+
+<!-- MODAL UPLOAD COMPROBANTE -->
+<div id="modal-upload" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:18px;padding:32px;width:420px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="color:var(--blue);font-size:1.1em;font-weight:700">📎 Subir Comprobante de Pago</h2>
+      <button onclick="cerrarUpload()" style="background:none;border:none;font-size:1.4em;cursor:pointer;color:#aaa">✕</button>
+    </div>
+    <div style="background:var(--blue3);border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:.85em;color:var(--blue)">
+      Factura: <strong id="upload-factura-display"></strong>
+    </div>
+    <input type="hidden" id="upload-factura">
+    <label style="display:block;border:2px dashed #bcd;border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:border .2s"
+           onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='#bcd'">
+      <div style="font-size:2em;margin-bottom:8px">🖼️</div>
+      <div style="font-size:.9em;color:#666;margin-bottom:6px">Arrastra o haz clic para seleccionar</div>
+      <div style="font-size:.75em;color:#aaa">JPG, PNG, JPEG, WEBP</div>
+      <input type="file" id="upload-file" accept="image/*" style="display:none" onchange="previewImagen(this)">
+    </label>
+    <div id="upload-preview" style="text-align:center"></div>
+    <div id="upload-status" style="text-align:center;margin-top:10px;font-size:.85em;min-height:20px"></div>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button onclick="cerrarUpload()" style="flex:1;padding:11px;border:1px solid #dde;border-radius:10px;background:#fff;cursor:pointer;font-weight:600;color:#888">Cancelar</button>
+      <button id="btn-subir" onclick="subirComprobante()" style="flex:2;padding:11px;border:none;border-radius:10px;background:var(--blue);color:#fff;cursor:pointer;font-weight:700;font-size:.95em">⬆️ Subir Comprobante</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VER IMAGEN -->
+<div id="modal-imagen" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:14px" onclick="cerrarImagen()">
+  <img id="img-full" src="" style="max-width:90vw;max-height:80vh;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.5)" onclick="event.stopPropagation()">
+  <div style="display:flex;gap:14px">
+    <a id="img-link" href="#" target="_blank" onclick="event.stopPropagation()" style="background:#fff;color:var(--blue);padding:8px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.9em">Abrir en Drive →</a>
+    <button onclick="cerrarImagen()" style="background:rgba(255,255,255,.15);border:none;color:#fff;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.9em">✕ Cerrar</button>
+  </div>
+</div>
+
 </body>
 </html>"""
 
