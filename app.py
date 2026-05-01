@@ -553,24 +553,23 @@ tr:hover td{background:var(--blue3)}
       <div class="cards" id="frec-cards">
         <div class="loading"><div class="spinner"></div><br>Cargando...</div>
       </div>
-      <div class="charts">
-        <div class="chart-box full">
-          <h3>📦 Ventas por Período</h3>
-          <canvas id="chartVentasMes" height="100"></canvas>
-        </div>
-      </div>
       <div class="table-box">
-        <h3>⭐ Top Clientes Frecuentes</h3>
+        <h3>⭐ Clientes Frecuentes — Orden de Ingreso</h3>
+        <div class="table-controls">
+          <input type="text" id="frecuentes-search" placeholder="🔍 Buscar..." oninput="filterTable('frecuentes')">
+        </div>
         <div class="tbl-wrap" id="frec-top-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="pagination" id="frec-pag"></div>
       </div>
     </div>
 
     <!-- ═══ VENTAS ═══ -->
     <div class="section" id="sec-ventas">
       <div class="table-box">
-        <h3>💰 Registro de Ventas</h3>
+        <h3>💰 Ventas — Orden de Ingreso</h3>
         <div class="table-controls">
           <input type="text" id="ventas-search" placeholder="🔍 Buscar..." oninput="filterTable('ventas')">
+          <span id="ventas-count" style="font-size:.8em;color:#888;align-self:center;margin-left:4px"></span>
         </div>
         <div class="tbl-wrap" id="ventas-table"><div class="loading"><div class="spinner"></div></div></div>
         <div class="pagination" id="ventas-pag"></div>
@@ -701,7 +700,8 @@ async function loadSection(name) {
   switch(name) {
     case 'dashboard':   await loadDashboard(); break;
     case 'frecuentes':  await loadFrecuentes(); break;
-    case 'ventas':      await loadTableSection('ventas',      '/api/prospectos/ventas',      'ventas-table',      'ventas-pag',      ['ventas-search']); break;
+    // filterTable('frecuentes') → frec-top-table / frec-pag manejado en loadFrecuentes
+    case 'ventas':      await loadVentas(); break;
     case 'contactos':   await loadContactos(); break;
     case 'ciudades':    await loadCiudades(); break;
     case 'respuestas':  await loadTableSection('respuestas',  '/api/prospectos/respuestas',  'respuestas-table',  'respuestas-pag',  ['resp-search','resp-resultado']); break;
@@ -789,34 +789,36 @@ async function loadDashboard() {
 
 // ─── FRECUENTES ─────────────────────────────────────────────────────────────
 async function loadFrecuentes() {
-  const vs = await fetchAPI('/api/ventas/stats');
+  // Mostrar hoja FRECUENTES tal cual, en orden de ingreso (sin agrupación)
+  const data = await fetchAPI('/api/prospectos/frecuentes');
+  state.data['frecuentes'] = data;
+  state.filtered['frecuentes'] = data;
+  state.page['frecuentes'] = 1;
 
+  // KPIs simples
   document.getElementById('frec-cards').innerHTML = `
-    <div class="card"><div class="label">Total Ventas</div><div class="value">${vs.total_ventas}</div><div class="sub">Registros</div></div>
-    <div class="card green"><div class="label">Clientes Únicos</div><div class="value">${vs.clientes}</div><div class="sub">Diferentes</div></div>
+    <div class="card"><div class="label">Total Registros</div><div class="value">${data.length}</div><div class="sub">Clientes frecuentes</div></div>
   `;
 
-  // Chart ventas por mes
-  destroyChart('chartVentasMes');
-  const meses = vs.por_mes || [];
-  const ctxM = document.getElementById('chartVentasMes').getContext('2d');
-  charts['chartVentasMes'] = new Chart(ctxM, {
-    type: 'bar',
-    data: {
-      labels: meses.map(m => m.mes),
-      datasets: [{ label: 'Ventas', data: meses.map(m => m.total), backgroundColor: '#00CC47' }]
-    },
-    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-  });
+  // Ocultar chart box si existe
+  const chartBox = document.querySelector('#sec-frecuentes .chart-box');
+  if (chartBox) chartBox.style.display = 'none';
 
-  // Top clientes table
-  const top = vs.top_clientes || [];
-  let html = `<table><thead><tr><th>#</th><th>Cliente</th><th>Compras</th></tr></thead><tbody>`;
-  top.forEach(([cli, cnt], i) => {
-    html += `<tr><td>${i+1}</td><td>${cli}</td><td>${cnt}</td></tr>`;
-  });
-  html += '</tbody></table>';
-  document.getElementById('frec-top-table').innerHTML = html;
+  // Tabla directa en orden de ingreso (tal cual la hoja)
+  renderTable('frecuentes', 'frec-top-table', 'frec-pag');
+}
+
+// ─── VENTAS (orden cronológico de ingreso) ────────────────────────────────────
+async function loadVentas() {
+  const data = await fetchAPI('/api/prospectos/ventas');
+  // Mostrar en orden inverso: últimas entradas primero
+  const reversed = [...data].reverse();
+  state.data['ventas'] = reversed;
+  state.filtered['ventas'] = reversed;
+  state.page['ventas'] = 1;
+  const countEl = document.getElementById('ventas-count');
+  if (countEl) countEl.textContent = `${data.length} registros`;
+  renderTable('ventas', 'ventas-table', 'ventas-pag');
 }
 
 // ─── GENERIC TABLE ──────────────────────────────────────────────────────────
@@ -833,7 +835,7 @@ function filterTable(key) {
   let filtered = d;
 
   // Generic text search across all fields
-  const searchId = key === 'respuestas' ? 'resp-search' : key + '-search';
+  const searchId = key === 'respuestas' ? 'resp-search' : key === 'frecuentes' ? 'frecuentes-search' : key + '-search';
   const searchEl = document.getElementById(searchId);
   const q = searchEl ? searchEl.value.toLowerCase() : '';
   if (q) {
@@ -859,8 +861,9 @@ function filterTable(key) {
 
   state.filtered[key] = filtered;
   state.page[key] = 1;
-  const tableId  = key + '-table';
-  const pagId    = key + '-pag';
+  // frecuentes usa IDs distintos
+  const tableId = key === 'frecuentes' ? 'frec-top-table' : key + '-table';
+  const pagId   = key === 'frecuentes' ? 'frec-pag'       : key + '-pag';
   renderTable(key, tableId, pagId);
 }
 
