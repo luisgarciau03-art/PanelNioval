@@ -22,12 +22,13 @@ SHEET_IDS = {
     'mensajes':    '1oEtAiYaYVdOnEum3tbp_BminBUdj06JzXqJhaOVQFlk',
     'seguimiento': '1i0bWYQG7d5GVvOjuklZRpsg1bQfsScdY0bg7lytMXKM',
 }
-SHEET_NAMES = {
-    'ventas':      'Ventas',
-    'contactos':   'LISTA DE CONTACTOS',
-    'respuestas':  'Respuestas de formulario 1',
-    'mensajes':    'Mensajes',
-    'seguimiento': None,
+# GIDs directos de cada hoja (más confiable que nombres)
+SHEET_GIDS = {
+    'ventas':      1268382090,
+    'contactos':   823047163,
+    'respuestas':  1343998886,
+    'mensajes':    0,
+    'seguimiento': 258325319,
 }
 
 _cache: dict = {}
@@ -64,9 +65,20 @@ def get_data(key: str, force: bool = False) -> list:
     try:
         client = get_gs_client()
         sp = client.open_by_key(SHEET_IDS[key])
-        ws = sp.worksheet(SHEET_NAMES[key]) if SHEET_NAMES[key] else sp.get_worksheet(0)
-        data = ws.get_all_records()
+        gid = SHEET_GIDS.get(key)
+        # Buscar hoja por GID primero
+        ws = None
+        if gid is not None:
+            try:
+                ws = sp.get_worksheet_by_id(gid)
+            except Exception:
+                ws = None
+        # Fallback: primera hoja
+        if ws is None:
+            ws = sp.get_worksheet(0)
+        data = ws.get_all_records(numericise_ignore=['all'])
         _cache[key] = (data, now)
+        print(f"[OK] {key} -> {len(data)} filas desde '{ws.title}'")
         return data
     except Exception as e:
         print(f"[ERROR] get_data({key}): {e}")
@@ -74,6 +86,20 @@ def get_data(key: str, force: bool = False) -> list:
         if key in _cache:
             return _cache[key][0]
         return []
+
+
+@app.route('/api/debug')
+def api_debug():
+    """Lista todas las hojas disponibles en cada spreadsheet"""
+    result = {}
+    for key, sid in SHEET_IDS.items():
+        try:
+            client = get_gs_client()
+            sp = client.open_by_key(sid)
+            result[key] = [{'title': ws.title, 'id': ws.id, 'rows': ws.row_count} for ws in sp.worksheets()]
+        except Exception as e:
+            result[key] = {'error': str(e)}
+    return jsonify(result)
 
 
 def str_val(v) -> str:
