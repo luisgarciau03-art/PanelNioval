@@ -25,7 +25,7 @@ SHEET_IDS = {
 }
 # GIDs directos de cada hoja (más confiable que nombres)
 SHEET_GIDS = {
-    'ventas':      1509137423,  # Hoja 12 (5620 filas) — validar columnas
+    'ventas':      1268382090,  # Hoja "Ventas"
     'frecuentes':  1061706533,   # hoja FRECUENTES en spreadsheet contactos
     'contactos':   823047163,
     'respuestas':  1343998886,
