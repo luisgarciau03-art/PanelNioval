@@ -430,15 +430,9 @@ def api_mensajes():
 VENTAS_COLS = ['Fecha', 'Cliente', 'ESQUEMA', 'MES', 'Monto ', 'Monto', 'Envio Costo', 'Num Factura', 'Cotizacion PDF', 'PAGO']
 
 def filter_ventas_cols(data: list) -> list:
-    """Devuelve solo las columnas de ventas en el orden exacto definido.
-    Excluye filas de totales/resumen (sin Fecha ni Num Factura)."""
+    """Devuelve solo las columnas de ventas en el orden exacto definido."""
     result = []
     for row in data:
-        fecha = str(row.get('Fecha', '')).strip()
-        factura = str(row.get('Num Factura', '')).strip()
-        # Excluir filas de resumen/totales que no tienen ni fecha ni número de factura
-        if not fecha and not factura:
-            continue
         clean = {k: row[k] for k in VENTAS_COLS if k in row}
         if any(str(v).strip() for v in clean.values()):
             result.append(clean)
