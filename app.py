@@ -85,26 +85,22 @@ def get_drive_service():
 
 
 def get_pago_folder_id():
-    """Crea o reutiliza la carpeta NIOVAL_PAGOS en Drive."""
+    """Obtiene la carpeta NIOVAL_PAGOS desde env var (carpeta compartida del usuario)."""
     global _pago_folder_id
     if _pago_folder_id:
         return _pago_folder_id
-    drive = get_drive_service()
-    # Buscar carpeta existente
-    q = f"name='{PAGO_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-    results = drive.files().list(q=q, fields='files(id,name)').execute()
-    files = results.get('files', [])
-    if files:
-        _pago_folder_id = files[0]['id']
-    else:
-        # Crear carpeta
-        meta = {'name': PAGO_FOLDER_NAME, 'mimeType': 'application/vnd.google-apps.folder'}
-        folder = drive.files().create(body=meta, fields='id').execute()
-        _pago_folder_id = folder['id']
-        # Hacerla accesible con link
-        drive.permissions().create(fileId=_pago_folder_id, body={'type': 'anyone', 'role': 'reader'}).execute()
-    print(f'[Drive] Carpeta PAGO: {_pago_folder_id}')
-    return _pago_folder_id
+    # Leer desde variable de entorno (carpeta de Drive del usuario compartida con la cuenta de servicio)
+    folder_id = os.environ.get('PAGO_FOLDER_ID', '').strip()
+    if folder_id:
+        _pago_folder_id = folder_id
+        print(f'[Drive] Carpeta PAGO desde env: {_pago_folder_id}')
+        return _pago_folder_id
+    raise ValueError(
+        'PAGO_FOLDER_ID no configurado. '
+        'Crea una carpeta en tu Google Drive, compártela con '
+        'maps-905@bubbly-subject-412101.iam.gserviceaccount.com (Editor) '
+        'y agrega el ID de la carpeta como variable PAGO_FOLDER_ID en Railway.'
+    )
 
 
 def get_worksheet(key: str):
@@ -289,16 +285,26 @@ def upload_pago():
         contenido = archivo.read()
         mimetype = archivo.mimetype or 'image/jpeg'
 
-        # 1. Subir a Google Drive
+        # 1. Subir a Google Drive (carpeta compartida del usuario)
         drive = get_drive_service()
         folder_id = get_pago_folder_id()
         meta = {'name': nombre_archivo, 'parents': [folder_id]}
         media = MediaIoBaseUpload(io.BytesIO(contenido), mimetype=mimetype)
-        file_drive = drive.files().create(body=meta, media_body=media, fields='id').execute()
+        file_drive = drive.files().create(
+            body=meta, media_body=media, fields='id',
+            supportsAllDrives=True
+        ).execute()
         file_id = file_drive['id']
 
         # Hacer público (acceso con link)
-        drive.permissions().create(fileId=file_id, body={'type': 'anyone', 'role': 'reader'}).execute()
+        try:
+            drive.permissions().create(
+                fileId=file_id,
+                body={'type': 'anyone', 'role': 'reader'},
+                supportsAllDrives=True
+            ).execute()
+        except Exception:
+            pass  # En Shared Drives los permisos los hereda la carpeta
         url_drive = f'https://drive.google.com/file/d/{file_id}/view'
         url_thumb = f'https://drive.google.com/thumbnail?id={file_id}&sz=w400'
 
