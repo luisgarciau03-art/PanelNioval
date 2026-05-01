@@ -1089,11 +1089,11 @@ function renderCell(col, val, row) {
         <a href="${val}" target="_blank" style="color:var(--blue);font-size:.78em">🔍 Abrir</a>
       </span>`;
     }
-    // Solo tiene nombre de archivo (sin URL) → mostrar nombre + botón subir para convertir a Drive
+    // Solo tiene nombre de archivo (sin URL) → debe subirse a Drive para poder verse
     const factura = row ? (row['Num Factura'] || '') : '';
     return `<span style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-      <span style="font-size:.75em;color:#888;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${val}">🖼️ ${val.slice(0,18)}…</span>
-      <button class="btn-upload-pago" onclick="abrirUpload('${factura}',this)" title="Subir para poder abrir">📎 Subir</button>
+      <span style="font-size:.72em;color:#e67e22;font-weight:600" title="Imagen guardada localmente — súbela a Drive para poder abrirla">⚠️ Sin subir</span>
+      <button class="btn-upload-pago" onclick="abrirUpload('${factura}',this)" title="${val}">📤 Subir imagen</button>
     </span>`;
   }
 
@@ -1317,6 +1317,9 @@ loadSection('dashboard');
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
       <h2 style="color:var(--blue);font-size:1.1em;font-weight:700">📎 Subir Comprobante de Pago</h2>
       <button onclick="cerrarUpload()" style="background:none;border:none;font-size:1.4em;cursor:pointer;color:#aaa">✕</button>
+    </div>
+    <div style="background:#fff8e6;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:.82em;color:#856404;border:1px solid #ffc107">
+      ⚠️ La imagen está guardada solo en tu dispositivo. Súbela aquí para poder verla desde el panel.
     </div>
     <div style="background:var(--blue3);border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:.85em;color:var(--blue)">
       Factura: <strong id="upload-factura-display"></strong>
