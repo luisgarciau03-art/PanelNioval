@@ -17,6 +17,7 @@ app = Flask(__name__)
 # ─── CONFIG ─────────────────────────────────────────────────────────────────
 SHEET_IDS = {
     'ventas':      '1Dlpm6swrNSPnt9L5tQhoi2OMln0bb8bqqgeLACNos98',
+    'frecuentes':  '1wgEentS16hJrcf6YdEnSpEBcp4SCBJ9TkOCZY439jV4',  # hoja FRECUENTES dentro del mismo sheet de contactos
     'contactos':   '1wgEentS16hJrcf6YdEnSpEBcp4SCBJ9TkOCZY439jV4',
     'respuestas':  '1U_z1KNqCxSRZVi7wvO2FQH4zIdS_wxuafxj6YHdHEqg',
     'mensajes':    '1oEtAiYaYVdOnEum3tbp_BminBUdj06JzXqJhaOVQFlk',
@@ -25,6 +26,7 @@ SHEET_IDS = {
 # GIDs directos de cada hoja (más confiable que nombres)
 SHEET_GIDS = {
     'ventas':      1268382090,
+    'frecuentes':  1061706533,   # hoja FRECUENTES en spreadsheet contactos
     'contactos':   823047163,
     'respuestas':  1343998886,
     'mensajes':    0,
@@ -68,7 +70,8 @@ def get_worksheet(key: str):
                 return ws
     # 2. Por nombre
     NAMES = {
-        'ventas': 'Ventas', 'contactos': 'LISTA DE CONTACTOS',
+        'ventas': 'Ventas', 'frecuentes': 'FRECUENTES',
+        'contactos': 'LISTA DE CONTACTOS',
         'respuestas': 'Respuestas de formulario 1',
         'mensajes': 'Mensajes', 'seguimiento': 'Seguimiento',
     }
@@ -176,29 +179,34 @@ def api_stats():
 
     total_contactos = len(contactos)
 
-    # Conteos de respuestas por resultado (columna S / 'Resultado' o columna J)
+    # Columnas reales del sheet de respuestas:
+    # "Compatible" = Resultado (col S): APROBADO, NEGADO, NO COMPATIBLE, MARCA UNICA
+    # "Respondio"  = Estado llamada (col T): Respondio, Buzon, Telefono Incorrecto
+    # "Conclusión" = cierre de llamada: Pedido, Revisara el Catalogo, Correo, etc.
+    # "Marca temporal" = fecha
     resultados = Counter()
     estados_llamada = Counter()
+    conclusiones = Counter()
     por_semana: dict = defaultdict(int)
 
     for r in respuestas:
-        res = str_val(r.get('Resultado', r.get('resultado', ''))).upper()
+        res = str_val(r.get('Compatible', r.get('Resultado', ''))).upper()
         if res:
             resultados[res] += 1
-        estado = str_val(r.get('Estado de llamada', r.get('Estado', ''))).upper()
-        if not estado:
-            # intentar columna T (índice 19)
-            vals = list(r.values())
-            estado = str_val(vals[19]).upper() if len(vals) > 19 else ''
+
+        estado = str_val(r.get('Respondio', r.get('Estado de llamada', ''))).strip()
         if estado:
             estados_llamada[estado] += 1
 
-        # Agrupar por semana
-        fecha_str = str_val(r.get('Fecha_Hora', r.get('Marca temporal', '')))
+        conclusion = str_val(r.get('Conclusión', r.get('Conclusion', ''))).strip()
+        if conclusion:
+            conclusiones[conclusion] += 1
+
+        fecha_str = str_val(r.get('Marca temporal', r.get('Fecha_Hora', '')))
         if fecha_str:
-            for fmt in ('%d/%m/%Y %H:%M:%S', '%d/%m/%Y', '%Y-%m-%d %H:%M:%S', '%m/%d/%Y %H:%M:%S'):
+            for fmt in ('%m/%d/%Y', '%d/%m/%Y %H:%M:%S', '%d/%m/%Y', '%Y-%m-%d'):
                 try:
-                    dt = datetime.strptime(fecha_str[:16], fmt[:16])
+                    dt = datetime.strptime(fecha_str[:10], fmt[:10])
                     semana = f"S{dt.isocalendar()[1]:02d}/{dt.year}"
                     por_semana[semana] += 1
                     break
@@ -210,7 +218,7 @@ def api_stats():
     # Ciudades en contactos
     ciudades_contactos = Counter()
     for c in contactos:
-        ciudad = str_val(c.get('Ciudad', c.get('ciudad', c.get('CIUDAD', '')))).title()
+        ciudad = str_val(c.get('CIUDAD', c.get('Ciudad', c.get('ciudad', '')))).title()
         if ciudad:
             ciudades_contactos[ciudad] += 1
 
@@ -219,6 +227,7 @@ def api_stats():
         'total_respuestas': len(respuestas),
         'resultados': dict(resultados),
         'estados_llamada': dict(estados_llamada),
+        'conclusiones': dict(conclusiones),
         'por_semana': [{'semana': s, 'total': n} for s, n in semanas_sorted],
         'top_ciudades': ciudades_contactos.most_common(10),
     })
@@ -238,7 +247,8 @@ def api_respuestas():
 
 @app.route('/api/prospectos/ventas')
 def api_ventas():
-    data = get_data('ventas')
+    # Ventas está vacío — devuelve frecuentes como alternativa
+    data = get_data('frecuentes')
     return jsonify(data)
 
 
@@ -248,19 +258,24 @@ def api_mensajes():
     return jsonify(data)
 
 
+@app.route('/api/prospectos/frecuentes')
+def api_frecuentes():
+    data = get_data('frecuentes')
+    return jsonify(data)
+
+
 @app.route('/api/prospectos/ciudades')
 def api_ciudades():
     contactos = get_data('contactos')
     respuestas = get_data('respuestas')
 
-    # Agrupar respuestas por tienda (nombre)
+    # Columnas reales: "Nombre De la Tienda", "Compatible" (resultado), "Respondio" (estado)
     resp_por_tienda: dict = {}
     for r in respuestas:
-        nombre = str_val(r.get('TIENDA', r.get('Tienda', ''))).strip().upper()
+        nombre = str_val(r.get('Nombre De la Tienda', r.get('TIENDA', r.get('Tienda', '')))).strip().upper()
         if nombre:
             resp_por_tienda[nombre] = r
 
-    # Calcular métricas por ciudad
     ciudades: dict = defaultdict(lambda: {
         'total': 0, 'llamados': 0, 'aprobados': 0,
         'buzon': 0, 'tel_incorrecto': 0, 'negados': 0,
@@ -268,7 +283,7 @@ def api_ciudades():
     })
 
     for c in contactos:
-        ciudad = str_val(c.get('Ciudad', c.get('ciudad', c.get('CIUDAD', '')))).title().strip()
+        ciudad = str_val(c.get('CIUDAD', c.get('Ciudad', c.get('ciudad', '')))).title().strip()
         if not ciudad:
             ciudad = 'Sin ciudad'
         nombre = str_val(c.get('TIENDA', c.get('Tienda', c.get('Nombre', '')))).strip().upper()
@@ -277,13 +292,13 @@ def api_ciudades():
         if nombre in resp_por_tienda:
             r = resp_por_tienda[nombre]
             ciudades[ciudad]['llamados'] += 1
-            res = str_val(r.get('Resultado', '')).upper()
-            estado = str_val(r.get('Estado de llamada', '')).upper()
+            res    = str_val(r.get('Compatible', '')).upper()   # col S = resultado
+            estado = str_val(r.get('Respondio', '')).strip()    # col T = estado llamada
             if res == 'APROBADO':
                 ciudades[ciudad]['aprobados'] += 1
-            elif 'BUZON' in estado or 'BUZÓN' in estado:
+            elif 'BUZON' in estado.upper() or 'BUZÓN' in estado.upper():
                 ciudades[ciudad]['buzon'] += 1
-            elif 'INCORRECTO' in estado:
+            elif 'INCORRECTO' in estado.upper():
                 ciudades[ciudad]['tel_incorrecto'] += 1
             elif res == 'NEGADO':
                 ciudades[ciudad]['negados'] += 1
@@ -295,11 +310,7 @@ def api_ciudades():
     result = []
     for ciudad, m in ciudades.items():
         interes = round(m['aprobados'] / m['llamados'] * 100, 1) if m['llamados'] > 0 else 0
-        result.append({
-            'ciudad': ciudad,
-            **m,
-            'interes_pct': interes,
-        })
+        result.append({'ciudad': ciudad, **m, 'interes_pct': interes})
 
     result.sort(key=lambda x: (x['aprobados'], x['interes_pct']), reverse=True)
     return jsonify(result)
