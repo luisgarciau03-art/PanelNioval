@@ -1078,19 +1078,23 @@ function renderCell(col, val, row) {
   if (colLow.includes('estado') && valUp.includes('INCORRECTO')) return `<span class="tag tel-inc">Tel. Incorrecto</span>`;
   if (colLow.includes('estado') && valUp === 'RESPONDIO') return `<span class="tag aprobado">Respondió</span>`;
 
-  // Columna PAGO — si tiene CUALQUIER valor, no permitir subir
+  // Columna PAGO
   if (col === 'PAGO') {
     if (val.startsWith('http')) {
-      // URL de Drive → thumbnail + ver
+      // Ya tiene URL de Drive → solo ver, NO subir
       const fileId = val.match(/\/d\/([^/]+)\//)?.[1] || '';
       const thumb = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w120` : '';
       return `<span style="display:flex;align-items:center;gap:6px">
         ${thumb ? `<img src="${thumb}" style="height:40px;border-radius:4px;cursor:pointer;border:1px solid #dde" onclick="verImagen('${val}','${thumb}')" title="Ver imagen">` : ''}
-        <a href="${val}" target="_blank" style="color:var(--blue);font-size:.78em">Ver →</a>
+        <a href="${val}" target="_blank" style="color:var(--blue);font-size:.78em">🔍 Abrir</a>
       </span>`;
     }
-    // Nombre de archivo u otro valor → solo mostrar texto, SIN botón subir
-    return `<span style="font-size:.78em;color:#555;max-width:140px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${val}">🖼️ ${val}</span>`;
+    // Solo tiene nombre de archivo (sin URL) → mostrar nombre + botón subir para convertir a Drive
+    const factura = row ? (row['Num Factura'] || '') : '';
+    return `<span style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+      <span style="font-size:.75em;color:#888;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${val}">🖼️ ${val.slice(0,18)}…</span>
+      <button class="btn-upload-pago" onclick="abrirUpload('${factura}',this)" title="Subir para poder abrir">📎 Subir</button>
+    </span>`;
   }
 
   if (val.startsWith('http')) return `<a href="${val}" target="_blank" style="color:var(--blue);font-size:.8em">Ver →</a>`;
