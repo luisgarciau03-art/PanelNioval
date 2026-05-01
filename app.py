@@ -25,7 +25,7 @@ SHEET_IDS = {
 }
 # GIDs directos de cada hoja (más confiable que nombres)
 SHEET_GIDS = {
-    'ventas':      1268382090,
+    'ventas':      1509137423,  # Hoja 12 (5620 filas) — validar columnas
     'frecuentes':  1061706533,   # hoja FRECUENTES en spreadsheet contactos
     'contactos':   823047163,
     'respuestas':  1343998886,
@@ -247,9 +247,8 @@ def api_respuestas():
 
 @app.route('/api/prospectos/ventas')
 def api_ventas():
-    # Ventas está vacío — devuelve frecuentes como alternativa
-    data = get_data('frecuentes')
-    return jsonify(data)
+    data = get_data('ventas')
+    return jsonify(filter_ventas_cols(data))
 
 
 @app.route('/api/prospectos/mensajes')
@@ -258,17 +257,23 @@ def api_mensajes():
     return jsonify(data)
 
 
+VENTAS_COLS = ['Fecha', 'Cliente', 'ESQUEMA', 'MES', 'Monto ', 'Monto', 'Envio Costo', 'Num Factura', 'Cotizacion PDF', 'PAGO']
+
+def filter_ventas_cols(data: list) -> list:
+    """Devuelve solo las columnas de ventas en el orden exacto definido."""
+    result = []
+    for row in data:
+        # Solo columnas que existan en VENTAS_COLS, en ese orden
+        clean = {k: row[k] for k in VENTAS_COLS if k in row}
+        if any(str(v).strip() for v in clean.values()):
+            result.append(clean)
+    return result
+
+
 @app.route('/api/prospectos/frecuentes')
 def api_frecuentes():
     data = get_data('frecuentes')
-    # Filtrar solo columnas relevantes y eliminar duplicadas/vacías
-    COLS = ['Fecha', 'Cliente', 'ESQUEMA', 'MES', 'Monto ', 'Monto', 'Envio Costo', 'Num Factura', 'Cotizacion PDF', 'PAGO']
-    result = []
-    for row in data:
-        clean = {k: v for k, v in row.items() if k in COLS or (k.strip() and k not in ['VACIO', 'COUNTA de Cliente', 'SUM de Monto ', 'Ultima Compra'])}
-        if any(v for v in clean.values()):  # ignorar filas vacías
-            result.append(clean)
-    return jsonify(result)
+    return jsonify(filter_ventas_cols(data))
 
 
 @app.route('/api/prospectos/ciudades')
