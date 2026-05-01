@@ -221,6 +221,59 @@ def api_refresh():
     return jsonify({'ok': True})
 
 
+@app.route('/api/ventas/buscar-imagen')
+def buscar_imagen_drive():
+    """Busca en Drive un archivo por nombre exacto y devuelve su URL."""
+    nombre = request.args.get('nombre', '').strip()
+    if not nombre:
+        return jsonify({'encontrado': False})
+    try:
+        drive = get_drive_service()
+        nombre_safe = nombre.replace("'", "\\'")
+        q = f"name='{nombre_safe}' and trashed=false"
+        results = drive.files().list(q=q, fields='files(id,name,mimeType)', pageSize=1).execute()
+        files = results.get('files', [])
+        if files:
+            fid = files[0]['id']
+            # Hacer público si no lo es
+            try:
+                drive.permissions().create(fileId=fid, body={'type': 'anyone', 'role': 'reader'}).execute()
+            except Exception:
+                pass
+            url = f'https://drive.google.com/file/d/{fid}/view'
+            thumb = f'https://drive.google.com/thumbnail?id={fid}&sz=w400'
+            return jsonify({'encontrado': True, 'url': url, 'thumb': thumb, 'file_id': fid})
+        return jsonify({'encontrado': False})
+    except Exception as e:
+        return jsonify({'encontrado': False, 'error': str(e)})
+
+
+@app.route('/api/ventas/update-pago-url', methods=['POST'])
+def update_pago_url():
+    """Actualiza la celda PAGO con una URL ya existente en Drive."""
+    try:
+        num_factura = request.form.get('num_factura', '').strip()
+        url = request.form.get('url_existente', '').strip()
+        if not num_factura or not url:
+            return jsonify({'ok': False})
+        ws = get_worksheet('ventas')
+        rows = ws.get_all_values()
+        headers = rows[0] if rows else []
+        try:
+            col_factura = headers.index('Num Factura') + 1
+            col_pago    = headers.index('PAGO') + 1
+        except ValueError:
+            return jsonify({'ok': False, 'error': 'columnas no encontradas'})
+        for i, row in enumerate(rows[1:], start=2):
+            if str(row[col_factura - 1]).strip() == num_factura:
+                ws.update_cell(i, col_pago, url)
+                _cache.pop('ventas', None)
+                return jsonify({'ok': True})
+        return jsonify({'ok': False, 'error': 'factura no encontrada'})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
 @app.route('/api/ventas/upload-pago', methods=['POST'])
 def upload_pago():
     """Sube imagen de comprobante a Drive y actualiza la celda PAGO en el sheet."""
@@ -1089,11 +1142,12 @@ function renderCell(col, val, row) {
         <a href="${val}" target="_blank" style="color:var(--blue);font-size:.78em">🔍 Abrir</a>
       </span>`;
     }
-    // Solo tiene nombre de archivo (sin URL) → debe subirse a Drive para poder verse
+    // Tiene nombre de archivo pero no URL — buscar en Drive o subir
     const factura = row ? (row['Num Factura'] || '') : '';
-    return `<span style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-      <span style="font-size:.72em;color:#e67e22;font-weight:600" title="Imagen guardada localmente — súbela a Drive para poder abrirla">⚠️ Sin subir</span>
-      <button class="btn-upload-pago" onclick="abrirUpload('${factura}',this)" title="${val}">📤 Subir imagen</button>
+    const nombreEnc = encodeURIComponent(val);
+    return `<span style="display:flex;align-items:center;gap:5px;flex-wrap:wrap" id="pago-cell-${factura}">
+      <button class="btn-upload-pago" style="background:#e8f5e9;border-color:#00CC47;color:#155724" onclick="buscarEnDrive('${nombreEnc}','${factura}')" title="Buscar imagen en Google Drive">🔍 Buscar</button>
+      <button class="btn-upload-pago" onclick="abrirUpload('${factura}',this)" title="Subir imagen desde tu dispositivo">📤 Subir</button>
     </span>`;
   }
 
@@ -1209,6 +1263,39 @@ async function refreshData() {
   loadSection(state.currentSection);
 }
 
+// ─── BUSCAR IMAGEN EN DRIVE ──────────────────────────────────────────────────
+async function buscarEnDrive(nombreEnc, factura) {
+  const cell = document.getElementById(`pago-cell-${factura}`);
+  if (cell) cell.innerHTML = '<span style="font-size:.78em;color:#888">🔍 Buscando...</span>';
+
+  try {
+    const res = await fetch(`/api/ventas/buscar-imagen?nombre=${nombreEnc}`);
+    const data = await res.json();
+
+    if (data.encontrado) {
+      // Actualizar celda visualmente
+      if (cell) {
+        cell.innerHTML = `<span style="display:flex;align-items:center;gap:6px">
+          <img src="${data.thumb}" style="height:40px;border-radius:4px;cursor:pointer;border:1px solid #dde" onclick="verImagen('${data.url}','${data.thumb}')">
+          <a href="${data.url}" target="_blank" style="color:var(--blue);font-size:.78em">🔍 Abrir</a>
+        </span>`;
+      }
+      // Actualizar el sheet con la URL encontrada
+      const form = new FormData();
+      form.append('num_factura', factura);
+      form.append('url_existente', data.url);
+      await fetch('/api/ventas/update-pago-url', { method: 'POST', body: form });
+    } else {
+      if (cell) cell.innerHTML = `<span style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:.72em;color:#888">No en Drive</span>
+        <button class="btn-upload-pago" onclick="abrirUpload('${factura}',this)">📤 Subir</button>
+      </span>`;
+    }
+  } catch(e) {
+    if (cell) cell.innerHTML = `<button class="btn-upload-pago" onclick="abrirUpload('${factura}',this)">📤 Subir</button>`;
+  }
+}
+
 // ─── UPLOAD PAGO ─────────────────────────────────────────────────────────────
 function abrirUpload(numFactura, btn) {
   const modal = document.getElementById('modal-upload');
@@ -1317,9 +1404,6 @@ loadSection('dashboard');
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
       <h2 style="color:var(--blue);font-size:1.1em;font-weight:700">📎 Subir Comprobante de Pago</h2>
       <button onclick="cerrarUpload()" style="background:none;border:none;font-size:1.4em;cursor:pointer;color:#aaa">✕</button>
-    </div>
-    <div style="background:#fff8e6;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:.82em;color:#856404;border:1px solid #ffc107">
-      ⚠️ La imagen está guardada solo en tu dispositivo. Súbela aquí para poder verla desde el panel.
     </div>
     <div style="background:var(--blue3);border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:.85em;color:var(--blue)">
       Factura: <strong id="upload-factura-display"></strong>
