@@ -1141,12 +1141,11 @@ function renderCell(col, val, row) {
         <a href="${val}" target="_blank" style="color:var(--blue);font-size:.78em">🔍 Abrir</a>
       </span>`;
     }
-    // Tiene nombre de archivo pero no URL — buscar en Drive o subir
+    // Tiene nombre de archivo pero no URL → solo subir
     const factura = row ? (row['Num Factura'] || '') : '';
-    const nombreEnc = encodeURIComponent(val);
-    return `<span style="display:flex;align-items:center;gap:5px;flex-wrap:wrap" id="pago-cell-${factura}">
-      <button class="btn-upload-pago" style="background:#e8f5e9;border-color:#00CC47;color:#155724" onclick="buscarEnDrive('${nombreEnc}','${factura}')" title="Buscar imagen en Google Drive">🔍 Buscar</button>
-      <button class="btn-upload-pago" onclick="abrirUpload('${factura}',this)" title="Subir imagen desde tu dispositivo">📤 Subir</button>
+    return `<span style="display:flex;align-items:center;gap:5px" id="pago-cell-${factura}">
+      <span style="font-size:.72em;color:#999;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${val}">🖼 ${val.slice(0,14)}…</span>
+      <button class="btn-upload-pago" onclick="abrirUpload('${factura}',this)" title="Subir comprobante a Drive">📤 Subir</button>
     </span>`;
   }
 
