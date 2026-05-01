@@ -1078,10 +1078,10 @@ function renderCell(col, val, row) {
   if (colLow.includes('estado') && valUp.includes('INCORRECTO')) return `<span class="tag tel-inc">Tel. Incorrecto</span>`;
   if (colLow.includes('estado') && valUp === 'RESPONDIO') return `<span class="tag aprobado">Respondió</span>`;
 
-  // Columna PAGO con imagen Drive
+  // Columna PAGO — si tiene CUALQUIER valor, no permitir subir
   if (col === 'PAGO') {
     if (val.startsWith('http')) {
-      // Ya tiene imagen — solo ver, NO permite subir
+      // URL de Drive → thumbnail + ver
       const fileId = val.match(/\/d\/([^/]+)\//)?.[1] || '';
       const thumb = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w120` : '';
       return `<span style="display:flex;align-items:center;gap:6px">
@@ -1089,12 +1089,8 @@ function renderCell(col, val, row) {
         <a href="${val}" target="_blank" style="color:var(--blue);font-size:.78em">Ver →</a>
       </span>`;
     }
-    // Tiene nombre de archivo pero no URL → permitir subir
-    const factura = row ? (row['Num Factura'] || '') : '';
-    return `<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-      <span style="font-size:.75em;color:#888;max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${val}">${val.slice(0,20)}…</span>
-      <button class="btn-upload-pago" onclick="abrirUpload('${factura}', this)" title="Subir imagen">📎 Subir</button>
-    </span>`;
+    // Nombre de archivo u otro valor → solo mostrar texto, SIN botón subir
+    return `<span style="font-size:.78em;color:#555;max-width:140px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${val}">🖼️ ${val}</span>`;
   }
 
   if (val.startsWith('http')) return `<a href="${val}" target="_blank" style="color:var(--blue);font-size:.8em">Ver →</a>`;
