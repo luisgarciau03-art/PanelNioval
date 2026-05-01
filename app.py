@@ -1135,10 +1135,11 @@ function renderCell(col, val, row) {
     if (val.startsWith('http')) {
       // Ya tiene URL de Drive → solo ver, NO subir
       const fileId = val.match(/\/d\/([^/]+)\//)?.[1] || '';
-      const thumb = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w120` : '';
+      const thumb  = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w120` : '';
+      const full   = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200` : val;
       return `<span style="display:flex;align-items:center;gap:6px">
-        ${thumb ? `<img src="${thumb}" style="height:40px;border-radius:4px;cursor:pointer;border:1px solid #dde" onclick="verImagen('${val}','${thumb}')" title="Ver imagen">` : ''}
-        <a href="${val}" target="_blank" style="color:var(--blue);font-size:.78em">🔍 Abrir</a>
+        ${thumb ? `<img src="${thumb}" class="pago-thumb" data-full="${full}" data-link="${val}" style="height:40px;border-radius:4px;cursor:pointer;border:2px solid #0047CC" title="Clic para abrir">` : ''}
+        <a href="${val}" target="_blank" style="color:var(--blue);font-size:.78em;font-weight:600">🔍 Abrir</a>
       </span>`;
     }
     // Tiene nombre de archivo pero no URL → solo subir
@@ -1381,9 +1382,13 @@ async function subirComprobante() {
   }
 }
 
-function verImagen(url, thumb) {
-  const m = document.getElementById('modal-imagen');
-  document.getElementById('img-full').src = thumb || url;
+function verImagen(url, full) {
+  const m   = document.getElementById('modal-imagen');
+  const img = document.getElementById('img-full');
+  img.src = '';
+  img.style.opacity = '0';
+  img.onload = () => { img.style.transition = 'opacity .3s'; img.style.opacity = '1'; };
+  img.src = full || url;
   document.getElementById('img-link').href = url;
   m.style.display = 'flex';
 }
@@ -1391,6 +1396,15 @@ function verImagen(url, thumb) {
 function cerrarImagen() {
   document.getElementById('modal-imagen').style.display = 'none';
 }
+
+// ─── LISTENER GLOBAL THUMBNAILS PAGO ────────────────────────────────────────
+document.addEventListener('click', function(e) {
+  const img = e.target.closest('.pago-thumb');
+  if (!img) return;
+  const full = img.getAttribute('data-full');
+  const link = img.getAttribute('data-link');
+  if (full || link) verImagen(link, full);
+});
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 loadSection('dashboard');
