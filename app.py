@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 import traceback
 
 app = Flask(__name__)
+app.json.sort_keys = False  # preservar orden de columnas tal cual se definen
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────
 SHEET_IDS = {
