@@ -481,6 +481,20 @@ def api_clientes_frecuentes():
         if fecha and fecha > clientes[cliente]['ultimo_pedido']:
             clientes[cliente]['ultimo_pedido'] = fecha
 
+    MESES_ES = {
+        1:'Enero', 2:'Febrero', 3:'Marzo', 4:'Abril', 5:'Mayo', 6:'Junio',
+        7:'Julio', 8:'Agosto', 9:'Septiembre', 10:'Octubre', 11:'Noviembre', 12:'Diciembre'
+    }
+
+    def fecha_a_mes(f):
+        for fmt in ('%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d'):
+            try:
+                dt = datetime.strptime(f[:10], fmt)
+                return f"{MESES_ES[dt.month]} {dt.year}"
+            except:
+                pass
+        return f
+
     result = []
     for nombre, d in clientes.items():
         result.append({
@@ -488,7 +502,7 @@ def api_clientes_frecuentes():
             'Esquema':       d['esquema'],
             'Pedidos':       d['num_pedidos'],
             'Total Monto':   round(d['total_monto'], 2),
-            'Ultimo Pedido': d['ultimo_pedido'],
+            'Ultimo Pedido': fecha_a_mes(d['ultimo_pedido']) if d['ultimo_pedido'] else '—',
         })
 
     result.sort(key=lambda x: x['Total Monto'], reverse=True)
