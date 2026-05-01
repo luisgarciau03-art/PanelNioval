@@ -9,7 +9,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-import os, json, time, io
+import os, json, time, io, base64, requests as req_lib
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
@@ -285,28 +285,23 @@ def upload_pago():
         contenido = archivo.read()
         mimetype = archivo.mimetype or 'image/jpeg'
 
-        # 1. Subir a Google Drive (carpeta compartida del usuario)
-        drive = get_drive_service()
-        folder_id = get_pago_folder_id()
-        meta = {'name': nombre_archivo, 'parents': [folder_id]}
-        media = MediaIoBaseUpload(io.BytesIO(contenido), mimetype=mimetype)
-        file_drive = drive.files().create(
-            body=meta, media_body=media, fields='id',
-            supportsAllDrives=True
-        ).execute()
-        file_id = file_drive['id']
+        # 1. Subir a ImgBB (hosting gratuito, evita limite de cuota de Drive)
+        imgbb_key = os.environ.get('IMGBB_API_KEY', '').strip()
+        if not imgbb_key:
+            return jsonify({'ok': False, 'error': 'IMGBB_API_KEY no configurado. Obtén una key gratuita en imgbb.com/api y agrégala en Railway.'}), 500
 
-        # Hacer público (acceso con link)
-        try:
-            drive.permissions().create(
-                fileId=file_id,
-                body={'type': 'anyone', 'role': 'reader'},
-                supportsAllDrives=True
-            ).execute()
-        except Exception:
-            pass  # En Shared Drives los permisos los hereda la carpeta
-        url_drive = f'https://drive.google.com/file/d/{file_id}/view'
-        url_thumb = f'https://drive.google.com/thumbnail?id={file_id}&sz=w400'
+        img_b64 = base64.b64encode(contenido).decode('utf-8')
+        imgbb_resp = req_lib.post(
+            'https://api.imgbb.com/1/upload',
+            data={'key': imgbb_key, 'image': img_b64, 'name': nombre_archivo},
+            timeout=30
+        )
+        if imgbb_resp.status_code != 200:
+            return jsonify({'ok': False, 'error': f'ImgBB error {imgbb_resp.status_code}: {imgbb_resp.text[:200]}'}), 500
+
+        img_data   = imgbb_resp.json().get('data', {})
+        url_drive  = img_data.get('url', '')
+        url_thumb  = img_data.get('thumb', {}).get('url') or img_data.get('display_url', url_drive)
 
         # 2. Actualizar celda PAGO en el sheet Ventas
         ws = get_worksheet('ventas')
@@ -1139,12 +1134,20 @@ function renderCell(col, val, row) {
   // Columna PAGO
   if (col === 'PAGO') {
     if (val.startsWith('http')) {
-      // Ya tiene URL de Drive → solo ver, NO subir
+      // Ya tiene URL (ImgBB o Drive) → solo ver, NO subir
       const fileId = val.match(/\/d\/([^/]+)\//)?.[1] || '';
-      const thumb  = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w120` : '';
-      const full   = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200` : val;
+      // Thumb: Drive usa thumbnail API, ImgBB devuelve URL directa de imagen
+      const thumb = fileId
+        ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w120`
+        : val;  // ImgBB: la URL ya es la imagen directa
+      const full = fileId
+        ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200`
+        : val;
       return `<span style="display:flex;align-items:center;gap:6px">
-        ${thumb ? `<img src="${thumb}" class="pago-thumb" data-full="${full}" data-link="${val}" style="height:40px;border-radius:4px;cursor:pointer;border:2px solid #0047CC" title="Clic para abrir">` : ''}
+        <img src="${thumb}" class="pago-thumb" data-full="${full}" data-link="${val}"
+             style="height:40px;border-radius:4px;cursor:pointer;border:2px solid #0047CC"
+             title="Clic para ampliar"
+             onerror="this.style.display='none'">
         <a href="${val}" target="_blank" style="color:var(--blue);font-size:.78em;font-weight:600">🔍 Abrir</a>
       </span>`;
     }
