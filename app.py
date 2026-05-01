@@ -334,7 +334,6 @@ def upload_pago():
             'ok': True,
             'url': url_drive,
             'thumb': url_thumb,
-            'file_id': file_id,
             'fila': fila_actualizada,
         })
 
