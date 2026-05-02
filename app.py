@@ -409,6 +409,29 @@ def api_contactos():
     return jsonify(data)
 
 
+@app.route('/api/prospectos/contactos-pendientes')
+def api_contactos_pendientes():
+    """Contactos que NO tienen ninguna respuesta registrada (aún no han sido llamados)."""
+    contactos  = get_data('contactos')
+    respuestas = get_data('respuestas')
+
+    # Construir set de nombres ya contactados (normalizado)
+    contactados = set()
+    for r in respuestas:
+        nombre = str(r.get('Nombre De la Tienda', r.get('TIENDA', r.get('Tienda', '')))).strip().upper()
+        if nombre:
+            contactados.add(nombre)
+
+    # Filtrar contactos cuyo TIENDA no está en el set de contactados
+    pendientes = []
+    for c in contactos:
+        tienda = str(c.get('TIENDA', c.get('Tienda', c.get('Nombre', '')))).strip().upper()
+        if tienda and tienda not in contactados:
+            pendientes.append(c)
+
+    return jsonify(pendientes)
+
+
 @app.route('/api/prospectos/respuestas')
 def api_respuestas():
     data = get_data('respuestas')
@@ -825,6 +848,9 @@ tr:hover td{background:var(--blue3)}
     <div class="nav-item" onclick="showSection('contactos')">
       <span class="icon">📋</span> Lista de Contactos
     </div>
+    <div class="nav-item" onclick="showSection('pendientes')">
+      <span class="icon">📞</span> Por Llamar
+    </div>
     <div class="nav-item" onclick="showSection('ciudades')">
       <span class="icon">🗺️</span> Ciudades por Interés
     </div>
@@ -948,6 +974,24 @@ tr:hover td{background:var(--blue3)}
       </div>
     </div>
 
+    <!-- ═══ POR LLAMAR ═══ -->
+    <div class="section" id="sec-pendientes">
+      <div class="cards" id="pend-cards">
+        <div class="loading"><div class="spinner"></div><br>Cargando...</div>
+      </div>
+      <div class="table-box">
+        <h3>📞 Contactos Sin Respuesta — Por Llamar</h3>
+        <div class="table-controls">
+          <input type="text" id="pendientes-search" placeholder="🔍 Buscar..." oninput="filterTable('pendientes')">
+          <select id="pendientes-ciudad" onchange="filterTable('pendientes')">
+            <option value="">Todas las ciudades</option>
+          </select>
+        </div>
+        <div class="tbl-wrap" id="pendientes-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="pagination" id="pendientes-pag"></div>
+      </div>
+    </div>
+
     <!-- ═══ CIUDADES ═══ -->
     <div class="section" id="sec-ciudades">
       <div class="table-box">
@@ -1025,6 +1069,7 @@ const SECTION_TITLES = {
   'ventas-dash': '📈 Dashboard de Ventas',
   ventas:      '💰 Ventas',
   contactos:   '📋 Lista de Contactos',
+  pendientes:  '📞 Por Llamar — Sin Respuesta',
   ciudades:    '🗺️ Ciudades por Interés',
   respuestas:  '📝 Respuestas del Formulario',
   mensajes:    '💬 Mensajes Iniciales',
@@ -1059,6 +1104,7 @@ async function loadSection(name) {
     case 'ventas-dash': await loadVentasDash(); break;
     case 'ventas':      await loadVentas(); break;
     case 'contactos':   await loadContactos(); break;
+    case 'pendientes':  await loadPendientes(); break;
     case 'ciudades':    await loadCiudades(); break;
     case 'respuestas':  await loadTableSection('respuestas',  '/api/prospectos/respuestas',  'respuestas-table',  'respuestas-pag',  ['resp-search','resp-resultado']); break;
     case 'mensajes':    await loadTableSection('mensajes',    '/api/prospectos/mensajes',    'mensajes-table',    'mensajes-pag',    ['mensajes-search']); break;
@@ -1374,8 +1420,9 @@ function filterTable(key) {
   const d = state.data[key] || [];
   let filtered = d;
 
-  // Generic text search across all fields
-  const searchId = key === 'respuestas' ? 'resp-search' : key === 'frecuentes' ? 'frecuentes-search' : key + '-search';
+  const searchId = key === 'respuestas' ? 'resp-search'
+    : key === 'frecuentes' ? 'frecuentes-search'
+    : key + '-search';
   const searchEl = document.getElementById(searchId);
   const q = searchEl ? searchEl.value.toLowerCase() : '';
   if (q) {
@@ -1390,13 +1437,15 @@ function filterTable(key) {
     const res = resEl ? resEl.value.toUpperCase() : '';
     if (res) filtered = filtered.filter(r => String(r.Resultado || '').toUpperCase() === res);
   }
-  if (key === 'contactos') {
-    const ciudadEl = document.getElementById('contactos-ciudad');
+  if (key === 'contactos' || key === 'pendientes') {
+    const ciudadEl = document.getElementById(`${key}-ciudad`);
     const ciudad = ciudadEl ? ciudadEl.value.toLowerCase() : '';
-    const catEl = document.getElementById('contactos-cat');
-    const cat = catEl ? catEl.value.toLowerCase() : '';
     if (ciudad) filtered = filtered.filter(r => String(r.Ciudad || r.ciudad || r.CIUDAD || '').toLowerCase() === ciudad);
-    if (cat) filtered = filtered.filter(r => Object.values(r).some(v => String(v).toLowerCase() === cat));
+    if (key === 'contactos') {
+      const catEl = document.getElementById('contactos-cat');
+      const cat = catEl ? catEl.value.toLowerCase() : '';
+      if (cat) filtered = filtered.filter(r => Object.values(r).some(v => String(v).toLowerCase() === cat));
+    }
   }
 
   state.filtered[key] = filtered;
@@ -1543,6 +1592,44 @@ async function loadContactos() {
   }
 
   renderTable('contactos', 'contactos-table', 'contactos-pag');
+}
+
+// ─── POR LLAMAR ─────────────────────────────────────────────────────────────
+async function loadPendientes() {
+  const data = await fetchAPI('/api/prospectos/contactos-pendientes');
+  state.data['pendientes']     = data;
+  state.filtered['pendientes'] = data;
+  state.page['pendientes']     = 1;
+
+  // KPIs
+  const totalPend = data.length;
+  const ciudadesSet = [...new Set(data.map(r =>
+    String(r.CIUDAD || r.Ciudad || r.ciudad || '').trim()).filter(Boolean))];
+
+  document.getElementById('pend-cards').innerHTML = `
+    <div class="card red">
+      <div class="label">Sin Llamar</div>
+      <div class="value">${totalPend}</div>
+      <div class="sub">Sin respuesta aún</div>
+    </div>
+    <div class="card">
+      <div class="label">Ciudades</div>
+      <div class="value">${ciudadesSet.length}</div>
+      <div class="sub">Diferentes</div>
+    </div>
+  `;
+
+  // Populate ciudad filter
+  const ciudadSel = document.getElementById('pendientes-ciudad');
+  ciudadSel.innerHTML = '<option value="">Todas las ciudades</option>';
+  ciudadesSet.sort().forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.toLowerCase();
+    o.textContent = c;
+    ciudadSel.appendChild(o);
+  });
+
+  renderTable('pendientes', 'pendientes-table', 'pendientes-pag');
 }
 
 // ─── CIUDADES ───────────────────────────────────────────────────────────────
