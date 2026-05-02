@@ -5,7 +5,12 @@ Deploy: Railway  |  Auth: GOOGLE_CREDENTIALS_JSON env var o archivo .json local
 """
 
 from flask import Flask, jsonify, render_template_string, request, session
-import secrets
+import secrets, threading
+try:
+    import googlemaps
+    GMAPS_OK = True
+except ImportError:
+    GMAPS_OK = False
 import gspread
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
@@ -876,6 +881,11 @@ tr:hover td{background:var(--blue3)}
     <a href="/formulario" target="_blank" style="text-decoration:none">
       <div class="nav-item" style="background:rgba(0,204,71,.2);border:1px solid rgba(0,204,71,.4)">
         <span class="icon">📞</span> Iniciar Llamadas
+      </div>
+    </a>
+    <a href="/importador" target="_blank" style="text-decoration:none">
+      <div class="nav-item" style="background:rgba(230,126,34,.2);border:1px solid rgba(230,126,34,.4)">
+        <span class="icon">📥</span> Importar Contactos
       </div>
     </a>
   </div>
@@ -2391,6 +2401,420 @@ function cargarSiguiente() {
 
 // Iniciar
 cargarContacto();
+</script>
+</body>
+</html>"""
+
+
+# ─── IMPORTADOR DE CONTACTOS ─────────────────────────────────────────────────
+
+CATEGORIAS_IMPORTADOR = ['Ferreterías', 'Distribuidoras Ferreterías']
+
+_import_job = {
+    'status':    'idle',   # idle | running | done | error
+    'ciudad':    '',
+    'categoria': '',
+    'progreso':  0,        # categorías completadas
+    'total':     len(CATEGORIAS_IMPORTADOR),
+    'encontrados': 0,
+    'descartados': 0,
+    'resultados': [],
+    'log':        [],
+    'error':      '',
+}
+_import_lock = threading.Lock()
+
+
+def _buscar_negocios(gmaps_client, categoria, ciudad):
+    """Busca negocios con filtros de calidad. Devuelve (aprobados, stats)."""
+    resultados = []
+    vistos = set()
+    stats  = {'pocas_resenas': 0, 'baja_calificacion': 0, 'cerrado': 0, 'sin_telefono': 0}
+
+    variaciones = [f"{categoria} en {ciudad}", f"{categoria} {ciudad}"]
+
+    for query in variaciones:
+        try:
+            resp = gmaps_client.places(query=query, language='es', type='establishment')
+            lugares = resp.get('results', [])
+            paginas = 1
+            while 'next_page_token' in resp and paginas < 3:
+                time.sleep(2)
+                try:
+                    resp = gmaps_client.places(page_token=resp['next_page_token'])
+                    lugares.extend(resp.get('results', []))
+                    paginas += 1
+                except Exception:
+                    break
+
+            for lugar in lugares:
+                pid = lugar.get('place_id')
+                if pid in vistos: continue
+                cal  = lugar.get('rating')
+                resenas = lugar.get('user_ratings_total')
+                if not resenas or resenas < 10: stats['pocas_resenas'] += 1; continue
+                if not cal or cal < 3.5:        stats['baja_calificacion'] += 1; continue
+                vistos.add(pid)
+                try:
+                    det = gmaps_client.place(pid, language='es')['result']
+                    abierto = det.get('opening_hours', {}).get('open_now')
+                    if abierto is False: stats['cerrado'] += 1; continue
+                    tel = det.get('formatted_phone_number', '')
+                    if not tel: stats['sin_telefono'] += 1; continue
+
+                    tamano = 'Grande' if resenas >= 500 else 'Mediano' if resenas >= 200 else 'Pequeño'
+                    resultados.append({
+                        'TIENDA':      lugar.get('name', ''),
+                        'Dirección':   lugar.get('formatted_address', ''),
+                        'Calificación': cal,
+                        'Reseñas':     resenas,
+                        'Maps':        f"https://www.google.com/maps/place/?q=place_id:{pid}",
+                        'TELÉFONO':    tel,
+                        'Sitio Web':   det.get('website', ''),
+                        'Horarios':    str(det.get('opening_hours', {}).get('weekday_text', '')),
+                        'Tamaño':      tamano,
+                        'CATEGORIA ':  categoria,
+                    })
+                    time.sleep(0.3)
+                except Exception:
+                    continue
+            if lugares: break
+        except Exception as e:
+            print(f'[importador] error query: {e}')
+            time.sleep(2)
+
+    return resultados, stats
+
+
+def _exportar_a_sheets(resultados, categoria, ciudad):
+    """Exporta resultados a LISTA DE CONTACTOS evitando duplicados."""
+    try:
+        ws = get_worksheet('contactos')
+        datos_actuales = ws.get_all_values()
+        nombres_existentes = set()
+        for fila in datos_actuales[1:]:
+            if len(fila) > 0:
+                nombres_existentes.add(str(fila[0]).strip().upper())
+
+        fecha   = datetime.now().strftime('%d/%m/%Y')
+        semana  = datetime.now().isocalendar()[1]
+        nuevos  = []
+        for r in resultados:
+            if r['TIENDA'].strip().upper() not in nombres_existentes:
+                nuevos.append([
+                    r['TIENDA'], r.get('CATEGORIA ', categoria), r.get('CIUDAD', ciudad),
+                    r.get('TELÉFONO', ''), r.get('Dirección', ''), r.get('Calificación', ''),
+                    r.get('Reseñas', ''), r.get('Maps', ''), r.get('Sitio Web', ''),
+                    r.get('Tamaño', ''), fecha, str(semana),
+                ])
+
+        if nuevos:
+            ws.append_rows(nuevos, value_input_option='USER_ENTERED')
+            _cache.pop('contactos', None)
+        return len(nuevos)
+    except Exception as e:
+        print(f'[importador] sheets error: {e}')
+        return 0
+
+
+def _enviar_telegram_importador(ciudad, total, desglose, tiempo_min):
+    try:
+        token   = os.environ.get('TELEGRAM_TOKEN', '8404009072:AAGZC4Lb46ELP9-8zrRDWJG61a5F5lHjmSw')
+        chat_id = os.environ.get('TELEGRAM_CHAT_ID', '5838212022')
+        msg = f"<b>📥 Importador Completado</b>\n\n<b>Ciudad:</b> {ciudad}\n<b>Total:</b> {total} contactos\n<b>Tiempo:</b> {tiempo_min:.1f} min\n\n"
+        for cat, n in desglose.items():
+            msg += f"  {cat}: {n}\n"
+        req_lib.post(f'https://api.telegram.org/bot{token}/sendMessage',
+                     data={'chat_id': chat_id, 'text': msg, 'parse_mode': 'HTML'}, timeout=10)
+    except Exception:
+        pass
+
+
+def _worker_importador(ciudad, gmaps_api_key):
+    global _import_job
+    inicio = time.time()
+    try:
+        if not GMAPS_OK:
+            with _import_lock:
+                _import_job['status'] = 'error'
+                _import_job['error']  = 'googlemaps no instalado'
+            return
+
+        gmaps = googlemaps.Client(key=gmaps_api_key)
+        todos = []
+        desglose = {}
+
+        for i, cat in enumerate(CATEGORIAS_IMPORTADOR):
+            with _import_lock:
+                _import_job['categoria'] = cat
+                _import_job['progreso']  = i
+                _import_job['log'].append(f'Buscando {cat} en {ciudad}...')
+
+            resultados, stats = _buscar_negocios(gmaps, cat, ciudad)
+
+            # Agregar ciudad a cada resultado
+            for r in resultados:
+                r['CIUDAD'] = ciudad
+
+            nuevos = _exportar_a_sheets(resultados, cat, ciudad)
+            todos.extend(resultados)
+            desglose[cat] = len(resultados)
+
+            desc = sum(stats.values())
+            with _import_lock:
+                _import_job['encontrados'] += len(resultados)
+                _import_job['descartados'] += desc
+                _import_job['resultados']   = todos[:]
+                _import_job['log'].append(
+                    f'✓ {cat}: {len(resultados)} aprobados, {desc} descartados, {nuevos} nuevos en Sheet'
+                )
+
+        tiempo = (time.time() - inicio) / 60
+        _enviar_telegram_importador(ciudad, len(todos), desglose, tiempo)
+
+        with _import_lock:
+            _import_job['status']   = 'done'
+            _import_job['progreso'] = len(CATEGORIAS_IMPORTADOR)
+            _import_job['log'].append(f'✅ Completado en {tiempo:.1f} min — {len(todos)} contactos encontrados')
+
+    except Exception as e:
+        with _import_lock:
+            _import_job['status'] = 'error'
+            _import_job['error']  = str(e)
+        traceback.print_exc()
+
+
+@app.route('/importador')
+def importador_page():
+    return render_template_string(IMPORTADOR_HTML)
+
+
+@app.route('/api/importador/iniciar', methods=['POST'])
+def importador_iniciar():
+    global _import_job
+    ciudad       = request.json.get('ciudad', '').strip()
+    gmaps_api_key = os.environ.get('GMAPS_API_KEY', 'AIzaSyANnZsLqkul5Z8x1PlVsaihlHkpJHqDhJU')
+
+    if not ciudad:
+        return jsonify({'ok': False, 'error': 'Ciudad requerida'})
+
+    with _import_lock:
+        if _import_job['status'] == 'running':
+            return jsonify({'ok': False, 'error': 'Ya hay una búsqueda en curso'})
+        _import_job = {
+            'status': 'running', 'ciudad': ciudad,
+            'categoria': '', 'progreso': 0,
+            'total': len(CATEGORIAS_IMPORTADOR),
+            'encontrados': 0, 'descartados': 0,
+            'resultados': [], 'log': [], 'error': '',
+        }
+
+    t = threading.Thread(target=_worker_importador, args=(ciudad, gmaps_api_key), daemon=True)
+    t.start()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/importador/estado')
+def importador_estado():
+    with _import_lock:
+        return jsonify({
+            'status':     _import_job['status'],
+            'ciudad':     _import_job['ciudad'],
+            'categoria':  _import_job['categoria'],
+            'progreso':   _import_job['progreso'],
+            'total':      _import_job['total'],
+            'encontrados': _import_job['encontrados'],
+            'descartados': _import_job['descartados'],
+            'log':        _import_job['log'][-10:],
+            'error':      _import_job['error'],
+        })
+
+
+IMPORTADOR_HTML = r"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>NIOVAL — Importador de Contactos</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--blue:#0047CC;--blue2:#003399;--green:#00CC47;--orange:#e67e22}
+body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399,#0047CC);min-height:100vh;padding:20px;display:flex;justify-content:center}
+.card{background:#fff;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:100%;max-width:640px;overflow:hidden}
+.header{background:linear-gradient(135deg,#003399,#0047CC);color:#fff;padding:24px 28px;display:flex;align-items:center;gap:14px}
+.header img{height:44px;background:#fff;border-radius:10px;padding:5px}
+.header h1{font-size:1.15em;font-weight:800}
+.header p{font-size:.78em;opacity:.8;margin-top:3px}
+.body{padding:28px}
+.input-row{display:flex;gap:10px;margin-bottom:20px}
+.input-row input{flex:1;padding:12px 16px;border:2px solid #dde6ff;border-radius:10px;font-size:.95em;outline:none;transition:border .2s}
+.input-row input:focus{border-color:var(--blue)}
+.btn{padding:12px 24px;border:none;border-radius:10px;font-size:.92em;font-weight:700;cursor:pointer;transition:all .2s}
+.btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:var(--blue2)}
+.btn-blue:disabled{opacity:.5;cursor:not-allowed}
+.filters{background:#f0f4ff;border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:.82em;color:#555}
+.filters strong{color:var(--blue)}
+.progress-box{display:none;margin-bottom:20px}
+.progress-label{display:flex;justify-content:space-between;font-size:.82em;color:#555;margin-bottom:8px}
+.progress-bar{height:10px;background:#e6f0ff;border-radius:5px;overflow:hidden}
+.progress-fill{height:100%;background:var(--blue);border-radius:5px;transition:width .5s ease}
+.cats{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.cat-badge{padding:5px 12px;border-radius:20px;font-size:.78em;font-weight:600;background:#e6f0ff;color:#888;transition:all .3s}
+.cat-badge.active{background:var(--blue);color:#fff}
+.cat-badge.done{background:var(--green);color:#fff}
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px}
+.stat-box{background:#f8f9fa;border-radius:10px;padding:12px;text-align:center;border-top:3px solid #dde}
+.stat-box.green{border-color:var(--green)}.stat-box.red{border-color:#e74c3c}.stat-box.blue{border-color:var(--blue)}
+.stat-box .n{font-size:1.8em;font-weight:800;color:var(--blue)}.stat-box.green .n{color:var(--green)}.stat-box.red .n{color:#e74c3c}
+.stat-box .l{font-size:.68em;color:#888;text-transform:uppercase;margin-top:2px}
+.log-box{background:#1a1a2e;border-radius:10px;padding:14px;max-height:160px;overflow-y:auto;font-family:monospace;font-size:.78em;color:#a8d8a8;margin-bottom:16px}
+.log-box .entry{margin-bottom:4px;line-height:1.4}
+.result-box{display:none;text-align:center;padding:20px 0}
+.result-box .icon{font-size:3.5em;margin-bottom:12px}
+.result-box h2{color:var(--blue);margin-bottom:8px}
+.result-box p{color:#888;font-size:.88em}
+.link-panel{display:inline-flex;align-items:center;gap:8px;background:#e6f0ff;border:1px solid #c5d8ff;color:var(--blue);padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:600;font-size:.88em;margin-top:16px}
+.link-panel:hover{background:var(--blue);color:#fff}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <img src="https://res.cloudinary.com/dipt3jq6r/image/upload/v1764307686/NIOVAL-05_xhfrrh.jpg" onerror="this.style.display='none'">
+    <div>
+      <h1>Importador de Contactos</h1>
+      <p>Busca ferreterías en Google Maps y las agrega a tu lista</p>
+    </div>
+  </div>
+  <div class="body">
+
+    <div class="filters">
+      <strong>Filtros aplicados:</strong> Mínimo 10 reseñas · Calificación ≥ 3.5 ⭐ · Solo abiertos · Con teléfono
+    </div>
+
+    <!-- CATEGORÍAS -->
+    <div style="font-size:.78em;color:#888;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.8px">Categorías a buscar</div>
+    <div class="cats" id="cats-list"></div>
+
+    <!-- INPUT CIUDAD -->
+    <div class="input-row">
+      <input type="text" id="input-ciudad" placeholder="Ciudad (ej: Guadalajara, Monterrey, CDMX...)" onkeydown="if(event.key==='Enter') iniciar()">
+      <button class="btn btn-blue" id="btn-iniciar" onclick="iniciar()">🔍 Buscar</button>
+    </div>
+
+    <!-- PROGRESO -->
+    <div class="progress-box" id="progress-box">
+      <div class="progress-label">
+        <span id="prog-label">Iniciando...</span>
+        <span id="prog-pct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-row" id="stats-row" style="display:none">
+      <div class="stat-box green"><div class="n" id="s-encontrados">0</div><div class="l">Encontrados</div></div>
+      <div class="stat-box red"><div class="n" id="s-descartados">0</div><div class="l">Descartados</div></div>
+      <div class="stat-box blue"><div class="n" id="s-progreso">0/0</div><div class="l">Progreso</div></div>
+    </div>
+
+    <!-- LOG -->
+    <div class="log-box" id="log-box" style="display:none"></div>
+
+    <!-- RESULTADO FINAL -->
+    <div class="result-box" id="result-box">
+      <div class="icon">✅</div>
+      <h2 id="result-titulo">Búsqueda Completada</h2>
+      <p id="result-desc"></p>
+      <br>
+      <a href="/" class="link-panel">← Volver al Panel</a>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const CATS = ["Ferreterías","Distribuidoras Ferreterías"];
+let polling = null;
+
+// Render categoria badges
+document.getElementById('cats-list').innerHTML = CATS.map((c,i) =>
+  `<div class="cat-badge" id="cat-${i}">${c}</div>`
+).join('');
+
+async function iniciar() {
+  const ciudad = document.getElementById('input-ciudad').value.trim();
+  if (!ciudad) { alert('Ingresa una ciudad'); return; }
+
+  const btn = document.getElementById('btn-iniciar');
+  btn.disabled = true;
+  btn.textContent = '⏳ Buscando...';
+
+  document.getElementById('progress-box').style.display = 'block';
+  document.getElementById('stats-row').style.display = 'grid';
+  document.getElementById('log-box').style.display = 'block';
+  document.getElementById('result-box').style.display = 'none';
+
+  const r = await fetch('/api/importador/iniciar', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ciudad})
+  });
+  const d = await r.json();
+  if (!d.ok) { alert('Error: ' + d.error); btn.disabled=false; btn.textContent='🔍 Buscar'; return; }
+
+  polling = setInterval(actualizarEstado, 3000);
+  actualizarEstado();
+}
+
+async function actualizarEstado() {
+  const r = await fetch('/api/importador/estado');
+  const d = await r.json();
+
+  // Progreso
+  const pct = d.total > 0 ? Math.round((d.progreso / d.total) * 100) : 0;
+  document.getElementById('prog-fill').style.width  = pct + '%';
+  document.getElementById('prog-pct').textContent   = pct + '%';
+  document.getElementById('prog-label').textContent = d.categoria ? `Buscando: ${d.categoria}...` : 'Procesando...';
+
+  // Stats
+  document.getElementById('s-encontrados').textContent = d.encontrados;
+  document.getElementById('s-descartados').textContent = d.descartados;
+  document.getElementById('s-progreso').textContent    = `${d.progreso}/${d.total}`;
+
+  // Cat badges
+  CATS.forEach((c, i) => {
+    const el = document.getElementById('cat-'+i);
+    if (i < d.progreso) el.className = 'cat-badge done';
+    else if (d.categoria === c) el.className = 'cat-badge active';
+  });
+
+  // Log
+  const logEl = document.getElementById('log-box');
+  logEl.innerHTML = d.log.map(l => `<div class="entry">> ${l}</div>`).join('');
+  logEl.scrollTop = logEl.scrollHeight;
+
+  if (d.status === 'done') {
+    clearInterval(polling);
+    document.getElementById('prog-fill').style.width = '100%';
+    document.getElementById('prog-pct').textContent = '100%';
+    document.getElementById('prog-label').textContent = '¡Completado!';
+    CATS.forEach((_,i) => document.getElementById('cat-'+i).className = 'cat-badge done');
+    document.getElementById('result-box').style.display = 'block';
+    document.getElementById('result-titulo').textContent = `✅ Búsqueda completada — ${d.ciudad}`;
+    document.getElementById('result-desc').textContent =
+      `${d.encontrados} contactos encontrados · ${d.descartados} descartados · Guardados en Google Sheets`;
+    document.getElementById('btn-iniciar').textContent = '🔍 Nueva Búsqueda';
+    document.getElementById('btn-iniciar').disabled = false;
+  }
+
+  if (d.status === 'error') {
+    clearInterval(polling);
+    document.getElementById('prog-label').textContent = '❌ Error: ' + d.error;
+    document.getElementById('btn-iniciar').disabled = false;
+    document.getElementById('btn-iniciar').textContent = '🔍 Reintentar';
+  }
+}
 </script>
 </body>
 </html>"""
