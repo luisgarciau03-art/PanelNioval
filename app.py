@@ -4,7 +4,8 @@ Dashboard centralizado: Prospectos + Seguimiento
 Deploy: Railway  |  Auth: GOOGLE_CREDENTIALS_JSON env var o archivo .json local
 """
 
-from flask import Flask, jsonify, render_template_string, request
+from flask import Flask, jsonify, render_template_string, request, session
+import secrets
 import gspread
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
@@ -15,7 +16,8 @@ from collections import Counter, defaultdict
 import traceback
 
 app = Flask(__name__)
-app.json.sort_keys = False  # preservar orden de columnas tal cual se definen
+app.json.sort_keys = False
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────
 SHEET_IDS = {
@@ -1901,6 +1903,493 @@ loadSection('dashboard');
 
 </body>
 </html>"""
+
+
+# ─── FORMULARIO DE LLAMADAS ──────────────────────────────────────────────────
+
+def get_contacto_pendiente(skip=0):
+    """Devuelve el contacto con columna F vacía (skip para avanzar)."""
+    try:
+        ws = get_worksheet('contactos')
+        rows = ws.get_all_values()
+        if not rows: return None
+        headers = rows[0]
+        col_f_idx = 5  # Columna F (0-based)
+        encontrados = 0
+        for i, row in enumerate(rows[1:], start=2):
+            val_f = row[col_f_idx] if len(row) > col_f_idx else ''
+            if not str(val_f).strip():
+                if encontrados < skip:
+                    encontrados += 1
+                    continue
+                datos = {headers[j]: (row[j] if j < len(row) else '') for j in range(len(headers))}
+                datos['_row'] = i
+                return datos
+        return None
+    except Exception as e:
+        print(f"[formulario] get_contacto_pendiente error: {e}")
+        return None
+
+
+def marcar_contacto_procesado(row_num):
+    """Marca columna F del contacto como procesado."""
+    try:
+        ws = get_worksheet('contactos')
+        ws.update_cell(row_num, 6, 'Llamado')
+        _cache.pop('contactos', None)
+    except Exception as e:
+        print(f"[formulario] marcar error: {e}")
+
+
+def guardar_respuesta_formulario(datos):
+    """Guarda respuesta en hoja Respuestas de formulario 1."""
+    try:
+        client = get_gs_client()
+        sp = client.open_by_key(SHEET_IDS['respuestas'])
+        ws = sp.get_worksheet_by_id(SHEET_GIDS['respuestas'])
+        rows = ws.get_all_values()
+        ultima_fila = len(rows) + 1
+
+        fecha_hora  = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        tienda      = datos.get('tienda', '')
+        r0          = datos.get('r0', '')        # Estado llamada
+        r1          = datos.get('r1', '')        # Pregunta 1
+        r2          = datos.get('r2', '')        # Pregunta 2
+        r3          = datos.get('r3', '')        # Pedido inicial
+        r4          = datos.get('r4', '')        # Pedido muestra
+        r5          = datos.get('r5', '')        # Esta semana
+        r6          = datos.get('r6', '')        # Cerrar pedido
+        r7          = datos.get('r7', '')        # Conclusión
+        resultado   = datos.get('resultado', '')
+
+        # Columna J = conclusión o estado especial
+        col_j = ''
+        if r7 == 'Colgo':              col_j = 'Colgo'
+        elif r0 == 'Buzon':            col_j = 'BUZON'
+        elif r0 == 'Telefono Incorrecto': col_j = 'TELEFONO INCORRECTO'
+        elif resultado == 'NEGADO':    col_j = 'No apto'
+        elif resultado == 'NO COMPATIBLE': col_j = 'No compatible'
+        elif resultado == 'MARCA UNICA':   col_j = 'Marca Unica'
+        elif r7:                       col_j = r7
+
+        actualizaciones = [
+            {'range': f'A{ultima_fila}', 'values': [[fecha_hora]]},
+            {'range': f'B{ultima_fila}', 'values': [[tienda]]},
+        ]
+        if r1: actualizaciones.append({'range': f'C{ultima_fila}', 'values': [[r1]]})
+        if r2: actualizaciones.append({'range': f'D{ultima_fila}', 'values': [[r2]]})
+        if r3: actualizaciones.append({'range': f'E{ultima_fila}', 'values': [[r3]]})
+        if r4: actualizaciones.append({'range': f'G{ultima_fila}', 'values': [[r4]]})
+        if r5: actualizaciones.append({'range': f'H{ultima_fila}', 'values': [[r5]]})
+        if r6: actualizaciones.append({'range': f'I{ultima_fila}', 'values': [[r6]]})
+        if col_j: actualizaciones.append({'range': f'J{ultima_fila}', 'values': [[col_j]]})
+        actualizaciones.append({'range': f'S{ultima_fila}', 'values': [[resultado]]})
+        if r0: actualizaciones.append({'range': f'T{ultima_fila}', 'values': [[r0]]})
+
+        ws.batch_update(actualizaciones)
+        _cache.pop('respuestas', None)
+        return True
+    except Exception as e:
+        print(f"[formulario] guardar error: {e}")
+        traceback.print_exc()
+        return False
+
+
+@app.route('/api/formulario/siguiente')
+def formulario_siguiente():
+    skip = int(request.args.get('skip', 0))
+    c = get_contacto_pendiente(skip)
+    if not c:
+        return jsonify({'fin': True})
+    return jsonify({'fin': False, 'contacto': c})
+
+
+@app.route('/api/formulario/guardar', methods=['POST'])
+def formulario_guardar():
+    try:
+        datos = request.json
+        row   = datos.get('row')
+        ok    = guardar_respuesta_formulario(datos)
+        if ok and row:
+            marcar_contacto_procesado(int(row))
+        return jsonify({'ok': ok})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
+FORMULARIO_HTML = r"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>NIOVAL — Formulario de Llamadas</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--blue:#0047CC;--blue2:#003399;--green:#00CC47;--red:#e74c3c;--orange:#e67e22;--gray:#6c757d}
+body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC,#003399);min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:20px}
+.card{background:#fff;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:100%;max-width:600px;overflow:hidden;animation:fadeIn .4s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+.header{background:linear-gradient(135deg,#003399,#0047CC);color:#fff;padding:24px 28px;display:flex;align-items:center;gap:14px}
+.header img{height:44px;background:#fff;border-radius:10px;padding:5px}
+.header h1{font-size:1.2em;font-weight:800}
+.header p{font-size:.8em;opacity:.8;margin-top:3px}
+.body{padding:24px 28px}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.info-item{background:#f0f4ff;border-radius:10px;padding:12px;border-left:3px solid var(--blue)}
+.info-item .lbl{font-size:.68em;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
+.info-item .val{font-size:.95em;font-weight:600;color:#222;word-break:break-word}
+.info-item.full{grid-column:1/-1}
+.section-title{font-size:.8em;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #e6f0ff}
+.btn-group{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.btn{padding:13px 20px;border:none;border-radius:12px;font-size:.92em;font-weight:700;cursor:pointer;transition:all .2s;flex:1;min-width:120px}
+.btn:active{transform:scale(.97)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#00aa3a}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#c0392b}
+.btn-orange{background:var(--orange);color:#fff}.btn-orange:hover{background:#d35400}
+.btn-purple{background:#8e44ad;color:#fff}.btn-purple:hover{background:#6c3483}
+.btn-gray{background:#95a5a6;color:#fff}.btn-gray:hover{background:#7f8c8d}
+.btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:var(--blue2)}
+.step{display:none}.step.active{display:block}
+.badge{display:inline-block;background:#e6f0ff;color:var(--blue);padding:4px 12px;border-radius:20px;font-size:.75em;font-weight:700;margin-bottom:16px}
+.links{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.link-btn{display:inline-flex;align-items:center;gap:6px;background:#f0f4ff;border:1px solid #c5d8ff;color:var(--blue);padding:8px 14px;border-radius:8px;text-decoration:none;font-size:.82em;font-weight:600;cursor:pointer;transition:all .2s}
+.link-btn:hover{background:var(--blue);color:#fff}
+.progress{display:flex;gap:4px;margin-bottom:20px}
+.prog-step{flex:1;height:5px;border-radius:3px;background:#e6f0ff;transition:background .3s}
+.prog-step.done{background:var(--green)}.prog-step.active{background:var(--blue)}
+.spinner-box{text-align:center;padding:40px;color:#aaa}
+.spinner{display:inline-block;width:32px;height:32px;border:3px solid #dde;border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.fin{text-align:center;padding:40px}
+.fin .icon{font-size:4em;margin-bottom:16px}
+.fin h2{color:var(--blue);margin-bottom:8px}
+.fin p{color:#888;font-size:.9em}
+.stat-row{display:flex;justify-content:space-around;background:#f0f4ff;border-radius:12px;padding:14px;margin-top:16px}
+.stat{text-align:center}.stat .n{font-size:1.6em;font-weight:800;color:var(--blue)}.stat .l{font-size:.7em;color:#888;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <img src="https://res.cloudinary.com/dipt3jq6r/image/upload/v1764307686/NIOVAL-05_xhfrrh.jpg" onerror="this.style.display='none'">
+    <div>
+      <h1>NIOVAL — Formulario de Llamadas</h1>
+      <p id="header-sub">Cargando contacto...</p>
+    </div>
+  </div>
+  <div class="body">
+
+    <!-- LOADING -->
+    <div class="step active" id="step-loading">
+      <div class="spinner-box"><div class="spinner"></div><br><br>Cargando contacto...</div>
+    </div>
+
+    <!-- CONTACTO INFO -->
+    <div class="step" id="step-contacto">
+      <div class="badge" id="badge-ciudad">📍 Ciudad</div>
+      <div class="info-grid" id="info-grid"></div>
+      <div class="links" id="links-contacto"></div>
+      <div class="section-title">¿Qué resultado tuvo el contacto?</div>
+      <div class="btn-group">
+        <button class="btn btn-green" onclick="decidir('APROBADO')">✓ Aprobado</button>
+        <button class="btn btn-red"   onclick="decidir('NEGADO')">✗ Negado</button>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-orange" onclick="decidir('NO COMPATIBLE')">⊘ No Compatible</button>
+        <button class="btn btn-purple" onclick="decidir('MARCA UNICA')">◈ Marca Única</button>
+      </div>
+      <button class="btn btn-gray" onclick="saltarContacto()" style="width:100%;margin-top:8px;font-size:.82em">⟶ Saltar este contacto</button>
+    </div>
+
+    <!-- PREGUNTA 0: Estado llamada -->
+    <div class="step" id="step-p0">
+      <div class="progress" id="prog0"></div>
+      <div class="section-title">¿Qué sucedió con la llamada?</div>
+      <div class="btn-group" style="flex-direction:column">
+        <button class="btn btn-green"  onclick="resp0('Respondio')">📞 1 — Respondió</button>
+        <button class="btn btn-orange" onclick="resp0('Buzon')">📬 2 — Buzón</button>
+        <button class="btn btn-gray"   onclick="resp0('Telefono Incorrecto')">✗ 0 — Teléfono Incorrecto</button>
+      </div>
+    </div>
+
+    <!-- PREGUNTA 1 -->
+    <div class="step" id="step-p1">
+      <div class="progress" id="prog1"></div>
+      <div class="section-title">¿Algo que requiera tener un proveedor para poder comprar?</div>
+      <div id="sel-p1" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px"></div>
+      <button class="btn btn-blue" id="btn-p1" onclick="enviarP1()" disabled>→ Continuar</button>
+      <button class="btn btn-gray" onclick="colgo()" style="margin-top:8px;width:100%;font-size:.82em">📵 Colgó</button>
+    </div>
+
+    <!-- PREGUNTA 2 -->
+    <div class="step" id="step-p2">
+      <div class="progress" id="prog2"></div>
+      <div class="section-title">¿Toma usted las decisiones de compra?</div>
+      <div class="btn-group">
+        <button class="btn btn-green" onclick="resp2('Sí')">✓ Sí</button>
+        <button class="btn btn-red"   onclick="resp2('No')">✗ No</button>
+      </div>
+      <button class="btn btn-gray" onclick="colgo()" style="margin-top:8px;width:100%;font-size:.82em">📵 Colgó</button>
+    </div>
+
+    <!-- PREGUNTA 3 -->
+    <div class="step" id="step-p3">
+      <div class="progress" id="prog3"></div>
+      <div class="section-title">¿Le podemos ayudar con el pedido inicial?</div>
+      <div class="btn-group" style="flex-direction:column">
+        <button class="btn btn-green" onclick="resp3('Crear Pedido Inicial Sugerido')">✓ Crear Pedido Inicial Sugerido</button>
+        <button class="btn btn-red"   onclick="resp3('No')">✗ No</button>
+      </div>
+      <button class="btn btn-gray" onclick="colgo()" style="margin-top:8px;width:100%;font-size:.82em">📵 Colgó</button>
+    </div>
+
+    <!-- PREGUNTA 4 -->
+    <div class="step" id="step-p4">
+      <div class="progress" id="prog4"></div>
+      <div class="section-title">Pedido Muestra ($1,500 — envío cubierto)</div>
+      <div class="btn-group">
+        <button class="btn btn-green" onclick="resp4('Sí')">✓ Sí</button>
+        <button class="btn btn-red"   onclick="resp4('No')">✗ No</button>
+      </div>
+      <button class="btn btn-gray" onclick="colgo()" style="margin-top:8px;width:100%;font-size:.82em">📵 Colgó</button>
+    </div>
+
+    <!-- PREGUNTA 5 -->
+    <div class="step" id="step-p5">
+      <div class="progress" id="prog5"></div>
+      <div class="section-title">¿Podemos iniciar esta semana?</div>
+      <div class="btn-group">
+        <button class="btn btn-green"  onclick="resp5('Sí')">✓ Sí</button>
+        <button class="btn btn-red"    onclick="resp5('No')">✗ No</button>
+        <button class="btn btn-orange" onclick="resp5('Tal vez')">? Tal vez</button>
+      </div>
+      <button class="btn btn-gray" onclick="colgo()" style="margin-top:8px;width:100%;font-size:.82em">📵 Colgó</button>
+    </div>
+
+    <!-- PREGUNTA 6 -->
+    <div class="step" id="step-p6">
+      <div class="progress" id="prog6"></div>
+      <div class="section-title">¿Cerramos el pedido con envío gratis + mapeo de top de venta?</div>
+      <div class="btn-group">
+        <button class="btn btn-green"  onclick="resp6('Sí')">✓ Sí</button>
+        <button class="btn btn-red"    onclick="resp6('No')">✗ No</button>
+        <button class="btn btn-orange" onclick="resp6('Tal vez')">? Tal vez</button>
+      </div>
+      <button class="btn btn-gray" onclick="colgo()" style="margin-top:8px;width:100%;font-size:.82em">📵 Colgó</button>
+    </div>
+
+    <!-- PREGUNTA 7: Conclusión -->
+    <div class="step" id="step-p7">
+      <div class="progress" id="prog7"></div>
+      <div class="section-title">Conclusión — ¿Cuál es el siguiente paso?</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-green"  onclick="resp7('Pedido')">📦 Pedido</button>
+        <button class="btn btn-blue"   onclick="resp7('Revisara el Catalogo')">📖 Revisará el Catálogo</button>
+        <button class="btn btn-blue"   onclick="resp7('Correo')">📧 Correo</button>
+        <button class="btn btn-orange" onclick="resp7('Avance (Fecha Pactada)')">📅 Avance (Fecha Pactada)</button>
+        <button class="btn btn-orange" onclick="resp7('Continuacion (Cliente Esperando Alguna Situacion)')">⏳ Continuación</button>
+        <button class="btn btn-gray"   onclick="resp7('Nulo')">✗ Nulo</button>
+      </div>
+    </div>
+
+    <!-- FIN / GUARDANDO -->
+    <div class="step" id="step-guardando">
+      <div class="spinner-box"><div class="spinner"></div><br><br>Guardando respuestas...</div>
+    </div>
+
+    <!-- SIGUIENTE CONTACTO -->
+    <div class="step" id="step-siguiente">
+      <div class="fin">
+        <div class="icon">✅</div>
+        <h2>Contacto Guardado</h2>
+        <p id="resumen-guardado"></p>
+        <div class="stat-row">
+          <div class="stat"><div class="n" id="stat-procesados">0</div><div class="l">Procesados</div></div>
+          <div class="stat"><div class="n" id="stat-pendientes">—</div><div class="l">Restantes</div></div>
+        </div>
+        <button class="btn btn-green" onclick="cargarSiguiente()" style="margin-top:20px;width:100%">→ Siguiente Contacto</button>
+      </div>
+    </div>
+
+    <!-- FIN TOTAL -->
+    <div class="step" id="step-fin">
+      <div class="fin">
+        <div class="icon">🎉</div>
+        <h2>¡Lista completada!</h2>
+        <p>No hay más contactos pendientes por llamar.</p>
+        <div class="stat-row">
+          <div class="stat"><div class="n" id="stat-total">0</div><div class="l">Total procesados</div></div>
+        </div>
+        <button class="btn btn-blue" onclick="location.reload()" style="margin-top:20px;width:100%">↻ Recargar</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const O = {
+  skip: 0,
+  procesados: 0,
+  contacto: null,
+  resultado: '',
+  r0:'', r1:'', r2:'', r3:'', r4:'', r5:'', r6:'', r7:'',
+  opcionesP1: [],
+};
+
+const PASOS = ['loading','contacto','p0','p1','p2','p3','p4','p5','p6','p7','guardando','siguiente','fin'];
+const TOTAL_PREGUNTAS = 7;
+
+function showStep(name) {
+  PASOS.forEach(p => {
+    const el = document.getElementById('step-' + p);
+    if (el) el.classList.toggle('active', p === name);
+  });
+}
+
+function setProgress(stepId, actual, total) {
+  const el = document.getElementById(stepId);
+  if (!el) return;
+  el.innerHTML = Array.from({length: total}, (_,i) =>
+    `<div class="prog-step ${i < actual ? 'done' : i === actual ? 'active' : ''}"></div>`
+  ).join('');
+}
+
+async function cargarContacto() {
+  showStep('loading');
+  document.getElementById('header-sub').textContent = 'Cargando contacto...';
+  const r = await fetch(`/api/formulario/siguiente?skip=${O.skip}`);
+  const d = await r.json();
+  if (d.fin) { showStep('fin'); document.getElementById('stat-total').textContent = O.procesados; return; }
+  O.contacto = d.contacto;
+  renderContacto(d.contacto);
+}
+
+function renderContacto(c) {
+  const tienda = c.TIENDA || c.Tienda || c.Nombre || '(Sin nombre)';
+  const ciudad = c.CIUDAD || c.Ciudad || '';
+  const tel    = c.TELÉFONO || c['Teléfono'] || c.TELEFONO || c.Telefono || '';
+  const maps   = c.Maps || c.MAPS || '';
+  const link   = c.Link || c.LINK || '';
+  const cat    = c['CATEGORIA '] || c.CATEGORIA || c.Categoria || '';
+  const esq    = c.Esquema || c.ESQUEMA || '';
+
+  document.getElementById('badge-ciudad').textContent = `📍 ${ciudad || 'Sin ciudad'}`;
+  document.getElementById('header-sub').textContent = tienda;
+
+  const campos = [
+    {l:'Tienda', v: tienda, full: true},
+    {l:'Teléfono', v: tel},
+    {l:'Ciudad', v: ciudad},
+    {l:'Categoría', v: cat},
+    {l:'Esquema', v: esq},
+    {l:'Contacto', v: c.CONTACTO || c.Contacto || ''},
+  ].filter(x => x.v);
+
+  document.getElementById('info-grid').innerHTML = campos.map(f =>
+    `<div class="info-item ${f.full?'full':''}"><div class="lbl">${f.l}</div><div class="val">${f.v}</div></div>`
+  ).join('');
+
+  const links = [];
+  if (maps && maps.startsWith('http')) links.push(`<a class="link-btn" href="${maps}" target="_blank">🗺️ Google Maps</a>`);
+  if (link && link.startsWith('http')) links.push(`<a class="link-btn" href="${link}" target="_blank">🌐 Sitio Web</a>`);
+  if (tel) links.push(`<a class="link-btn" href="tel:${tel}">📞 Llamar</a>`);
+  document.getElementById('links-contacto').innerHTML = links.join('');
+
+  showStep('contacto');
+}
+
+function decidir(resultado) {
+  O.resultado = resultado;
+  O.r0=''; O.r1=''; O.r2=''; O.r3=''; O.r4=''; O.r5=''; O.r6=''; O.r7='';
+  if (resultado === 'APROBADO') {
+    setProgress('prog0', 0, TOTAL_PREGUNTAS);
+    showStep('p0');
+  } else {
+    guardar();
+  }
+}
+
+function resp0(v) {
+  O.r0 = v;
+  if (v === 'Respondio') {
+    renderP1();
+    setProgress('prog1', 1, TOTAL_PREGUNTAS);
+    showStep('p1');
+  } else {
+    guardar();
+  }
+}
+
+function renderP1() {
+  const opciones = ['Entregas Rápidas','Líneas de Crédito','Contra Entrega','Envío Gratis','Precio Preferente','Evaluar Calidad'];
+  O.opcionesP1 = [];
+  document.getElementById('sel-p1').innerHTML = opciones.map(op =>
+    `<button class="btn btn-blue" style="opacity:.7;font-size:.82em" onclick="toggleP1(this,'${op}')">${op}</button>`
+  ).join('');
+}
+
+function toggleP1(btn, op) {
+  const idx = O.opcionesP1.indexOf(op);
+  if (idx > -1) { O.opcionesP1.splice(idx, 1); btn.style.opacity='.7'; }
+  else { O.opcionesP1.push(op); btn.style.opacity='1'; btn.style.background='var(--green)'; }
+  document.getElementById('btn-p1').disabled = O.opcionesP1.length === 0;
+}
+
+function enviarP1() {
+  O.r1 = O.opcionesP1.join(', ');
+  setProgress('prog2', 2, TOTAL_PREGUNTAS);
+  showStep('p2');
+}
+
+function resp2(v) { O.r2=v; setProgress('prog3',3,TOTAL_PREGUNTAS); showStep('p3'); }
+function resp3(v) { O.r3=v; setProgress('prog4',4,TOTAL_PREGUNTAS); showStep('p4'); }
+function resp4(v) { O.r4=v; setProgress('prog5',5,TOTAL_PREGUNTAS); showStep('p5'); }
+function resp5(v) { O.r5=v; setProgress('prog6',6,TOTAL_PREGUNTAS); showStep('p6'); }
+function resp6(v) { O.r6=v; setProgress('prog7',7,TOTAL_PREGUNTAS); showStep('p7'); }
+function resp7(v) { O.r7=v; guardar(); }
+
+function colgo() { O.r7='Colgo'; guardar(); }
+
+function saltarContacto() { O.skip++; cargarContacto(); }
+
+async function guardar() {
+  showStep('guardando');
+  const tienda = O.contacto ? (O.contacto.TIENDA || O.contacto.Tienda || O.contacto.Nombre || '') : '';
+  const payload = {
+    row: O.contacto ? O.contacto._row : null,
+    tienda, resultado: O.resultado,
+    r0: O.r0, r1: O.r1, r2: O.r2, r3: O.r3,
+    r4: O.r4, r5: O.r5, r6: O.r6, r7: O.r7,
+  };
+  const r = await fetch('/api/formulario/guardar', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const d = await r.json();
+  O.procesados++;
+  document.getElementById('stat-procesados').textContent = O.procesados;
+  document.getElementById('resumen-guardado').textContent =
+    `${tienda} → ${O.resultado}${O.r0 ? ' ('+O.r0+')' : ''}`;
+  showStep('siguiente');
+}
+
+function cargarSiguiente() {
+  O.skip = 0;  // Resetear skip — el contacto anterior ya fue marcado
+  cargarContacto();
+}
+
+// Iniciar
+cargarContacto();
+</script>
+</body>
+</html>"""
+
+
+@app.route('/formulario')
+def formulario():
+    return render_template_string(FORMULARIO_HTML)
 
 
 @app.route('/')
