@@ -662,7 +662,15 @@ def api_ciudades():
         interes = round(m['aprobados'] / m['llamados'] * 100, 1) if m['llamados'] > 0 else 0
         result.append({'ciudad': ciudad, **m, 'interes_pct': interes})
 
-    result.sort(key=lambda x: (x['aprobados'], x['interes_pct']), reverse=True)
+    # Score de relevancia: prioriza interés real, luego volumen de contactos
+    max_total = max((r['total'] for r in result), default=1)
+    for r in result:
+        vol_score    = (r['total'] / max_total) * 40          # hasta 40 pts por volumen
+        interes_score = r['interes_pct'] * 1.5                # hasta 150 pts por interés
+        llamados_score = min(r['llamados'] * 2, 20)           # hasta 20 pts por actividad
+        r['relevancia'] = round(interes_score + vol_score + llamados_score, 1)
+
+    result.sort(key=lambda x: x['relevancia'], reverse=True)
     return jsonify(result)
 
 
@@ -2703,10 +2711,14 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399
     <div class="cats" id="cats-list"></div>
 
     <!-- CIUDADES -->
-    <div style="font-size:.78em;color:#888;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;margin-top:16px">
-      Ciudades — <span style="color:var(--green);font-weight:700">ordenadas por interés</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;margin-bottom:8px">
+      <div style="font-size:.78em;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.8px">
+        Ciudades <span id="ciudades-count" style="color:var(--blue)"></span> — <span style="color:var(--green)">ordenadas por relevancia</span>
+      </div>
+      <input type="text" id="ciudad-filter" placeholder="🔍 Filtrar..." oninput="filtrarCiudades()"
+        style="padding:5px 10px;border:1px solid #dde6ff;border-radius:8px;font-size:.8em;outline:none;width:140px">
     </div>
-    <div id="ciudades-chips" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;max-height:200px;overflow-y:auto;padding:4px 0">
+    <div id="ciudades-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;max-height:220px;overflow-y:auto;padding:4px 2px">
       <div style="color:#aaa;font-size:.82em;padding:6px">Cargando ciudades...</div>
     </div>
 
@@ -2757,61 +2769,44 @@ document.getElementById('cats-list').innerHTML = CATS.map((c,i) =>
   `<div class="cat-badge" id="cat-${i}">${c}</div>`
 ).join('');
 
-// Ciudades estáticas de respaldo ordenadas por relevancia comercial
-const CIUDADES_ESTATICAS = [
-  'Ciudad de México','Guadalajara','Monterrey','Puebla','Tijuana',
-  'León','Chihuahua','Querétaro','San Luis Potosí','Mérida',
-  'Mexicali','Aguascalientes','Torreón','Juárez','Veracruz',
-  'Culiacán','Hermosillo','Saltillo','Morelia','Oaxaca',
-  'Toluca','Mazatlán','Cancún','Reynosa','Celaya',
-  'Irapuato','Acapulco','Villahermosa','Tuxtla Gutiérrez','Durango'
-];
+let todasCiudades = [];
 
 async function cargarCiudades() {
-  const cont = document.getElementById('ciudades-chips');
   try {
-    const r = await fetch('/api/prospectos/ciudades');
+    const r    = await fetch('/api/prospectos/ciudades');
     const data = await r.json();
-
-    // Ciudades del panel con datos reales (ya ordenadas por interés/aprobados)
-    let chips = '';
-    const conDatos = data.filter(c => c.ciudad && c.ciudad !== 'Sin ciudad');
-
-    if (conDatos.length > 0) {
-      chips += `<div style="font-size:.72em;color:#888;width:100%;padding:2px 0">📊 Con datos en el panel:</div>`;
-      conDatos.forEach((c, i) => {
-        const isTop = i < 3;
-        const pct = c.interes_pct > 0 ? `<span class="pct">${c.interes_pct}%</span>` : '';
-        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
-        chips += `<span class="chip ${isTop?'top':''}" onclick="seleccionarCiudad('${c.ciudad}',this)">
-          ${medal}${c.ciudad} ${pct}
-        </span>`;
-      });
-    }
-
-    // Ciudades estáticas que no están ya en los datos
-    const yaEnDatos = new Set(conDatos.map(c => c.ciudad.toLowerCase()));
-    const estaticas = CIUDADES_ESTATICAS.filter(c => !yaEnDatos.has(c.toLowerCase()));
-    if (estaticas.length > 0) {
-      chips += `<div style="font-size:.72em;color:#888;width:100%;padding:4px 0;margin-top:4px">🇲🇽 Otras ciudades:</div>`;
-      estaticas.forEach(c => {
-        chips += `<span class="chip" onclick="seleccionarCiudad('${c}',this)">${c}</span>`;
-      });
-    }
-
-    cont.innerHTML = chips || '<div style="color:#aaa;font-size:.82em">Sin datos disponibles</div>';
+    todasCiudades = data.filter(c => c.ciudad && c.ciudad !== 'Sin ciudad');
+    document.getElementById('ciudades-count').textContent = `(${todasCiudades.length})`;
+    renderChips(todasCiudades);
   } catch(e) {
-    // Fallback: solo estáticas
-    cont.innerHTML = CIUDADES_ESTATICAS.map(c =>
-      `<span class="chip" onclick="seleccionarCiudad('${c}',this)">${c}</span>`
-    ).join('');
+    document.getElementById('ciudades-chips').innerHTML =
+      '<div style="color:#e74c3c;font-size:.82em">Error cargando ciudades</div>';
   }
 }
 
+function renderChips(lista) {
+  const cont = document.getElementById('ciudades-chips');
+  if (!lista.length) { cont.innerHTML = '<div style="color:#aaa;font-size:.82em">Sin resultados</div>'; return; }
+
+  cont.innerHTML = lista.map((c, i) => {
+    const rank   = i + 1;
+    const medal  = rank === 1 ? '🥇 ' : rank === 2 ? '🥈 ' : rank === 3 ? '🥉 ' : `${rank}. `;
+    const isTop  = rank <= 3;
+    const hasInt = c.interes_pct > 0;
+    const badge  = hasInt
+      ? `<span style="background:rgba(0,204,71,.2);color:#155724;padding:1px 5px;border-radius:8px;font-size:.85em">${c.interes_pct}%</span>`
+      : `<span style="opacity:.55;font-size:.85em">${c.total}</span>`;
+    return `<span class="chip ${isTop?'top':''}" onclick="seleccionarCiudad('${c.ciudad}',this)">${medal}${c.ciudad} ${badge}</span>`;
+  }).join('');
+}
+
+function filtrarCiudades() {
+  const q = document.getElementById('ciudad-filter').value.toLowerCase().trim();
+  renderChips(q ? todasCiudades.filter(c => c.ciudad.toLowerCase().includes(q)) : todasCiudades);
+}
+
 function seleccionarCiudad(ciudad, el) {
-  ciudadSeleccionada = ciudad;
   document.getElementById('input-ciudad').value = ciudad;
-  // Deseleccionar todos
   document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
 }
