@@ -870,6 +870,15 @@ tr:hover td{background:var(--blue3)}
       <span class="icon">🔄</span> Seguimiento
     </div>
   </div>
+
+  <div class="nav-group">
+    <div class="nav-label">Herramientas</div>
+    <a href="/formulario" target="_blank" style="text-decoration:none">
+      <div class="nav-item" style="background:rgba(0,204,71,.2);border:1px solid rgba(0,204,71,.4)">
+        <span class="icon">📞</span> Iniciar Llamadas
+      </div>
+    </a>
+  </div>
 </aside>
 
 <!-- MAIN -->
