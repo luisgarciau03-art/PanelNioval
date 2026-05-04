@@ -761,6 +761,23 @@ def api_seguimiento():
     return jsonify(data)
 
 
+def _sheet_update_row(ws_key, row_num, fields, cache_key=None):
+    """Actualiza celdas de una hoja por nombre de columna."""
+    import gspread.utils as gsu
+    ws = get_worksheet(ws_key)
+    headers = ws.row_values(1)
+    updates = []
+    for col_name, value in fields.items():
+        if col_name in headers:
+            col_idx = headers.index(col_name) + 1
+            a1 = gsu.rowcol_to_a1(int(row_num), col_idx)
+            updates.append({'range': a1, 'values': [[str(value)]]})
+    if updates:
+        ws.batch_update(updates, value_input_option='USER_ENTERED')
+    _cache.pop(cache_key or ws_key, None)
+    return len(updates)
+
+
 @app.route('/api/seguimiento/update', methods=['POST'])
 def api_seguimiento_update():
     body = request.json or {}
@@ -769,20 +786,25 @@ def api_seguimiento_update():
         return jsonify({'error': 'Falta _row'}), 400
     fields = {k: v for k, v in body.items() if not k.startswith('_')}
     try:
-        import gspread.utils as gsu
-        ws = get_worksheet('seguimiento')
-        headers = ws.row_values(1)
-        updates = []
-        for col_name, value in fields.items():
-            if col_name in headers:
-                col_idx = headers.index(col_name) + 1
-                a1 = gsu.rowcol_to_a1(int(row_num), col_idx)
-                updates.append({'range': a1, 'values': [[str(value)]]})
-        if updates:
-            ws.batch_update(updates)
-        _cache.pop('seguimiento', None)
-        print(f"[seguimiento] update row={row_num} fields={list(fields.keys())}")
-        return jsonify({'ok': True, 'updated': len(updates)})
+        n = _sheet_update_row('seguimiento', row_num, fields)
+        print(f"[seguimiento] update row={row_num} fields={list(fields.keys())} updated={n}")
+        return jsonify({'ok': True, 'updated': n})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/mensajes/update', methods=['POST'])
+def api_mensajes_update():
+    body = request.json or {}
+    row_num = body.get('_row')
+    if not row_num:
+        return jsonify({'error': 'Falta _row'}), 400
+    fields = {k: v for k, v in body.items() if not k.startswith('_')}
+    try:
+        n = _sheet_update_row('mensajes', row_num, fields)
+        print(f"[mensajes] update row={row_num} fields={list(fields.keys())} updated={n}")
+        return jsonify({'ok': True, 'updated': n})
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -1201,11 +1223,11 @@ tr:hover td{background:var(--blue3)}
 <div id="edit-seg-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;overflow-y:auto;padding:20px">
   <div style="background:#fff;border-radius:18px;max-width:640px;margin:30px auto;padding:30px 28px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <button onclick="closeEditSeg()" style="position:absolute;top:14px;right:18px;background:none;border:none;font-size:1.6em;cursor:pointer;color:#888">✕</button>
-    <h3 style="margin-bottom:22px;color:#0047CC;font-size:1em;text-transform:uppercase;letter-spacing:.5px">✏️ Editar Registro — Seguimiento</h3>
+    <h3 id="edit-modal-title" style="margin-bottom:22px;color:#0047CC;font-size:1em;text-transform:uppercase;letter-spacing:.5px">✏️ Editar Registro</h3>
     <div id="edit-seg-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:14px"></div>
     <div style="margin-top:24px;display:flex;gap:10px;justify-content:flex-end">
       <button onclick="closeEditSeg()" style="padding:9px 22px;border-radius:9px;border:1px solid #ddd;background:#f5f5f5;cursor:pointer;font-weight:600">Cancelar</button>
-      <button id="edit-seg-save" onclick="saveEditSeg()" style="padding:9px 22px;border-radius:9px;border:none;background:#0047CC;color:#fff;cursor:pointer;font-weight:700">💾 Guardar</button>
+      <button id="edit-seg-save" onclick="saveEdit()" style="padding:9px 22px;border-radius:9px;border:none;background:#0047CC;color:#fff;cursor:pointer;font-weight:700">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -1675,20 +1697,22 @@ function renderTable(key, tableId, pagId) {
   }
 
   const isSeguimiento = key === 'seguimiento';
+  const isMensajes    = key === 'mensajes';
+  const isEditable    = isSeguimiento || isMensajes;
+  const openFn        = isMensajes ? 'openEditMen' : 'openEditSeg';
   const arrow = c => c === sc ? (sd ? ' ▲' : ' ▼') : ' ⇅';
   const thStyle = 'cursor:pointer;white-space:nowrap;user-select:none';
 
-  // Encabezados: columna de edición primero en seguimiento
-  const editTh = isSeguimiento ? '<th style="width:60px"></th>' : '';
+  const editTh = isEditable ? '<th style="width:60px"></th>' : '';
   let html = `<table><thead><tr>${editTh}${sortedCols.map(c =>
     `<th style="${thStyle}" data-key="${key}" data-tableid="${tableId}" data-pagid="${pagId}" data-col="${c.replace(/"/g,'&quot;')}" onclick="sortTable(this)">${c}<span style="opacity:.4;font-size:.75em">${arrow(c)}</span></th>`
   ).join('')}</tr></thead><tbody>`;
 
   slice.forEach(row => {
-    // Registrar en el mapa de edición para seguimiento
     if (isSeguimiento && row._row) _segRowMap[row._row] = row;
-    const editTd = isSeguimiento
-      ? `<td><button class="btn-edit-row" onclick="openEditSeg(${row._row})">✏️ Editar</button></td>`
+    if (isMensajes    && row._row) _menRowMap[row._row] = row;
+    const editTd = isEditable
+      ? `<td><button class="btn-edit-row" onclick="${openFn}(${row._row})">✏️ Editar</button></td>`
       : '';
     html += '<tr>' + editTd + sortedCols.map(c => {
       const v = row[c] !== undefined ? row[c] : '';
@@ -1955,6 +1979,7 @@ let _segResultKey = null;
 async function loadSeguimiento() {
   const data = await fetchAPI('/api/seguimiento');
   state.data['seguimiento'] = data;
+  _segColumnOptions = buildColumnOptions(data);
 
   // Detectar columna "Resultado Llamada" o similar
   if (data.length) {
@@ -2018,48 +2043,92 @@ function renderSegTab() {
   renderTable('seguimiento', 'seguimiento-table', 'seguimiento-pag');
 }
 
-// ─── EDICIÓN SEGUIMIENTO ─────────────────────────────────────────────────────
-const _segRowMap = {};  // _row → registro completo
+// ─── EDICIÓN GENÉRICA (Seguimiento + Mensajes) ───────────────────────────────
+const _segRowMap = {};
+const _menRowMap = {};
+let _segColumnOptions = {};  // columna → [opciones] derivadas del dataset
+let _editCtx = { endpoint: '', rowMap: {}, reload: null, label: '' };
 
-function openEditSeg(rowNum) {
-  const row = _segRowMap[rowNum];
+function buildColumnOptions(data) {
+  const opts = {};
+  if (!data.length) return opts;
+  const keys = Object.keys(data[0]).filter(k => !k.startsWith('_'));
+  keys.forEach(k => {
+    const vals = [...new Set(data.map(r => String(r[k] || '').trim()).filter(Boolean))].sort();
+    if (vals.length >= 2 && vals.length <= 20) opts[k] = vals;
+  });
+  return opts;
+}
+
+function openEdit(ctx, rowNum) {
+  _editCtx = ctx;
+  const row = ctx.rowMap[rowNum];
   if (!row) return;
+  const opts = ctx.columnOptions || {};
   const fields = Object.entries(row).filter(([k]) => !k.startsWith('_'));
-  const html = fields.map(([k, v]) => `
-    <div class="edit-field-group">
-      <label>${k}</label>
-      <input data-field="${k.replace(/"/g,'&quot;')}" value="${String(v).replace(/"/g,'&quot;').replace(/</g,'&lt;')}">
-    </div>`).join('');
+  const html = fields.map(([k, v]) => {
+    const safeK = k.replace(/"/g, '&quot;');
+    const safeV = String(v).replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const options = opts[k];
+    if (options) {
+      const selectOpts = options.map(o =>
+        `<option value="${o.replace(/"/g,'&quot;')}"${o === String(v).trim() ? ' selected' : ''}>${o}</option>`
+      ).join('');
+      return `<div class="edit-field-group"><label>${k}</label>
+        <select data-field="${safeK}" style="width:100%;padding:7px 10px;border:1.5px solid #d0d7e2;border-radius:8px;font-size:.93em">
+          <option value=""></option>${selectOpts}
+        </select></div>`;
+    }
+    return `<div class="edit-field-group"><label>${k}</label>
+      <input data-field="${safeK}" value="${safeV}"></div>`;
+  }).join('');
+  document.getElementById('edit-modal-title').textContent = `✏️ Editar — ${ctx.label}`;
   document.getElementById('edit-seg-fields').innerHTML = html;
   document.getElementById('edit-seg-modal')._rowNum = rowNum;
   document.getElementById('edit-seg-modal').style.display = 'block';
+}
+
+function openEditSeg(rowNum) {
+  openEdit({ endpoint: '/api/seguimiento/update', rowMap: _segRowMap,
+    columnOptions: _segColumnOptions, label: 'Seguimiento',
+    reload: async () => { delete state.loaded['seguimiento']; await loadSeguimiento(); }
+  }, rowNum);
+}
+
+function openEditMen(rowNum) {
+  openEdit({ endpoint: '/api/mensajes/update', rowMap: _menRowMap,
+    columnOptions: {}, label: 'Mensajes',
+    reload: async () => {
+      delete state.loaded['mensajes'];
+      await loadTableSection('mensajes', '/api/prospectos/mensajes', 'mensajes-table', 'mensajes-pag', ['mensajes-search']);
+    }
+  }, rowNum);
 }
 
 function closeEditSeg() {
   document.getElementById('edit-seg-modal').style.display = 'none';
 }
 
-async function saveEditSeg() {
+async function saveEdit() {
   const modal = document.getElementById('edit-seg-modal');
   const rowNum = modal._rowNum;
-  const row = _segRowMap[rowNum];
+  const row = _editCtx.rowMap[rowNum];
   if (!row) return;
-  const inputs = modal.querySelectorAll('input[data-field]');
+  const inputs = modal.querySelectorAll('[data-field]');
   const payload = { _row: row._row };
-  inputs.forEach(inp => { payload[inp.dataset.field] = inp.value; });
+  inputs.forEach(el => { payload[el.dataset.field] = el.value; });
   const btn = document.getElementById('edit-seg-save');
   btn.textContent = '⏳ Guardando...';
   btn.disabled = true;
   try {
-    const res = await fetch('/api/seguimiento/update', {
+    const res = await fetch(_editCtx.endpoint, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     });
     const data = await res.json();
     if (data.ok) {
       closeEditSeg();
-      delete state.loaded['seguimiento'];
-      await loadSeguimiento();
+      if (_editCtx.reload) await _editCtx.reload();
     } else {
       alert('Error: ' + (data.error || 'No se pudo guardar'));
     }
