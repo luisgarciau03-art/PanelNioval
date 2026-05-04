@@ -143,12 +143,13 @@ def values_to_records(rows: list) -> list:
         return []
     headers = [str(h).strip() for h in rows[0]]
     records = []
-    for row in rows[1:]:
-        # Ignorar filas completamente vacías
+    for sheet_row, row in enumerate(rows[1:], start=2):  # row 1 = header
         if not any(str(c).strip() for c in row):
             continue
         padded = list(row) + [''] * (len(headers) - len(row))
-        records.append({headers[i]: str(padded[i]).strip() for i in range(len(headers))})
+        r = {headers[i]: str(padded[i]).strip() for i in range(len(headers))}
+        r['_row'] = sheet_row  # número de fila real en la hoja (para updates)
+        records.append(r)
     return records
 
 
@@ -760,6 +761,33 @@ def api_seguimiento():
     return jsonify(data)
 
 
+@app.route('/api/seguimiento/update', methods=['POST'])
+def api_seguimiento_update():
+    body = request.json or {}
+    row_num = body.get('_row')
+    if not row_num:
+        return jsonify({'error': 'Falta _row'}), 400
+    fields = {k: v for k, v in body.items() if not k.startswith('_')}
+    try:
+        import gspread.utils as gsu
+        ws = get_worksheet('seguimiento')
+        headers = ws.row_values(1)
+        updates = []
+        for col_name, value in fields.items():
+            if col_name in headers:
+                col_idx = headers.index(col_name) + 1
+                a1 = gsu.rowcol_to_a1(int(row_num), col_idx)
+                updates.append({'range': a1, 'values': [[str(value)]]})
+        if updates:
+            ws.batch_update(updates)
+        _cache.pop('seguimiento', None)
+        print(f"[seguimiento] update row={row_num} fields={list(fields.keys())}")
+        return jsonify({'ok': True, 'updated': len(updates)})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/ventas/stats')
 def api_ventas_stats():
     ventas = get_data('ventas')
@@ -878,6 +906,12 @@ body{font-family:'Segoe UI',sans-serif;background:#f0f4ff;display:flex;min-heigh
 .seg-tab:hover{background:#e2e8f0;color:#1e293b}
 .seg-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
 .seg-tab .tab-count{font-size:.75em;opacity:.75;margin-left:3px}
+.edit-field-group{display:flex;flex-direction:column;gap:4px}
+.edit-field-group label{font-size:.72em;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px}
+.edit-field-group input,.edit-field-group select,.edit-field-group textarea{padding:7px 10px;border:1px solid #dde;border-radius:8px;font-size:.84em;outline:none;transition:border .2s;width:100%}
+.edit-field-group input:focus,.edit-field-group textarea:focus{border-color:#0047CC}
+.btn-edit-row{padding:4px 10px;border:1px solid #0047CC;border-radius:6px;background:#eff6ff;color:#0047CC;cursor:pointer;font-size:.78em;font-weight:600;white-space:nowrap}
+.btn-edit-row:hover{background:#0047CC;color:#fff}
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:.82em}
 th{background:var(--blue);color:#fff;padding:9px 10px;text-align:left;font-weight:600;white-space:nowrap}
@@ -1162,6 +1196,19 @@ tr:hover td{background:var(--blue3)}
 
   </div><!-- /content -->
 </div><!-- /main -->
+
+<!-- ═══ MODAL EDICIÓN SEGUIMIENTO ═══ -->
+<div id="edit-seg-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;overflow-y:auto;padding:20px">
+  <div style="background:#fff;border-radius:18px;max-width:640px;margin:30px auto;padding:30px 28px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <button onclick="closeEditSeg()" style="position:absolute;top:14px;right:18px;background:none;border:none;font-size:1.6em;cursor:pointer;color:#888">✕</button>
+    <h3 style="margin-bottom:22px;color:#0047CC;font-size:1em;text-transform:uppercase;letter-spacing:.5px">✏️ Editar Registro — Seguimiento</h3>
+    <div id="edit-seg-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:14px"></div>
+    <div style="margin-top:24px;display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closeEditSeg()" style="padding:9px 22px;border-radius:9px;border:1px solid #ddd;background:#f5f5f5;cursor:pointer;font-weight:600">Cancelar</button>
+      <button id="edit-seg-save" onclick="saveEditSeg()" style="padding:9px 22px;border-radius:9px;border:none;background:#0047CC;color:#fff;cursor:pointer;font-weight:700">💾 Guardar</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ─── STATE ──────────────────────────────────────────────────────────────────
@@ -1627,13 +1674,23 @@ function renderTable(key, tableId, pagId) {
     sortedCols = allCols.filter(c => c.trim() !== '').slice(0, 20);
   }
 
+  const isSeguimiento = key === 'seguimiento';
   const arrow = c => c === sc ? (sd ? ' ▲' : ' ▼') : ' ⇅';
   const thStyle = 'cursor:pointer;white-space:nowrap;user-select:none';
-  let html = `<table><thead><tr>${sortedCols.map(c =>
+
+  // Encabezados: columna de edición primero en seguimiento
+  const editTh = isSeguimiento ? '<th style="width:60px"></th>' : '';
+  let html = `<table><thead><tr>${editTh}${sortedCols.map(c =>
     `<th style="${thStyle}" data-key="${key}" data-tableid="${tableId}" data-pagid="${pagId}" data-col="${c.replace(/"/g,'&quot;')}" onclick="sortTable(this)">${c}<span style="opacity:.4;font-size:.75em">${arrow(c)}</span></th>`
   ).join('')}</tr></thead><tbody>`;
+
   slice.forEach(row => {
-    html += '<tr>' + sortedCols.map(c => {
+    // Registrar en el mapa de edición para seguimiento
+    if (isSeguimiento && row._row) _segRowMap[row._row] = row;
+    const editTd = isSeguimiento
+      ? `<td><button class="btn-edit-row" onclick="openEditSeg(${row._row})">✏️ Editar</button></td>`
+      : '';
+    html += '<tr>' + editTd + sortedCols.map(c => {
       const v = row[c] !== undefined ? row[c] : '';
       return `<td>${renderCell(c, String(v), row)}</td>`;
     }).join('') + '</tr>';
@@ -1959,6 +2016,56 @@ function renderSegTab() {
   state.filtered['seguimiento'] = filtered;
   state.page['seguimiento'] = 1;
   renderTable('seguimiento', 'seguimiento-table', 'seguimiento-pag');
+}
+
+// ─── EDICIÓN SEGUIMIENTO ─────────────────────────────────────────────────────
+const _segRowMap = {};  // _row → registro completo
+
+function openEditSeg(rowNum) {
+  const row = _segRowMap[rowNum];
+  if (!row) return;
+  const fields = Object.entries(row).filter(([k]) => !k.startsWith('_'));
+  const html = fields.map(([k, v]) => `
+    <div class="edit-field-group">
+      <label>${k}</label>
+      <input data-field="${k.replace(/"/g,'&quot;')}" value="${String(v).replace(/"/g,'&quot;').replace(/</g,'&lt;')}">
+    </div>`).join('');
+  document.getElementById('edit-seg-fields').innerHTML = html;
+  document.getElementById('edit-seg-modal')._rowNum = rowNum;
+  document.getElementById('edit-seg-modal').style.display = 'block';
+}
+
+function closeEditSeg() {
+  document.getElementById('edit-seg-modal').style.display = 'none';
+}
+
+async function saveEditSeg() {
+  const modal = document.getElementById('edit-seg-modal');
+  const rowNum = modal._rowNum;
+  const row = _segRowMap[rowNum];
+  if (!row) return;
+  const inputs = modal.querySelectorAll('input[data-field]');
+  const payload = { _row: row._row };
+  inputs.forEach(inp => { payload[inp.dataset.field] = inp.value; });
+  const btn = document.getElementById('edit-seg-save');
+  btn.textContent = '⏳ Guardando...';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/seguimiento/update', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.ok) {
+      closeEditSeg();
+      delete state.loaded['seguimiento'];
+      await loadSeguimiento();
+    } else {
+      alert('Error: ' + (data.error || 'No se pudo guardar'));
+    }
+  } catch(e) { alert('Error de conexión'); }
+  btn.textContent = '💾 Guardar';
+  btn.disabled = false;
 }
 
 // ─── UTILS ──────────────────────────────────────────────────────────────────
