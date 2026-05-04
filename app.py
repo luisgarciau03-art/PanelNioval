@@ -2309,52 +2309,52 @@ def marcar_contacto_procesado(row_num):
 
 
 def guardar_respuesta_formulario(datos):
-    """Guarda respuesta en hoja Respuestas de formulario 1."""
+    """Guarda respuesta en hoja Respuestas de formulario 1 usando append_row."""
     try:
         client = get_gs_client()
         sp = client.open_by_key(SHEET_IDS['respuestas'])
         ws = sp.get_worksheet_by_id(SHEET_GIDS['respuestas'])
-        rows = ws.get_all_values()
-        ultima_fila = len(rows) + 1
 
-        fecha_hora  = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        tienda      = datos.get('tienda', '')
-        r0          = datos.get('r0', '')        # Estado llamada
-        r1          = datos.get('r1', '')        # Pregunta 1
-        r2          = datos.get('r2', '')        # Pregunta 2
-        r3          = datos.get('r3', '')        # Pedido inicial
-        r4          = datos.get('r4', '')        # Pedido muestra
-        r5          = datos.get('r5', '')        # Esta semana
-        r6          = datos.get('r6', '')        # Cerrar pedido
-        r7          = datos.get('r7', '')        # Conclusión
-        resultado   = datos.get('resultado', '')
+        fecha_hora = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        tienda     = datos.get('tienda', '')
+        r0         = datos.get('r0', '')   # Estado llamada
+        r1         = datos.get('r1', '')   # Pregunta 1
+        r2         = datos.get('r2', '')   # Pregunta 2
+        r3         = datos.get('r3', '')   # Pedido inicial
+        r4         = datos.get('r4', '')   # Pedido muestra
+        r5         = datos.get('r5', '')   # Esta semana
+        r6         = datos.get('r6', '')   # Cerrar pedido
+        r7         = datos.get('r7', '')   # Conclusión
+        resultado  = datos.get('resultado', '')
 
         # Columna J = conclusión o estado especial
         col_j = ''
-        if r7 == 'Colgo':              col_j = 'Colgo'
-        elif r0 == 'Buzon':            col_j = 'BUZON'
-        elif r0 == 'Telefono Incorrecto': col_j = 'TELEFONO INCORRECTO'
-        elif resultado == 'NEGADO':    col_j = 'No apto'
+        if r7 == 'Colgo':                  col_j = 'Colgo'
+        elif r0 == 'Buzon':                col_j = 'BUZON'
+        elif r0 == 'Telefono Incorrecto':  col_j = 'TELEFONO INCORRECTO'
+        elif resultado == 'NEGADO':        col_j = 'No apto'
         elif resultado == 'NO COMPATIBLE': col_j = 'No compatible'
         elif resultado == 'MARCA UNICA':   col_j = 'Marca Unica'
-        elif r7:                       col_j = r7
+        elif r7:                           col_j = r7
 
-        actualizaciones = [
-            {'range': f'A{ultima_fila}', 'values': [[fecha_hora]]},
-            {'range': f'B{ultima_fila}', 'values': [[tienda]]},
-        ]
-        if r1: actualizaciones.append({'range': f'C{ultima_fila}', 'values': [[r1]]})
-        if r2: actualizaciones.append({'range': f'D{ultima_fila}', 'values': [[r2]]})
-        if r3: actualizaciones.append({'range': f'E{ultima_fila}', 'values': [[r3]]})
-        if r4: actualizaciones.append({'range': f'G{ultima_fila}', 'values': [[r4]]})
-        if r5: actualizaciones.append({'range': f'H{ultima_fila}', 'values': [[r5]]})
-        if r6: actualizaciones.append({'range': f'I{ultima_fila}', 'values': [[r6]]})
-        if col_j: actualizaciones.append({'range': f'J{ultima_fila}', 'values': [[col_j]]})
-        actualizaciones.append({'range': f'S{ultima_fila}', 'values': [[resultado]]})
-        if r0: actualizaciones.append({'range': f'T{ultima_fila}', 'values': [[r0]]})
+        # Fila completa A:T (20 columnas) — una sola llamada API
+        fila = [''] * 20
+        fila[0]  = fecha_hora   # A - Fecha/Hora
+        fila[1]  = tienda       # B - Tienda
+        fila[2]  = r1           # C
+        fila[3]  = r2           # D
+        fila[4]  = r3           # E
+        # fila[5] = ''          # F (vacío intencional)
+        fila[6]  = r4           # G
+        fila[7]  = r5           # H
+        fila[8]  = r6           # I
+        fila[9]  = col_j        # J - Conclusión
+        fila[18] = resultado    # S - Compatible/Resultado
+        fila[19] = r0           # T - Estado llamada
 
-        ws.batch_update(actualizaciones)
+        ws.append_row(fila, value_input_option='USER_ENTERED')
         _cache.pop('respuestas', None)
+        _cache.pop('all_respuestas', None)
         return True
     except Exception as e:
         print(f"[formulario] guardar error: {e}")
