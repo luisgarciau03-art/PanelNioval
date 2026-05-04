@@ -2352,12 +2352,14 @@ def guardar_respuesta_formulario(datos):
         fila[18] = resultado    # S - Compatible/Resultado
         fila[19] = r0           # T - Estado llamada
 
-        ws.append_row(fila, value_input_option='USER_ENTERED')
+        print(f"[formulario] guardando → tienda='{tienda}' resultado='{resultado}' r0='{r0}' col_j='{col_j}'")
+        ws.append_row(fila)  # RAW por defecto, compatible gspread 5.x y 6.x
         _cache.pop('respuestas', None)
         _cache.pop('all_respuestas', None)
+        print(f"[formulario] OK — fila guardada en '{ws.title}'")
         return True
     except Exception as e:
-        print(f"[formulario] guardar error: {e}")
+        print(f"[formulario] ERROR guardar: {e}")
         traceback.print_exc()
         return False
 
@@ -2668,11 +2670,14 @@ function renderContacto(c) {
 
 function decidir(resultado) {
   O.resultado = resultado;
-  O.r0=''; O.r1=''; O.r2=''; O.r3=''; O.r4=''; O.r5=''; O.r6=''; O.r7='';
+  O.r1=''; O.r2=''; O.r3=''; O.r4=''; O.r5=''; O.r6=''; O.r7='';
   if (resultado === 'APROBADO') {
+    O.r0 = '';  // se captura en p0
     setProgress('prog0', 0, TOTAL_PREGUNTAS);
     showStep('p0');
   } else {
+    // NEGADO / NO COMPATIBLE / MARCA UNICA → el cliente respondió
+    O.r0 = 'Respondio';
     guardar();
   }
 }
@@ -2729,17 +2734,27 @@ async function guardar() {
     r0: O.r0, r1: O.r1, r2: O.r2, r3: O.r3,
     r4: O.r4, r5: O.r5, r6: O.r6, r7: O.r7,
   };
-  const r = await fetch('/api/formulario/guardar', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(payload)
-  });
-  const d = await r.json();
-  O.procesados++;
-  document.getElementById('stat-procesados').textContent = O.procesados;
-  document.getElementById('resumen-guardado').textContent =
-    `${tienda} → ${O.resultado}${O.r0 ? ' ('+O.r0+')' : ''}`;
-  showStep('siguiente');
+  try {
+    const r = await fetch('/api/formulario/guardar', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if (!d.ok) {
+      showStep('contacto');
+      alert('⚠️ Error al guardar: ' + (d.error || 'No se pudo guardar en la hoja. Intenta de nuevo.'));
+      return;
+    }
+    O.procesados++;
+    document.getElementById('stat-procesados').textContent = O.procesados;
+    document.getElementById('resumen-guardado').textContent =
+      `${tienda} → ${O.resultado}${O.r0 && O.r0 !== 'Respondio' ? ' ('+O.r0+')' : ''}`;
+    showStep('siguiente');
+  } catch(e) {
+    showStep('contacto');
+    alert('⚠️ Error de conexión al guardar. Verifica tu internet e intenta de nuevo.');
+  }
 }
 
 function cargarSiguiente() {
