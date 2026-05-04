@@ -514,34 +514,11 @@ def api_ventas():
 
 @app.route('/api/prospectos/mensajes')
 def api_mensajes():
-    """Mensajes: estructura por columna. Col A (A2+) = nombres de campo. Col B+ = registros."""
+    """Mensajes: fila 1 = encabezados de columna, filas 2+ = registros (estándar)."""
     try:
         ws = get_worksheet('mensajes')
-        all_vals = ws.get_all_values()
-        if not all_vals:
-            return jsonify([])
-        # Fila 1 es título/encabezado — se ignora
-        # Col A desde fila 2 = nombres de campo
-        field_rows = []  # (row_idx_0based, field_name)
-        for i in range(1, len(all_vals)):
-            fname = str(all_vals[i][0]).strip() if all_vals[i] else ''
-            if fname:
-                field_rows.append((i, fname))
-        if not field_rows:
-            return jsonify([])
-        max_cols = max(len(r) for r in all_vals)
-        records = []
-        for col_idx in range(1, max_cols):  # Col B (idx 1), C (idx 2), ...
-            record = {'_col': col_idx + 1}  # 1-indexed para gspread
-            has_data = False
-            for row_idx, fname in field_rows:
-                row = all_vals[row_idx] if row_idx < len(all_vals) else []
-                val = str(row[col_idx]).strip() if col_idx < len(row) else ''
-                record[fname] = val
-                if val:
-                    has_data = True
-            if has_data:
-                records.append(record)
+        rows = ws.get_all_values()
+        records = values_to_records(rows)
         return jsonify(records)
     except Exception as e:
         print(f"[mensajes] error: {e}")
@@ -827,32 +804,15 @@ def api_seguimiento_update():
 
 @app.route('/api/mensajes/update', methods=['POST'])
 def api_mensajes_update():
-    """Actualiza un mensaje (columna) por campo: busca fila del campo en col A, actualiza celda col×fila."""
     body = request.json or {}
-    col_num = body.get('_col')  # columna 1-indexed del registro
-    if not col_num:
-        return jsonify({'error': 'Falta _col'}), 400
+    row_num = body.get('_row')
+    if not row_num:
+        return jsonify({'error': 'Falta _row'}), 400
     fields = {k: v for k, v in body.items() if not k.startswith('_')}
     try:
-        import gspread.utils as gsu
-        ws = get_worksheet('mensajes')
-        all_vals = ws.get_all_values()
-        # Mapear nombre de campo → fila 1-indexed (desde fila 2)
-        field_to_row = {}
-        for i in range(1, len(all_vals)):
-            fname = str(all_vals[i][0]).strip() if all_vals[i] else ''
-            if fname:
-                field_to_row[fname] = i + 1  # 1-indexed
-        updates = []
-        for fname, value in fields.items():
-            if fname in field_to_row:
-                a1 = gsu.rowcol_to_a1(field_to_row[fname], int(col_num))
-                updates.append({'range': a1, 'values': [[str(value)]]})
-        if updates:
-            ws.batch_update(updates, value_input_option='USER_ENTERED')
-        _cache.pop('mensajes', None)
-        print(f"[mensajes] update col={col_num} fields={list(fields.keys())} updated={len(updates)}")
-        return jsonify({'ok': True, 'updated': len(updates)})
+        n = _sheet_update_row('mensajes', row_num, fields)
+        print(f"[mensajes] update row={row_num} fields={list(fields.keys())} updated={n}")
+        return jsonify({'ok': True, 'updated': n})
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -976,12 +936,19 @@ body{font-family:'Segoe UI',sans-serif;background:#f0f4ff;display:flex;min-heigh
 .seg-tab:hover{background:#e2e8f0;color:#1e293b}
 .seg-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
 .seg-tab .tab-count{font-size:.75em;opacity:.75;margin-left:3px}
-.edit-field-group{display:flex;flex-direction:column;gap:4px}
-.edit-field-group label{font-size:.72em;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px}
-.edit-field-group input,.edit-field-group select,.edit-field-group textarea{padding:7px 10px;border:1px solid #dde;border-radius:8px;font-size:.84em;outline:none;transition:border .2s;width:100%}
-.edit-field-group input:focus,.edit-field-group textarea:focus{border-color:#0047CC}
-.btn-edit-row{padding:4px 10px;border:1px solid #0047CC;border-radius:6px;background:#eff6ff;color:#0047CC;cursor:pointer;font-size:.78em;font-weight:600;white-space:nowrap}
-.btn-edit-row:hover{background:#0047CC;color:#fff}
+.edit-field-group{display:flex;flex-direction:column;gap:5px}
+.edit-field-group label{font-size:.68em;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.6px;display:flex;align-items:center;gap:4px}
+.edit-field-group input,.edit-field-group select,.edit-field-group textarea{padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.87em;outline:none;transition:border .2s,box-shadow .2s;width:100%;background:#f8fafc;color:#1e293b}
+.edit-field-group input:focus,.edit-field-group select:focus,.edit-field-group textarea:focus{border-color:#0047CC;box-shadow:0 0 0 3px rgba(0,71,204,.1);background:#fff}
+.edit-field-group textarea{resize:vertical;min-height:72px;line-height:1.5}
+.edit-field-group input[type=date]{color:#0f172a}
+.btn-edit-row{padding:4px 11px;border:1.5px solid #0047CC;border-radius:7px;background:#eff6ff;color:#0047CC;cursor:pointer;font-size:.77em;font-weight:700;white-space:nowrap;transition:all .15s}
+.btn-edit-row:hover{background:#0047CC;color:#fff;box-shadow:0 2px 8px rgba(0,71,204,.25)}
+.color-opt{position:relative;width:30px;height:30px;border-radius:50%;cursor:pointer;transition:transform .15s,border .15s;flex-shrink:0}
+.color-opt:hover{transform:scale(1.15)}
+.color-opt.selected{transform:scale(1.1)}
+.color-legend{font-size:.7em;color:#64748b;display:flex;align-items:center;gap:5px;white-space:nowrap}
+#edit-color-picker{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:.82em}
 th{background:var(--blue);color:#fff;padding:9px 10px;text-align:left;font-weight:600;white-space:nowrap}
@@ -1267,15 +1234,29 @@ tr:hover td{background:var(--blue3)}
   </div><!-- /content -->
 </div><!-- /main -->
 
-<!-- ═══ MODAL EDICIÓN SEGUIMIENTO ═══ -->
-<div id="edit-seg-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;overflow-y:auto;padding:20px">
-  <div style="background:#fff;border-radius:18px;max-width:640px;margin:30px auto;padding:30px 28px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-    <button onclick="closeEditSeg()" style="position:absolute;top:14px;right:18px;background:none;border:none;font-size:1.6em;cursor:pointer;color:#888">✕</button>
-    <h3 id="edit-modal-title" style="margin-bottom:22px;color:#0047CC;font-size:1em;text-transform:uppercase;letter-spacing:.5px">✏️ Editar Registro</h3>
-    <div id="edit-seg-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:14px"></div>
-    <div style="margin-top:24px;display:flex;gap:10px;justify-content:flex-end">
-      <button onclick="closeEditSeg()" style="padding:9px 22px;border-radius:9px;border:1px solid #ddd;background:#f5f5f5;cursor:pointer;font-weight:600">Cancelar</button>
-      <button id="edit-seg-save" onclick="saveEdit()" style="padding:9px 22px;border-radius:9px;border:none;background:#0047CC;color:#fff;cursor:pointer;font-weight:700">💾 Guardar</button>
+<!-- ═══ MODAL EDICIÓN ═══ -->
+<div id="edit-seg-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.65);backdrop-filter:blur(5px);z-index:9999;overflow-y:auto;padding:20px">
+  <div style="background:#fff;border-radius:22px;max-width:740px;margin:24px auto;position:relative;box-shadow:0 30px 90px rgba(0,0,0,.4);overflow:hidden">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#0047CC 0%,#0284c7 100%);padding:22px 28px 18px;position:relative">
+      <button onclick="closeEditSeg()" style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.18);border:none;border-radius:50%;width:34px;height:34px;color:#fff;font-size:1.15em;cursor:pointer;line-height:34px;text-align:center;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.32)'" onmouseout="this.style.background='rgba(255,255,255,.18)'">✕</button>
+      <div id="edit-modal-title" style="color:#fff;font-size:1.05em;font-weight:800;letter-spacing:.3px">✏️ Editar Registro</div>
+      <div id="edit-modal-subtitle" style="color:rgba(255,255,255,.65);font-size:.78em;margin-top:5px;max-width:560px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+    </div>
+    <!-- Color selector (solo Seguimiento) -->
+    <div id="edit-color-section" style="padding:14px 28px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:14px">
+      <span style="font-size:.68em;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Estado visual</span>
+      <div id="edit-color-picker"></div>
+      <span id="edit-color-label" style="font-size:.78em;color:#475569;font-style:italic"></span>
+    </div>
+    <!-- Fields -->
+    <div style="padding:22px 28px 10px">
+      <div id="edit-seg-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:15px 18px"></div>
+    </div>
+    <!-- Footer -->
+    <div style="padding:16px 28px 20px;display:flex;gap:10px;justify-content:flex-end;background:#f8fafc;border-top:1px solid #e2e8f0;margin-top:10px">
+      <button onclick="closeEditSeg()" style="padding:10px 26px;border-radius:10px;border:1.5px solid #cbd5e1;background:#fff;cursor:pointer;font-weight:600;color:#475569;font-size:.9em;transition:all .15s" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#fff'">Cancelar</button>
+      <button id="edit-seg-save" onclick="saveEdit()" style="padding:10px 26px;border-radius:10px;border:none;background:linear-gradient(135deg,#0047CC,#0284c7);color:#fff;cursor:pointer;font-weight:700;font-size:.9em;box-shadow:0 4px 14px rgba(0,71,204,.35);transition:all .15s">💾 Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -1758,12 +1739,15 @@ function renderTable(key, tableId, pagId) {
 
   slice.forEach(row => {
     if (isSeguimiento && row._row) _segRowMap[row._row] = row;
-    if (isMensajes    && row._col) _menRowMap[row._col] = row;
-    const editKey = isMensajes ? row._col : row._row;
+    if (isMensajes    && row._row) _menRowMap[row._row] = row;
+    const editKey = row._row;
     const editTd = isEditable && editKey
       ? `<td><button class="btn-edit-row" onclick="${openFn}(${editKey})">✏️ Editar</button></td>`
       : '<td></td>';
-    html += '<tr>' + editTd + sortedCols.map(c => {
+    const colorCode = (isSeguimiento && row._row) ? (_segColorMap[row._row] || '') : '';
+    const colorD    = colorCode ? SEG_COLORS[colorCode] : null;
+    const rowStyle  = colorD ? `style="background:${colorD.bg};border-left:5px solid ${colorD.border}"` : '';
+    html += `<tr ${rowStyle}>` + editTd + sortedCols.map(c => {
       const v = row[c] !== undefined ? row[c] : '';
       return `<td>${renderCell(c, String(v), row)}</td>`;
     }).join('') + '</tr>';
@@ -2095,8 +2079,24 @@ function renderSegTab() {
 // ─── EDICIÓN GENÉRICA (Seguimiento + Mensajes) ───────────────────────────────
 const _segRowMap = {};
 const _menRowMap = {};
-let _segColumnOptions = {};  // columna → [opciones] derivadas del dataset
+let _segColumnOptions = {};
 let _editCtx = { endpoint: '', rowMap: {}, reload: null, label: '' };
+
+// Colores de estado visual — persisten en localStorage
+const SEG_COLORS = {
+  '':       { hex:'#cbd5e1', bg:'',        border:'',        label:'Sin estado' },
+  'yellow': { hex:'#f59e0b', bg:'#fffbeb', border:'#f59e0b', label:'Pendiente envío' },
+  'red':    { hex:'#ef4444', bg:'#fef2f2', border:'#ef4444', label:'Urgente' },
+  'green':  { hex:'#22c55e', bg:'#f0fdf4', border:'#22c55e', label:'Completado' },
+  'blue':   { hex:'#3b82f6', bg:'#eff6ff', border:'#3b82f6', label:'En seguimiento' },
+  'orange': { hex:'#f97316', bg:'#fff7ed', border:'#f97316', label:'Esperando resp.' },
+  'purple': { hex:'#a855f7', bg:'#faf5ff', border:'#a855f7', label:'Info enviada' },
+};
+let _segColorMap = {};
+try { _segColorMap = JSON.parse(localStorage.getItem('seg_colors') || '{}'); } catch(e) {}
+function _saveColorMap() {
+  try { localStorage.setItem('seg_colors', JSON.stringify(_segColorMap)); } catch(e) {}
+}
 
 function buildColumnOptions(data) {
   const opts = {};
@@ -2109,32 +2109,101 @@ function buildColumnOptions(data) {
   return opts;
 }
 
+// Conversión de fechas DD/MM/YYYY ↔ YYYY-MM-DD
+function toInputDate(val) {
+  if (!val) return new Date().toISOString().slice(0, 10);
+  const m = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10);
+  return new Date().toISOString().slice(0, 10);
+}
+function fromInputDate(val) {
+  const m = val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : val;
+}
+
+function _isDateField(k)  { return /fecha|date/i.test(k); }
+function _isLongField(k,v){ return /nota|detalle|comentar|observ|descrip|info|mensaje/i.test(k) || String(v).length > 80; }
+
 function openEdit(ctx, rowNum) {
   _editCtx = ctx;
   const row = ctx.rowMap[rowNum];
   if (!row) return;
   const opts = ctx.columnOptions || {};
+  const isSeg = ctx.label === 'Seguimiento';
   const fields = Object.entries(row).filter(([k]) => !k.startsWith('_'));
+
+  // ── Color picker ──
+  const modal = document.getElementById('edit-seg-modal');
+  const colorSection = document.getElementById('edit-color-section');
+  if (isSeg) {
+    const curColor = _segColorMap[row._row] || '';
+    document.getElementById('edit-color-picker').innerHTML = Object.entries(SEG_COLORS).map(([code, c]) =>
+      `<div class="color-opt${code===curColor?' selected':''}" data-color="${code}" onclick="selectEditColor(this)"
+           title="${c.label}"
+           style="background:${code?c.hex:'#e2e8f0'};border:3px solid ${code===curColor?'#1e293b':'transparent'}">
+         ${code===curColor?'<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.75em;font-weight:900">✓</span>':''}
+       </div>`).join('');
+    document.getElementById('edit-color-label').textContent = SEG_COLORS[curColor]?.label || '';
+    colorSection.style.display = 'flex';
+    modal._color = curColor;
+  } else {
+    colorSection.style.display = 'none';
+    modal._color = undefined;
+  }
+
+  // ── Fields ──
   const html = fields.map(([k, v]) => {
-    const safeK = k.replace(/"/g, '&quot;');
-    const safeV = String(v).replace(/"/g, '&quot;').replace(/</g, '&lt;');
-    const options = opts[k];
-    if (options) {
-      const selectOpts = options.map(o =>
-        `<option value="${o.replace(/"/g,'&quot;')}"${o === String(v).trim() ? ' selected' : ''}>${o}</option>`
-      ).join('');
-      return `<div class="edit-field-group"><label>${k}</label>
-        <select data-field="${safeK}" style="width:100%;padding:7px 10px;border:1.5px solid #d0d7e2;border-radius:8px;font-size:.93em">
-          <option value=""></option>${selectOpts}
-        </select></div>`;
+    const safeK  = k.replace(/"/g,'&quot;');
+    const safeV  = String(v).replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    const fullRow = _isLongField(k, v) ? 'grid-column:1/-1' : '';
+    const icon   = _isDateField(k) ? '📅 ' : '';
+
+    if (_isDateField(k)) {
+      return `<div class="edit-field-group" style="${fullRow}">
+        <label>${icon}${k}</label>
+        <input type="date" data-field="${safeK}" data-type="date" value="${toInputDate(String(v))}">
+      </div>`;
     }
-    return `<div class="edit-field-group"><label>${k}</label>
-      <input data-field="${safeK}" value="${safeV}"></div>`;
+    if (opts[k]) {
+      const opts2 = opts[k].map(o=>
+        `<option value="${o.replace(/"/g,'&quot;')}"${o===String(v).trim()?' selected':''}>${o}</option>`).join('');
+      return `<div class="edit-field-group" style="${fullRow}">
+        <label>${k}</label>
+        <select data-field="${safeK}"><option value=""></option>${opts2}</select>
+      </div>`;
+    }
+    if (_isLongField(k, v)) {
+      return `<div class="edit-field-group" style="${fullRow}">
+        <label>${k}</label>
+        <textarea data-field="${safeK}" rows="3">${String(v).replace(/</g,'&lt;')}</textarea>
+      </div>`;
+    }
+    return `<div class="edit-field-group">
+      <label>${k}</label>
+      <input data-field="${safeK}" value="${safeV}">
+    </div>`;
   }).join('');
+
+  // Subtitle = primer valor no vacío
+  const subtitle = (fields.find(([,v]) => String(v).trim())?.[1] || '').slice(0, 55);
   document.getElementById('edit-modal-title').textContent = `✏️ Editar — ${ctx.label}`;
+  document.getElementById('edit-modal-subtitle').textContent = subtitle;
   document.getElementById('edit-seg-fields').innerHTML = html;
-  document.getElementById('edit-seg-modal')._rowNum = rowNum;
-  document.getElementById('edit-seg-modal').style.display = 'block';
+  modal._rowNum = rowNum;
+  modal.style.display = 'block';
+}
+
+function selectEditColor(el) {
+  const code = el.dataset.color;
+  document.querySelectorAll('#edit-color-picker .color-opt').forEach(d => {
+    d.style.border = '3px solid transparent';
+    d.innerHTML = '';
+  });
+  el.style.border = '3px solid #1e293b';
+  el.innerHTML = '<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.75em;font-weight:900">✓</span>';
+  document.getElementById('edit-seg-modal')._color = code;
+  document.getElementById('edit-color-label').textContent = SEG_COLORS[code]?.label || '';
 }
 
 function openEditSeg(rowNum) {
@@ -2151,7 +2220,7 @@ function openEditMen(rowNum) {
       delete state.loaded['mensajes'];
       await loadTableSection('mensajes', '/api/prospectos/mensajes', 'mensajes-table', 'mensajes-pag', ['mensajes-search']);
     }
-  }, rowNum);
+  }, colNum);
 }
 
 function closeEditSeg() {
@@ -2167,10 +2236,18 @@ async function saveEdit() {
   const payload = {};
   if (row._row !== undefined) payload._row = row._row;
   if (row._col !== undefined) payload._col = row._col;
-  inputs.forEach(el => { payload[el.dataset.field] = el.value; });
+  inputs.forEach(el => {
+    payload[el.dataset.field] = el.dataset.type === 'date' ? fromInputDate(el.value) : el.value;
+  });
+  // Guardar color en localStorage
+  if (_editCtx.label === 'Seguimiento' && row._row !== undefined) {
+    const color = modal._color !== undefined ? modal._color : '';
+    if (color) _segColorMap[row._row] = color;
+    else        delete _segColorMap[row._row];
+    _saveColorMap();
+  }
   const btn = document.getElementById('edit-seg-save');
-  btn.textContent = '⏳ Guardando...';
-  btn.disabled = true;
+  btn.textContent = '⏳ Guardando...'; btn.disabled = true;
   try {
     const res = await fetch(_editCtx.endpoint, {
       method: 'POST', headers: {'Content-Type':'application/json'},
@@ -2184,8 +2261,7 @@ async function saveEdit() {
       alert('Error: ' + (data.error || 'No se pudo guardar'));
     }
   } catch(e) { alert('Error de conexión'); }
-  btn.textContent = '💾 Guardar';
-  btn.disabled = false;
+  btn.textContent = '💾 Guardar cambios'; btn.disabled = false;
 }
 
 // ─── UTILS ──────────────────────────────────────────────────────────────────
