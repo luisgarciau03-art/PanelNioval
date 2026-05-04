@@ -2434,86 +2434,127 @@ _import_lock = threading.Lock()
 
 
 def _buscar_negocios(gmaps_client, categoria, ciudad):
-    """Busca negocios con filtros de calidad. Devuelve (aprobados, stats)."""
+    """Busca negocios con filtros de calidad. Campos y lógica idénticos al script original."""
     resultados = []
     vistos = set()
     stats  = {'pocas_resenas': 0, 'baja_calificacion': 0, 'cerrado': 0, 'sin_telefono': 0}
 
-    variaciones = [f"{categoria} en {ciudad}", f"{categoria} {ciudad}"]
+    variaciones = [
+        f"{categoria} en {ciudad}",
+        f"{categoria} cerca de {ciudad}",
+        f"{categoria} {ciudad}",
+    ]
 
     for query in variaciones:
-        try:
-            resp = gmaps_client.places(query=query, language='es', type='establishment')
-            lugares = resp.get('results', [])
-            paginas = 1
-            while 'next_page_token' in resp and paginas < 3:
-                time.sleep(2)
-                try:
-                    resp = gmaps_client.places(page_token=resp['next_page_token'])
-                    lugares.extend(resp.get('results', []))
-                    paginas += 1
-                except Exception:
-                    break
+        for intento in range(3):
+            try:
+                resp   = gmaps_client.places(query=query, language='es', type='establishment')
+                lugares = resp.get('results', [])
+                paginas = 1
+                while 'next_page_token' in resp and paginas < 3:
+                    time.sleep(2)
+                    try:
+                        resp = gmaps_client.places(page_token=resp['next_page_token'])
+                        lugares.extend(resp.get('results', []))
+                        paginas += 1
+                    except Exception:
+                        break
 
-            for lugar in lugares:
-                pid = lugar.get('place_id')
-                if pid in vistos: continue
-                cal  = lugar.get('rating')
-                resenas = lugar.get('user_ratings_total')
-                if not resenas or resenas < 10: stats['pocas_resenas'] += 1; continue
-                if not cal or cal < 3.5:        stats['baja_calificacion'] += 1; continue
-                vistos.add(pid)
-                try:
-                    det = gmaps_client.place(pid, language='es')['result']
-                    abierto = det.get('opening_hours', {}).get('open_now')
-                    if abierto is False: stats['cerrado'] += 1; continue
-                    tel = det.get('formatted_phone_number', '')
-                    if not tel: stats['sin_telefono'] += 1; continue
+                for lugar in lugares:
+                    pid     = lugar.get('place_id')
+                    if pid in vistos: continue
+                    cal     = lugar.get('rating')
+                    resenas = lugar.get('user_ratings_total')
 
-                    tamano = 'Grande' if resenas >= 500 else 'Mediano' if resenas >= 200 else 'Pequeño'
-                    resultados.append({
-                        'TIENDA':      lugar.get('name', ''),
-                        'Dirección':   lugar.get('formatted_address', ''),
-                        'Calificación': cal,
-                        'Reseñas':     resenas,
-                        'Maps':        f"https://www.google.com/maps/place/?q=place_id:{pid}",
-                        'TELÉFONO':    tel,
-                        'Sitio Web':   det.get('website', ''),
-                        'Horarios':    str(det.get('opening_hours', {}).get('weekday_text', '')),
-                        'Tamaño':      tamano,
-                        'CATEGORIA ':  categoria,
-                    })
-                    time.sleep(0.3)
-                except Exception:
-                    continue
-            if lugares: break
-        except Exception as e:
-            print(f'[importador] error query: {e}')
-            time.sleep(2)
+                    if not resenas or resenas < 10:
+                        stats['pocas_resenas'] += 1; continue
+                    if not cal or cal < 3.5:
+                        stats['baja_calificacion'] += 1; continue
+
+                    vistos.add(pid)
+                    try:
+                        det     = gmaps_client.place(pid, language='es')['result']
+                        abierto = det.get('opening_hours', {}).get('open_now')
+                        if abierto is False:
+                            stats['cerrado'] += 1; continue
+                        tel = det.get('formatted_phone_number', '')
+                        if not tel:
+                            stats['sin_telefono'] += 1; continue
+
+                        tamano = 'Grande' if resenas >= 500 else 'Mediano' if resenas >= 200 else 'Pequeño'
+                        resultados.append({
+                            'Nombre':          lugar.get('name', ''),
+                            'Dirección':        lugar.get('formatted_address', ''),
+                            'Calificación':     cal,
+                            'Núm. de Reseñas':  resenas,
+                            'Google Maps Link': f"https://www.google.com/maps/place/?q=place_id:{pid}",
+                            'Teléfono':         tel,
+                            'Sitio Web':        det.get('website', 'No disponible'),
+                            'Horarios':         str(det.get('opening_hours', {}).get('weekday_text', 'No disponible')),
+                            'Estado':           'Abierto',
+                            'Latitud':          lugar.get('geometry', {}).get('location', {}).get('lat', ''),
+                            'Longitud':         lugar.get('geometry', {}).get('location', {}).get('lng', ''),
+                            'Tamaño':           tamano,
+                            'Tipo Cliente':     'Mayorista/Corporativo' if resenas > 300 else 'Minorista',
+                        })
+                        time.sleep(0.3)
+                    except Exception:
+                        continue
+
+                if lugares: break
+
+            except Exception as e:
+                print(f'[importador] error query intento {intento+1}: {e}')
+                if intento < 2: time.sleep(2 ** intento)
+
+        if query != variaciones[-1]: time.sleep(1)
 
     return resultados, stats
 
 
 def _exportar_a_sheets(resultados, categoria, ciudad):
-    """Exporta resultados a LISTA DE CONTACTOS evitando duplicados."""
+    """Exporta a LISTA DE CONTACTOS con columnas idénticas al script original."""
     try:
         ws = get_worksheet('contactos')
         datos_actuales = ws.get_all_values()
+
+        # Detección de duplicados: Nombre|Dirección (igual que el original)
         nombres_existentes = set()
         for fila in datos_actuales[1:]:
-            if len(fila) > 0:
-                nombres_existentes.add(str(fila[0]).strip().upper())
+            if len(fila) > 7:
+                nombres_existentes.add(f"{fila[1]}|{fila[7]}")
 
-        fecha   = datetime.now().strftime('%d/%m/%Y')
-        semana  = datetime.now().isocalendar()[1]
-        nuevos  = []
+        fecha  = datetime.now().strftime('%d/%m/%Y')
+        semana = datetime.now().isocalendar()[1]
+        nuevos = []
+
         for r in resultados:
-            if r['TIENDA'].strip().upper() not in nombres_existentes:
+            key = f"{r['Nombre']}|{r['Dirección']}"
+            if key not in nombres_existentes:
+                # Orden de columnas EXACTO al script original:
+                # NUM SEMANA | Nombre | Ciudad | Categoría | Teléfono | "" | "" |
+                # Dirección | Calificación | Núm. de Reseñas | Google Maps Link |
+                # Sitio Web | Horarios | Estado | Latitud | Longitud | Tamaño | Tipo Cliente | Fecha
                 nuevos.append([
-                    r['TIENDA'], r.get('CATEGORIA ', categoria), r.get('CIUDAD', ciudad),
-                    r.get('TELÉFONO', ''), r.get('Dirección', ''), r.get('Calificación', ''),
-                    r.get('Reseñas', ''), r.get('Maps', ''), r.get('Sitio Web', ''),
-                    r.get('Tamaño', ''), fecha, str(semana),
+                    semana,
+                    r['Nombre'],
+                    ciudad,
+                    categoria,
+                    r['Teléfono'],
+                    '',
+                    '',
+                    r['Dirección'],
+                    r['Calificación'],
+                    r['Núm. de Reseñas'],
+                    r['Google Maps Link'],
+                    r['Sitio Web'],
+                    r['Horarios'],
+                    r['Estado'],
+                    r['Latitud'],
+                    r['Longitud'],
+                    r['Tamaño'],
+                    r['Tipo Cliente'],
+                    fecha,
                 ])
 
         if nuevos:
@@ -2522,6 +2563,7 @@ def _exportar_a_sheets(resultados, categoria, ciudad):
         return len(nuevos)
     except Exception as e:
         print(f'[importador] sheets error: {e}')
+        traceback.print_exc()
         return 0
 
 
