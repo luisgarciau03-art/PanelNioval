@@ -1172,6 +1172,8 @@ const state = {
   filtered: {},
   page: {},
   pageSize: 50,
+  sortCol: {},
+  sortDir: {},  // true = asc, false = desc
 };
 
 const SECTION_TITLES = {
@@ -1586,13 +1588,25 @@ function renderTable(key, tableId, pagId) {
   const ps   = state.pageSize;
   const total = data.length;
   const totalPages = Math.ceil(total / ps);
-  const slice = data.slice((page-1)*ps, page*ps);
 
-  if (!slice.length) {
+  if (!total) {
     document.getElementById(tableId).innerHTML = '<div class="empty">No hay datos</div>';
     document.getElementById(pagId).innerHTML = '';
     return;
   }
+
+  // Ordenar antes de paginar
+  const sc = state.sortCol[key];
+  const sd = state.sortDir[key]; // true=asc false=desc
+  const sorted = sc ? [...data].sort((a, b) => {
+    const va = String(a[sc] ?? '');
+    const vb = String(b[sc] ?? '');
+    const na = parseFloat(va.replace(/[,$\s]/g, ''));
+    const nb = parseFloat(vb.replace(/[,$\s]/g, ''));
+    const cmp = !isNaN(na) && !isNaN(nb) ? na - nb : va.localeCompare(vb, 'es-MX');
+    return sd ? cmp : -cmp;
+  }) : data;
+  const slice = sorted.slice((page-1)*ps, page*ps);
 
   const allCols = Object.keys(slice[0]).filter(k => !k.startsWith('_'));
 
@@ -1605,19 +1619,19 @@ function renderTable(key, tableId, pagId) {
 
   let sortedCols;
   if (isVentas) {
-    // Mostrar solo columnas relevantes en el orden exacto indicado
     sortedCols = VENTAS_COLS.filter(c => allCols.includes(c));
-    // Agregar cualquier columna extra no vacía que no esté en la lista fija
     allCols.filter(c => !VENTAS_COLS.includes(c) && c.trim() !== '').forEach(c => sortedCols.push(c));
   } else if (isRespuestas) {
-    // Solo mostrar columnas clave con Conclusión al final
     sortedCols = RESPUESTAS_COLS.filter(c => allCols.includes(c));
   } else {
-    // Para otras secciones: orden exacto de la hoja, sin reordenar
     sortedCols = allCols.filter(c => c.trim() !== '').slice(0, 20);
   }
 
-  let html = `<table><thead><tr>${sortedCols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+  const arrow = c => c === sc ? (sd ? ' ▲' : ' ▼') : ' ⇅';
+  const thStyle = 'cursor:pointer;white-space:nowrap;user-select:none';
+  let html = `<table><thead><tr>${sortedCols.map(c =>
+    `<th style="${thStyle}" data-key="${key}" data-tableid="${tableId}" data-pagid="${pagId}" data-col="${c.replace(/"/g,'&quot;')}" onclick="sortTable(this)">${c}<span style="opacity:.4;font-size:.75em">${arrow(c)}</span></th>`
+  ).join('')}</tr></thead><tbody>`;
   slice.forEach(row => {
     html += '<tr>' + sortedCols.map(c => {
       const v = row[c] !== undefined ? row[c] : '';
@@ -1642,6 +1656,21 @@ function renderTable(key, tableId, pagId) {
 
 function goPage(key, tableId, pagId, p) {
   state.page[key] = p;
+  renderTable(key, tableId, pagId);
+}
+
+function sortTable(th) {
+  const key     = th.dataset.key;
+  const tableId = th.dataset.tableid;
+  const pagId   = th.dataset.pagid;
+  const col     = th.dataset.col;
+  if (state.sortCol[key] === col) {
+    state.sortDir[key] = !state.sortDir[key];
+  } else {
+    state.sortCol[key] = col;
+    state.sortDir[key] = true;
+  }
+  state.page[key] = 1;
   renderTable(key, tableId, pagId);
 }
 
