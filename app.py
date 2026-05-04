@@ -174,7 +174,7 @@ def get_data(key: str, force: bool = False) -> list:
 
 
 # GIDs de todas las hojas de respuestas a combinar
-_RESPUESTAS_GIDS = [1343998886, 703691069]  # Respuestas de formulario 1, Bruce FORMS
+_RESPUESTAS_GIDS = [1343998886]  # Respuestas de formulario 1
 
 def get_all_respuestas(force: bool = False) -> list:
     """Lee Respuestas de formulario 1 + Bruce FORMS y los combina en un dataset unificado."""
@@ -1118,11 +1118,6 @@ tr:hover td{background:var(--blue3)}
         <h3>📝 Respuestas del Formulario</h3>
         <div class="table-controls">
           <input type="text" id="resp-search" placeholder="🔍 Buscar..." oninput="filterTable('respuestas')">
-          <select id="resp-fuente" onchange="filterTable('respuestas')">
-            <option value="">Todas las fuentes</option>
-            <option value="Respuestas de formulario 1">Formulario 1</option>
-            <option value="Bruce FORMS">Bruce FORMS</option>
-          </select>
           <select id="resp-resultado" onchange="filterTable('respuestas')">
             <option value="">Todos los resultados</option>
             <option>APROBADO</option>
@@ -1547,10 +1542,6 @@ function filterTable(key) {
 
   // Specific filters
   if (key === 'respuestas') {
-    const fuenteEl = document.getElementById('resp-fuente');
-    const fuente = fuenteEl ? fuenteEl.value : '';
-    if (fuente) filtered = filtered.filter(r => String(r._sheet || '') === fuente);
-
     const resEl = document.getElementById('resp-resultado');
     const res = resEl ? resEl.value.toUpperCase() : '';
     if (res) filtered = filtered.filter(r => {
