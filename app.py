@@ -418,24 +418,13 @@ def api_contactos():
 
 @app.route('/api/prospectos/contactos-pendientes')
 def api_contactos_pendientes():
-    """Contactos que NO tienen ninguna respuesta registrada (aún no han sido llamados)."""
-    contactos  = get_data('contactos')
-    respuestas = get_data('respuestas')
-
-    # Construir set de nombres ya contactados (normalizado)
-    contactados = set()
-    for r in respuestas:
-        nombre = str(r.get('Nombre De la Tienda', r.get('TIENDA', r.get('Tienda', '')))).strip().upper()
-        if nombre:
-            contactados.add(nombre)
-
-    # Filtrar contactos cuyo TIENDA no está en el set de contactados
+    """Contactos donde la columna RESPUESTA en LISTA DE CONTACTOS está vacía."""
+    contactos = get_data('contactos')
     pendientes = []
     for c in contactos:
-        tienda = str(c.get('TIENDA', c.get('Tienda', c.get('Nombre', '')))).strip().upper()
-        if tienda and tienda not in contactados:
+        respuesta = str(c.get('RESPUESTA', '')).strip()
+        if not respuesta:
             pendientes.append(c)
-
     return jsonify(pendientes)
 
 
