@@ -2466,17 +2466,15 @@ def _buscar_negocios(gmaps_client, categoria, ciudad):
                     cal     = lugar.get('rating')
                     resenas = lugar.get('user_ratings_total')
 
-                    if not resenas or resenas < 10:
+                    if not resenas or resenas < 5:
                         stats['pocas_resenas'] += 1; continue
                     if not cal or cal < 3.5:
                         stats['baja_calificacion'] += 1; continue
 
                     vistos.add(pid)
                     try:
-                        det     = gmaps_client.place(pid, language='es')['result']
-                        abierto = det.get('opening_hours', {}).get('open_now')
-                        if abierto is False:
-                            stats['cerrado'] += 1; continue
+                        det = gmaps_client.place(pid, language='es')['result']
+                        # Filtro "Cerrado" eliminado — se capturan negocios sin importar horario
                         tel = det.get('formatted_phone_number', '')
                         if not tel:
                             stats['sin_telefono'] += 1; continue
@@ -2745,7 +2743,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399
   <div class="body">
 
     <div class="filters">
-      <strong>Filtros aplicados:</strong> Mínimo 10 reseñas · Calificación ≥ 3.5 ⭐ · Solo abiertos · Con teléfono
+      <strong>Filtros aplicados:</strong> Mínimo 5 reseñas · Calificación ≥ 3.5 ⭐ · Con teléfono
     </div>
 
     <!-- CATEGORÍAS -->
