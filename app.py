@@ -2275,59 +2275,83 @@ loadSection('dashboard');
 # ─── FORMULARIO DE LLAMADAS ──────────────────────────────────────────────────
 
 def get_contacto_pendiente(skip=0):
-    """Devuelve el contacto con columna F vacía (skip para avanzar)."""
+    """Devuelve el contacto pendiente — misma lógica que llenar_formularios.py."""
     try:
-        ws = get_worksheet('contactos')
+        client = get_gs_client()
+        sp = client.open_by_key(SHEET_IDS['contactos'])
+        ws = sp.worksheet('LISTA DE CONTACTOS')
         rows = ws.get_all_values()
         if not rows: return None
         headers = rows[0]
-        col_f_idx = 5  # Columna F (0-based)
+        # Buscar columna RESPUESTA por nombre; fallback a columna F (índice 5)
+        col_idx = next(
+            (i for i, h in enumerate(headers) if str(h).strip().upper() == 'RESPUESTA'),
+            5
+        )
+        print(f"[formulario] col_pendiente='{headers[col_idx] if col_idx < len(headers) else 'F'}' idx={col_idx}")
         encontrados = 0
         for i, row in enumerate(rows[1:], start=2):
-            val_f = row[col_f_idx] if len(row) > col_f_idx else ''
-            if not str(val_f).strip():
+            val = row[col_idx] if len(row) > col_idx else ''
+            if not str(val).strip():
                 if encontrados < skip:
                     encontrados += 1
                     continue
                 datos = {headers[j]: (row[j] if j < len(row) else '') for j in range(len(headers))}
                 datos['_row'] = i
+                datos['_col_respuesta'] = col_idx + 1  # 1-indexed para gspread
                 return datos
         return None
     except Exception as e:
         print(f"[formulario] get_contacto_pendiente error: {e}")
+        traceback.print_exc()
         return None
 
 
-def marcar_contacto_procesado(row_num):
-    """Marca columna F del contacto como procesado."""
+def marcar_contacto_procesado(row_num, col_respuesta=6):
+    """Marca columna RESPUESTA del contacto como Llamado."""
     try:
-        ws = get_worksheet('contactos')
-        ws.update_cell(row_num, 6, 'Llamado')
+        client = get_gs_client()
+        sp = client.open_by_key(SHEET_IDS['contactos'])
+        ws = sp.worksheet('LISTA DE CONTACTOS')
+        # Resolver columna RESPUESTA si no se proporcionó
+        if col_respuesta == 6:
+            headers = ws.row_values(1)
+            col_respuesta = next(
+                (i + 1 for i, h in enumerate(headers) if str(h).strip().upper() == 'RESPUESTA'),
+                6
+            )
+        ws.update_cell(row_num, col_respuesta, 'Llamado')
         _cache.pop('contactos', None)
+        print(f"[formulario] fila {row_num} col {col_respuesta} → Llamado")
     except Exception as e:
         print(f"[formulario] marcar error: {e}")
+        traceback.print_exc()
 
 
 def guardar_respuesta_formulario(datos):
-    """Guarda respuesta en hoja Respuestas de formulario 1 usando append_row."""
+    """Guarda respuesta en 'Respuestas de formulario 1' — misma lógica que llenar_formularios.py."""
     try:
         client = get_gs_client()
         sp = client.open_by_key(SHEET_IDS['respuestas'])
-        ws = sp.get_worksheet_by_id(SHEET_GIDS['respuestas'])
+        ws = sp.worksheet('Respuestas de formulario 1')
+
+        # Misma lógica que llenar_formularios.py: última fila por columna B (TIENDA)
+        col_b = ws.col_values(2)
+        ultima_fila = len(col_b) + 1
 
         fecha_hora = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
         tienda     = datos.get('tienda', '')
-        r0         = datos.get('r0', '')   # Estado llamada
-        r1         = datos.get('r1', '')   # Pregunta 1
-        r2         = datos.get('r2', '')   # Pregunta 2
-        r3         = datos.get('r3', '')   # Pedido inicial
-        r4         = datos.get('r4', '')   # Pedido muestra
-        r5         = datos.get('r5', '')   # Esta semana
-        r6         = datos.get('r6', '')   # Cerrar pedido
-        r7         = datos.get('r7', '')   # Conclusión
+        r0         = datos.get('r0', '')
+        r1         = datos.get('r1', '')
+        r2         = datos.get('r2', '')
+        r3         = datos.get('r3', '')
+        r4         = datos.get('r4', '')
+        r5         = datos.get('r5', '')
+        r6         = datos.get('r6', '')
+        r7         = datos.get('r7', '')
         resultado  = datos.get('resultado', '')
 
-        # Columna J = conclusión o estado especial
+        # Columna J — igual que llenar_formularios.py
         col_j = ''
         if r7 == 'Colgo':                  col_j = 'Colgo'
         elif r0 == 'Buzon':                col_j = 'BUZON'
@@ -2337,26 +2361,27 @@ def guardar_respuesta_formulario(datos):
         elif resultado == 'MARCA UNICA':   col_j = 'Marca Unica'
         elif r7:                           col_j = r7
 
-        # Fila completa A:T (20 columnas) — una sola llamada API
-        fila = [''] * 20
-        fila[0]  = fecha_hora   # A - Fecha/Hora
-        fila[1]  = tienda       # B - Tienda
-        fila[2]  = r1           # C
-        fila[3]  = r2           # D
-        fila[4]  = r3           # E
-        # fila[5] = ''          # F (vacío intencional)
-        fila[6]  = r4           # G
-        fila[7]  = r5           # H
-        fila[8]  = r6           # I
-        fila[9]  = col_j        # J - Conclusión
-        fila[18] = resultado    # S - Compatible/Resultado
-        fila[19] = r0           # T - Estado llamada
+        # Solo celdas con valor — igual que llenar_formularios.py
+        f = ultima_fila
+        actualizaciones = [
+            {'range': f'A{f}', 'values': [[fecha_hora]]},
+            {'range': f'B{f}', 'values': [[tienda]]},
+        ]
+        if r1:      actualizaciones.append({'range': f'C{f}', 'values': [[r1]]})
+        if r2:      actualizaciones.append({'range': f'D{f}', 'values': [[r2]]})
+        if r3:      actualizaciones.append({'range': f'E{f}', 'values': [[r3]]})
+        if r4:      actualizaciones.append({'range': f'G{f}', 'values': [[r4]]})
+        if r5:      actualizaciones.append({'range': f'H{f}', 'values': [[r5]]})
+        if r6:      actualizaciones.append({'range': f'I{f}', 'values': [[r6]]})
+        if col_j:   actualizaciones.append({'range': f'J{f}', 'values': [[col_j]]})
+        actualizaciones.append(        {'range': f'S{f}', 'values': [[resultado]]})
+        if r0:      actualizaciones.append({'range': f'T{f}', 'values': [[r0]]})
 
-        print(f"[formulario] guardando → tienda='{tienda}' resultado='{resultado}' r0='{r0}' col_j='{col_j}'")
-        ws.append_row(fila)  # RAW por defecto, compatible gspread 5.x y 6.x
+        print(f"[formulario] guardando fila {f} → tienda='{tienda}' resultado='{resultado}' r0='{r0}' col_j='{col_j}'")
+        ws.batch_update(actualizaciones, value_input_option='RAW')
         _cache.pop('respuestas', None)
         _cache.pop('all_respuestas', None)
-        print(f"[formulario] OK — fila guardada en '{ws.title}'")
+        print(f"[formulario] OK — fila {f} guardada en '{ws.title}'")
         return True
     except Exception as e:
         print(f"[formulario] ERROR guardar: {e}")
@@ -2377,10 +2402,11 @@ def formulario_siguiente():
 def formulario_guardar():
     try:
         datos = request.json
-        row   = datos.get('row')
-        ok    = guardar_respuesta_formulario(datos)
+        row          = datos.get('row')
+        col_respuesta = datos.get('col_respuesta', 6)
+        ok = guardar_respuesta_formulario(datos)
         if ok and row:
-            marcar_contacto_procesado(int(row))
+            marcar_contacto_procesado(int(row), int(col_respuesta))
         return jsonify({'ok': ok})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
@@ -2730,6 +2756,7 @@ async function guardar() {
   const tienda = O.contacto ? (O.contacto.TIENDA || O.contacto.Tienda || O.contacto.Nombre || '') : '';
   const payload = {
     row: O.contacto ? O.contacto._row : null,
+    col_respuesta: O.contacto ? (O.contacto._col_respuesta || 6) : 6,
     tienda, resultado: O.resultado,
     r0: O.r0, r1: O.r1, r2: O.r2, r3: O.r3,
     r4: O.r4, r5: O.r5, r6: O.r6, r7: O.r7,
