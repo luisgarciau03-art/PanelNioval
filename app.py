@@ -1115,15 +1115,11 @@ tr:hover td{background:var(--blue3)}
     <!-- ═══ RESPUESTAS ═══ -->
     <div class="section" id="sec-respuestas">
       <div class="table-box">
-        <h3>📝 Respuestas del Formulario</h3>
+        <h3>📝 Respuestas — Conclusión Final</h3>
         <div class="table-controls">
           <input type="text" id="resp-search" placeholder="🔍 Buscar..." oninput="filterTable('respuestas')">
-          <select id="resp-resultado" onchange="filterTable('respuestas')">
-            <option value="">Todos los resultados</option>
-            <option>APROBADO</option>
-            <option>NEGADO</option>
-            <option>NO COMPATIBLE</option>
-            <option>MARCA UNICA</option>
+          <select id="resp-conclusion" onchange="filterTable('respuestas')">
+            <option value="">Todas las conclusiones</option>
           </select>
         </div>
         <div class="tbl-wrap" id="respuestas-table"><div class="loading"><div class="spinner"></div></div></div>
@@ -1215,7 +1211,18 @@ async function loadSection(name) {
     case 'contactos':   await loadContactos(); break;
     case 'pendientes':  await loadPendientes(); break;
     case 'ciudades':    await loadCiudades(); break;
-    case 'respuestas':  await loadTableSection('respuestas',  '/api/prospectos/respuestas',  'respuestas-table',  'respuestas-pag',  ['resp-search','resp-resultado']); break;
+    case 'respuestas':
+      await loadTableSection('respuestas', '/api/prospectos/respuestas', 'respuestas-table', 'respuestas-pag', ['resp-search','resp-conclusion']);
+      // Poblar dropdown de Conclusión con valores únicos del dataset
+      { const concSel = document.getElementById('resp-conclusion');
+        if (concSel) {
+          const vals = [...new Set((state.data['respuestas'] || [])
+            .map(r => String(r['Conclusión'] || r['Conclusion'] || '').trim())
+            .filter(Boolean))].sort();
+          vals.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; concSel.appendChild(o); });
+        }
+      }
+      break;
     case 'mensajes':    await loadTableSection('mensajes',    '/api/prospectos/mensajes',    'mensajes-table',    'mensajes-pag',    ['mensajes-search']); break;
     case 'seguimiento': await loadSeguimiento(); break;
   }
@@ -1542,12 +1549,11 @@ function filterTable(key) {
 
   // Specific filters
   if (key === 'respuestas') {
-    const resEl = document.getElementById('resp-resultado');
-    const res = resEl ? resEl.value.toUpperCase() : '';
-    if (res) filtered = filtered.filter(r => {
-      const val = String(r.Compatible || r.Resultado || '').toUpperCase();
-      return val === res;
-    });
+    const concEl = document.getElementById('resp-conclusion');
+    const conc = concEl ? concEl.value : '';
+    if (conc) filtered = filtered.filter(r =>
+      String(r['Conclusión'] || r['Conclusion'] || '').trim() === conc
+    );
   }
   if (key === 'contactos' || key === 'pendientes') {
     const ciudadEl = document.getElementById(`${key}-ciudad`);
@@ -1586,7 +1592,10 @@ function renderTable(key, tableId, pagId) {
 
   // Columnas fijas para ventas/frecuentes (en orden exacto de la hoja)
   const VENTAS_COLS = ['Fecha','Cliente','ESQUEMA','MES','Monto ','Monto','Envio Costo','Num Factura','Cotizacion PDF','PAGO'];
+  // Columnas clave para respuestas (Conclusión es el campo principal)
+  const RESPUESTAS_COLS = ['Marca temporal','Nombre De la Tienda','Teléfono','Telefono','CIUDAD','Ciudad','Conclusión','Conclusion'];
   const isVentas = key === 'ventas' || key === 'frecuentes';
+  const isRespuestas = key === 'respuestas';
 
   let sortedCols;
   if (isVentas) {
@@ -1594,6 +1603,9 @@ function renderTable(key, tableId, pagId) {
     sortedCols = VENTAS_COLS.filter(c => allCols.includes(c));
     // Agregar cualquier columna extra no vacía que no esté en la lista fija
     allCols.filter(c => !VENTAS_COLS.includes(c) && c.trim() !== '').forEach(c => sortedCols.push(c));
+  } else if (isRespuestas) {
+    // Solo mostrar columnas clave con Conclusión al final
+    sortedCols = RESPUESTAS_COLS.filter(c => allCols.includes(c));
   } else {
     // Para otras secciones: orden exacto de la hoja, sin reordenar
     sortedCols = allCols.filter(c => c.trim() !== '').slice(0, 20);
