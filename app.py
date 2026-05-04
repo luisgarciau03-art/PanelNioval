@@ -514,8 +514,39 @@ def api_ventas():
 
 @app.route('/api/prospectos/mensajes')
 def api_mensajes():
-    data = get_data('mensajes')
-    return jsonify(data)
+    """Mensajes: estructura por columna. Col A (A2+) = nombres de campo. Col B+ = registros."""
+    try:
+        ws = get_worksheet('mensajes')
+        all_vals = ws.get_all_values()
+        if not all_vals:
+            return jsonify([])
+        # Fila 1 es título/encabezado — se ignora
+        # Col A desde fila 2 = nombres de campo
+        field_rows = []  # (row_idx_0based, field_name)
+        for i in range(1, len(all_vals)):
+            fname = str(all_vals[i][0]).strip() if all_vals[i] else ''
+            if fname:
+                field_rows.append((i, fname))
+        if not field_rows:
+            return jsonify([])
+        max_cols = max(len(r) for r in all_vals)
+        records = []
+        for col_idx in range(1, max_cols):  # Col B (idx 1), C (idx 2), ...
+            record = {'_col': col_idx + 1}  # 1-indexed para gspread
+            has_data = False
+            for row_idx, fname in field_rows:
+                row = all_vals[row_idx] if row_idx < len(all_vals) else []
+                val = str(row[col_idx]).strip() if col_idx < len(row) else ''
+                record[fname] = val
+                if val:
+                    has_data = True
+            if has_data:
+                records.append(record)
+        return jsonify(records)
+    except Exception as e:
+        print(f"[mensajes] error: {e}")
+        traceback.print_exc()
+        return jsonify([])
 
 
 VENTAS_COLS = ['Fecha', 'Cliente', 'ESQUEMA', 'MES', 'Monto ', 'Monto', 'Envio Costo', 'Num Factura', 'Cotizacion PDF', 'PAGO']
@@ -796,15 +827,32 @@ def api_seguimiento_update():
 
 @app.route('/api/mensajes/update', methods=['POST'])
 def api_mensajes_update():
+    """Actualiza un mensaje (columna) por campo: busca fila del campo en col A, actualiza celda col×fila."""
     body = request.json or {}
-    row_num = body.get('_row')
-    if not row_num:
-        return jsonify({'error': 'Falta _row'}), 400
+    col_num = body.get('_col')  # columna 1-indexed del registro
+    if not col_num:
+        return jsonify({'error': 'Falta _col'}), 400
     fields = {k: v for k, v in body.items() if not k.startswith('_')}
     try:
-        n = _sheet_update_row('mensajes', row_num, fields)
-        print(f"[mensajes] update row={row_num} fields={list(fields.keys())} updated={n}")
-        return jsonify({'ok': True, 'updated': n})
+        import gspread.utils as gsu
+        ws = get_worksheet('mensajes')
+        all_vals = ws.get_all_values()
+        # Mapear nombre de campo → fila 1-indexed (desde fila 2)
+        field_to_row = {}
+        for i in range(1, len(all_vals)):
+            fname = str(all_vals[i][0]).strip() if all_vals[i] else ''
+            if fname:
+                field_to_row[fname] = i + 1  # 1-indexed
+        updates = []
+        for fname, value in fields.items():
+            if fname in field_to_row:
+                a1 = gsu.rowcol_to_a1(field_to_row[fname], int(col_num))
+                updates.append({'range': a1, 'values': [[str(value)]]})
+        if updates:
+            ws.batch_update(updates, value_input_option='USER_ENTERED')
+        _cache.pop('mensajes', None)
+        print(f"[mensajes] update col={col_num} fields={list(fields.keys())} updated={len(updates)}")
+        return jsonify({'ok': True, 'updated': len(updates)})
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -1710,10 +1758,11 @@ function renderTable(key, tableId, pagId) {
 
   slice.forEach(row => {
     if (isSeguimiento && row._row) _segRowMap[row._row] = row;
-    if (isMensajes    && row._row) _menRowMap[row._row] = row;
-    const editTd = isEditable
-      ? `<td><button class="btn-edit-row" onclick="${openFn}(${row._row})">✏️ Editar</button></td>`
-      : '';
+    if (isMensajes    && row._col) _menRowMap[row._col] = row;
+    const editKey = isMensajes ? row._col : row._row;
+    const editTd = isEditable && editKey
+      ? `<td><button class="btn-edit-row" onclick="${openFn}(${editKey})">✏️ Editar</button></td>`
+      : '<td></td>';
     html += '<tr>' + editTd + sortedCols.map(c => {
       const v = row[c] !== undefined ? row[c] : '';
       return `<td>${renderCell(c, String(v), row)}</td>`;
@@ -2115,7 +2164,9 @@ async function saveEdit() {
   const row = _editCtx.rowMap[rowNum];
   if (!row) return;
   const inputs = modal.querySelectorAll('[data-field]');
-  const payload = { _row: row._row };
+  const payload = {};
+  if (row._row !== undefined) payload._row = row._row;
+  if (row._col !== undefined) payload._col = row._col;
   inputs.forEach(el => { payload[el.dataset.field] = el.value; });
   const btn = document.getElementById('edit-seg-save');
   btn.textContent = '⏳ Guardando...';
