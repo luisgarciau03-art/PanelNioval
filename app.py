@@ -605,21 +605,29 @@ def api_ventas_dashboard():
 
 @app.route('/api/prospectos/ciudades')
 def api_ciudades():
-    contactos = get_data('contactos')
+    contactos  = get_data('contactos')
     respuestas = get_data('respuestas')
 
-    # Columnas reales: "Nombre De la Tienda", "Compatible" (resultado), "Respondio" (estado)
-    resp_por_tienda: dict = {}
+    # Agrupar TODAS las respuestas por tienda (puede haber varias por contacto)
+    resp_por_tienda: dict = defaultdict(list)
     for r in respuestas:
         nombre = str_val(r.get('Nombre De la Tienda', r.get('TIENDA', r.get('Tienda', '')))).strip().upper()
         if nombre:
-            resp_por_tienda[nombre] = r
+            resp_por_tienda[nombre].append(r)
 
-    ciudades: dict = defaultdict(lambda: {
-        'total': 0, 'llamados': 0, 'aprobados': 0,
-        'buzon': 0, 'tel_incorrecto': 0, 'negados': 0,
-        'no_compatible': 0, 'marca_unica': 0,
-    })
+    def blank_ciudad():
+        return {
+            'total': 0, 'llamados': 0,
+            # Estado de llamada
+            'respondio': 0, 'buzon': 0, 'tel_incorrecto': 0,
+            # Resultado compatible
+            'aprobados': 0, 'negados': 0, 'no_compatible': 0, 'marca_unica': 0,
+            # Conclusión
+            'pedido': 0, 'catalogo': 0, 'correo': 0,
+            'avance': 0, 'continuacion': 0, 'nulo': 0, 'colgo': 0,
+        }
+
+    ciudades: dict = defaultdict(blank_ciudad)
 
     for c in contactos:
         ciudad = str_val(c.get('CIUDAD', c.get('Ciudad', c.get('ciudad', '')))).title().strip()
@@ -628,36 +636,48 @@ def api_ciudades():
         nombre = str_val(c.get('TIENDA', c.get('Tienda', c.get('Nombre', '')))).strip().upper()
         ciudades[ciudad]['total'] += 1
 
-        if nombre in resp_por_tienda:
-            r = resp_por_tienda[nombre]
+        for r in resp_por_tienda.get(nombre, []):
             ciudades[ciudad]['llamados'] += 1
-            res    = str_val(r.get('Compatible', '')).upper()   # col S = resultado
-            estado = str_val(r.get('Respondio', '')).strip()    # col T = estado llamada
-            if res == 'APROBADO':
-                ciudades[ciudad]['aprobados'] += 1
-            elif 'BUZON' in estado.upper() or 'BUZÓN' in estado.upper():
+
+            res    = str_val(r.get('Compatible', '')).upper()
+            estado = str_val(r.get('Respondio', '')).upper()
+            concl  = str_val(r.get('Conclusión', r.get('Conclusion', ''))).lower()
+
+            # Estado de llamada
+            if 'BUZON' in estado or 'BUZÓN' in estado:
                 ciudades[ciudad]['buzon'] += 1
-            elif 'INCORRECTO' in estado.upper():
+            elif 'INCORRECTO' in estado:
                 ciudades[ciudad]['tel_incorrecto'] += 1
-            elif res == 'NEGADO':
-                ciudades[ciudad]['negados'] += 1
-            elif res == 'NO COMPATIBLE':
-                ciudades[ciudad]['no_compatible'] += 1
-            elif res == 'MARCA UNICA':
-                ciudades[ciudad]['marca_unica'] += 1
+            elif 'RESPONDIO' in estado or 'RESPONDIÓ' in estado:
+                ciudades[ciudad]['respondio'] += 1
+
+            # Resultado
+            if res == 'APROBADO':      ciudades[ciudad]['aprobados'] += 1
+            elif res == 'NEGADO':      ciudades[ciudad]['negados'] += 1
+            elif res == 'NO COMPATIBLE': ciudades[ciudad]['no_compatible'] += 1
+            elif res == 'MARCA UNICA': ciudades[ciudad]['marca_unica'] += 1
+
+            # Conclusión
+            if 'pedido' in concl:          ciudades[ciudad]['pedido'] += 1
+            elif 'catalogo' in concl or 'catálogo' in concl: ciudades[ciudad]['catalogo'] += 1
+            elif 'correo' in concl:        ciudades[ciudad]['correo'] += 1
+            elif 'avance' in concl or 'fecha' in concl: ciudades[ciudad]['avance'] += 1
+            elif 'continuacion' in concl or 'continuación' in concl: ciudades[ciudad]['continuacion'] += 1
+            elif 'nulo' in concl:          ciudades[ciudad]['nulo'] += 1
+            elif 'colgo' in concl or 'colgó' in concl: ciudades[ciudad]['colgo'] += 1
 
     result = []
     for ciudad, m in ciudades.items():
         interes = round(m['aprobados'] / m['llamados'] * 100, 1) if m['llamados'] > 0 else 0
         result.append({'ciudad': ciudad, **m, 'interes_pct': interes})
 
-    # Score de relevancia: prioriza interés real, luego volumen de contactos
     max_total = max((r['total'] for r in result), default=1)
     for r in result:
-        vol_score    = (r['total'] / max_total) * 40          # hasta 40 pts por volumen
-        interes_score = r['interes_pct'] * 1.5                # hasta 150 pts por interés
-        llamados_score = min(r['llamados'] * 2, 20)           # hasta 20 pts por actividad
-        r['relevancia'] = round(interes_score + vol_score + llamados_score, 1)
+        r['relevancia'] = round(
+            r['interes_pct'] * 1.5 +
+            (r['total'] / max_total) * 40 +
+            min(r['llamados'] * 2, 20), 1
+        )
 
     result.sort(key=lambda x: x['relevancia'], reverse=True)
     return jsonify(result)
@@ -1652,39 +1672,84 @@ async function loadPendientes() {
 
 // ─── CIUDADES ───────────────────────────────────────────────────────────────
 let ciudadesData = [];
+let ciudadesSortCol = 'relevancia';
+let ciudadesSortAsc = false;
+
 async function loadCiudades() {
   ciudadesData = await fetchAPI('/api/prospectos/ciudades');
-  renderCiudades(ciudadesData);
+  renderCiudades(getSortedCiudades());
 }
 
 function filterCiudades() {
   const q = document.getElementById('ciudades-search').value.toLowerCase();
-  renderCiudades(q ? ciudadesData.filter(c => c.ciudad.toLowerCase().includes(q)) : ciudadesData);
+  const filtradas = q ? ciudadesData.filter(c => c.ciudad.toLowerCase().includes(q)) : ciudadesData;
+  renderCiudades(getSortedCiudades(filtradas));
+}
+
+function getSortedCiudades(data) {
+  const d = (data || ciudadesData).slice();
+  d.sort((a, b) => {
+    const va = a[ciudadesSortCol] ?? 0;
+    const vb = b[ciudadesSortCol] ?? 0;
+    return ciudadesSortAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+  });
+  return d;
+}
+
+function sortCiudades(col) {
+  if (ciudadesSortCol === col) ciudadesSortAsc = !ciudadesSortAsc;
+  else { ciudadesSortCol = col; ciudadesSortAsc = false; }
+  const q = document.getElementById('ciudades-search').value.toLowerCase();
+  const filtradas = q ? ciudadesData.filter(c => c.ciudad.toLowerCase().includes(q)) : null;
+  renderCiudades(getSortedCiudades(filtradas));
 }
 
 function renderCiudades(data) {
-  if (!data.length) { document.getElementById('ciudades-table').innerHTML = '<div class="empty">Sin datos</div>'; return; }
-  const maxAprobados = Math.max(...data.map(c => c.aprobados), 1);
+  if (!data || !data.length) {
+    document.getElementById('ciudades-table').innerHTML = '<div class="empty">Sin datos</div>';
+    return;
+  }
+  const maxAprob = Math.max(...data.map(c => c.aprobados), 1);
+
+  const cols = [
+    { key: 'ciudad',        label: 'Ciudad',        fmt: (v,c) => `<strong>${v}</strong>` },
+    { key: 'total',         label: 'En Lista',       fmt: v => v },
+    { key: 'llamados',      label: 'Llamados',       fmt: v => v },
+    { key: 'respondio',     label: '📞 Respondió',   fmt: v => v || 0 },
+    { key: 'buzon',         label: '📬 Buzón',       fmt: v => v || 0 },
+    { key: 'tel_incorrecto',label: '✗ Tel. Inc.',    fmt: v => v || 0 },
+    { key: 'aprobados',     label: '✓ Aprobados',    fmt: (v,c) => {
+      const w = Math.round((v / maxAprob) * 80);
+      return `${v} <span class="interes-bar" style="width:${w}px"></span>`;
+    }},
+    { key: 'interes_pct',   label: '% Interés',      fmt: v => `<strong style="color:var(--green)">${v}%</strong>` },
+    { key: 'negados',       label: '✗ Negados',      fmt: v => v || 0 },
+    { key: 'no_compatible', label: '⊘ No Compat.',   fmt: v => v || 0 },
+    { key: 'marca_unica',   label: '◈ M.Única',      fmt: v => v || 0 },
+    { key: 'pedido',        label: '📦 Pedido',      fmt: v => v ? `<strong style="color:var(--green)">${v}</strong>` : 0 },
+    { key: 'catalogo',      label: '📖 Catálogo',    fmt: v => v || 0 },
+    { key: 'correo',        label: '📧 Correo',      fmt: v => v || 0 },
+    { key: 'avance',        label: '📅 Avance',      fmt: v => v || 0 },
+    { key: 'continuacion',  label: '⏳ Continuación',fmt: v => v || 0 },
+    { key: 'nulo',          label: '✗ Nulo',         fmt: v => v || 0 },
+    { key: 'colgo',         label: '📵 Colgó',       fmt: v => v || 0 },
+  ];
+
+  const arrow = col => col === ciudadesSortCol ? (ciudadesSortAsc ? ' ▲' : ' ▼') : '';
+
   let html = `<table><thead><tr>
-    <th>#</th><th>Ciudad</th><th>Total Lista</th><th>Llamados</th><th>✓ Aprobados</th><th>Interés %</th>
-    <th>Buzón</th><th>Tel. Inc.</th><th>Negados</th><th>No Compatible</th><th>Marca Única</th>
+    <th style="cursor:default">#</th>
+    ${cols.map(c =>
+      `<th style="cursor:pointer;white-space:nowrap" onclick="sortCiudades('${c.key}')">${c.label}${arrow(c.key)}</th>`
+    ).join('')}
   </tr></thead><tbody>`;
+
   data.forEach((c, i) => {
-    const barW = Math.round((c.aprobados / maxAprobados) * 120);
-    html += `<tr>
-      <td>${i+1}</td>
-      <td><strong>${c.ciudad}</strong></td>
-      <td>${c.total}</td>
-      <td>${c.llamados}</td>
-      <td>${c.aprobados} <span class="interes-bar" style="width:${barW}px"></span></td>
-      <td><strong style="color:var(--green)">${c.interes_pct}%</strong></td>
-      <td>${c.buzon}</td>
-      <td>${c.tel_incorrecto}</td>
-      <td>${c.negados}</td>
-      <td>${c.no_compatible}</td>
-      <td>${c.marca_unica}</td>
-    </tr>`;
+    html += `<tr>${[`<td>${i+1}</td>`,
+      ...cols.map(col => `<td>${col.fmt(c[col.key], c)}</td>`)
+    ].join('')}</tr>`;
   });
+
   html += '</tbody></table>';
   document.getElementById('ciudades-table').innerHTML = html;
 }
