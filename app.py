@@ -2769,18 +2769,105 @@ document.getElementById('cats-list').innerHTML = CATS.map((c,i) =>
   `<div class="cat-badge" id="cat-${i}">${c}</div>`
 ).join('');
 
+// Lista completa de ciudades de México (200+)
+const CIUDADES_MX = [
+  // Zona Metropolitana / Grandes ciudades
+  'Ciudad de México','Guadalajara','Monterrey','Puebla','Toluca',
+  'Tijuana','Juárez','León','Zapopan','Nezahualcóyotl',
+  'Chihuahua','Naucalpan','Ecatepec','Mérida','Querétaro',
+  'San Luis Potosí','Aguascalientes','Mexicali','Hermosillo','Saltillo',
+  'Morelia','Torreón','Culiacán','Veracruz','Acapulco',
+  'Cancún','Tampico','Reynosa','San Nicolás de los Garza','Durango',
+  'Tlalnepantla','Chimalhuacán','Oaxaca','Tuxtla Gutiérrez','Irapuato',
+  'Ciudad López Mateos','Celaya','Tultitlán','Mazatlán','Xalapa',
+  'Nuevo Laredo','Ensenada','Matamoros','Monclova','Tepic',
+  'Ciudad Obregón','Los Mochis','Villahermosa','Cuernavaca','Colima',
+  'Pachuca','Chilpancingo','Tlaxcala','Campeche','La Paz',
+  // Estados y municipios importantes
+  'Apodaca','San Pedro Garza García','Guadalupe','Escobedo',
+  'Zapotlanejo','Tlaquepaque','Tonalá','El Salto','Tlajomulco',
+  'Soledad de Graciano Sánchez','Matehuala','Rioverde',
+  'Fresnillo','Zacatecas','Jerez','Guadalupe Zacatecas',
+  'Tepic','Santiago','Bahía de Banderas','Puerto Vallarta',
+  'Mazatlán','Culiacán','Los Mochis','Guasave','Guamúchil',
+  'Navojoa','Cajeme','Nogales','San Luis Río Colorado','Caborca',
+  'Delicias','Parral','Cuauhtémoc Chih','Guachochi',
+  'Monclova','Piedras Negras','Acuña','Sabinas','Múzquiz',
+  'Linares','Cadereyta','Allende NL','Galeana',
+  'Altamira','Ciudad Madero','Río Bravo','Valle Hermoso',
+  'Mante','Victoria','Tula Tamps','Jaumave',
+  'Tuxpan','Poza Rica','Coatzacoalcos','Minatitlán','Córdoba',
+  'Orizaba','Martínez de la Torre','Papantla','Tantoyuca',
+  'Cosamaloapan','San Andrés Tuxtla','Acayucan',
+  'Tehuacán','Atlixco','Teziutlán','Huauchinango','Cholula',
+  'San Martín Texmelucan','Izúcar de Matamoros','Tehuacan',
+  'Zamora','Uruapan','Lázaro Cárdenas','Apatzingán','Zitácuaro',
+  'Pátzcuaro','Sahuayo','La Piedad','Jacona','Jiquilpan',
+  'Colima','Manzanillo','Tecomán','Villa de Álvarez',
+  'Guadalajara','Zapopan','Tlaquepaque','Tonalá','Tlajomulco',
+  'Lagos de Moreno','Tepatitlán','Ocotlán','Ameca','Autlán',
+  'Puerto Vallarta','Chapala','Sayula','Ciudad Guzmán',
+  'Guanajuato','Irapuato','Celaya','León','Salamanca',
+  'Silao','Pénjamo','Dolores Hidalgo','San Miguel de Allende',
+  'Acámbaro','Moroleón','Uriangato','Cortazar','Valle de Santiago',
+  'Pachuca','Tulancingo','Tula de Allende','Ixmiquilpan',
+  'Actopan','Tizayuca','Cuautitlán Izcalli','Coacalco','Ecatepec',
+  'Tlalnepantla','Naucalpan','Atizapán','Nicolás Romero','Cuautitlán',
+  'Texcoco','Chalco','Valle de Chalco','Amecameca','Tultepec',
+  'Metepec','Zinacantepec','Lerma','Santiago Tianguistenco',
+  'Cuernavaca','Jiutepec','Temixco','Cuautla','Jojutla','Zacatepec',
+  'Oaxaca','Juchitán','Salina Cruz','Tehuantepec','Tuxtepec',
+  'Puerto Escondido','Huatulco','Miahuatlán','Ejutla',
+  'Chilpancingo','Acapulco','Iguala','Taxco','Zihuatanejo',
+  'Tlapa','Ometepec','Ayutla','Cruz Grande',
+  'Tapachula','San Cristóbal de las Casas','Comitán','Tonalá Chis',
+  'Pichucalco','Ocosingo','Palenque','Villaflores',
+  'Villahermosa','Cárdenas','Macuspana','Comalcalco',
+  'Campeche','Ciudad del Carmen','Calkiní','Hopelchén',
+  'Mérida','Cancún','Valladolid','Tizimín','Ticul','Izamal',
+  'Chetumal','Playa del Carmen','Cozumel','Felipe Carrillo Puerto',
+  'La Paz BCS','Cabo San Lucas','San José del Cabo','Loreto',
+  'Ensenada','Tijuana','Mexicali','Tecate','Rosarito',
+  'Hermosillo','Ciudad Obregón','Navojoa','Guaymas','Nogales',
+  'Los Mochis','Culiacán','Mazatlán','Guasave','Mochis',
+  'Durango','Gómez Palacio','Lerdo','Victoria de Durango',
+  'Zacatecas','Fresnillo','Jerez','Loreto Zac','Pinos',
+  'Aguascalientes','Calvillo','Rincón de Romos','San Francisco de los Romo',
+  'Tepic','Xalisco','Ixtlán','Santiago Ixc',
+  'San Luis Potosí','Matehuala','Ciudad Valles','Rioverde','Tamazunchale',
+  'Saltillo','Torreón','Monclova','Piedras Negras','Acuña',
+  'Monterrey','Guadalupe NL','Apodaca','San Nicolás','Escobedo','Juárez NL',
+];
+
 let todasCiudades = [];
 
 async function cargarCiudades() {
   try {
     const r    = await fetch('/api/prospectos/ciudades');
-    const data = await r.json();
-    todasCiudades = data.filter(c => c.ciudad && c.ciudad !== 'Sin ciudad');
+    const panelData = await r.json();
+
+    // Ciudades del panel con datos reales (con relevancia calculada)
+    const conDatos = panelData.filter(c => c.ciudad && c.ciudad !== 'Sin ciudad');
+    const enPanel  = new Set(conDatos.map(c => c.ciudad.toLowerCase()));
+
+    // Ciudades de la lista estática que NO están en el panel
+    const unicasMX = [...new Set(CIUDADES_MX)];
+    const sinDatos = unicasMX
+      .filter(c => !enPanel.has(c.toLowerCase()))
+      .map(c => ({ ciudad: c, total: 0, llamados: 0, aprobados: 0, interes_pct: 0, relevancia: 0 }));
+
+    // Fusionar: panel (con datos) + estáticas (sin datos)
+    todasCiudades = [...conDatos, ...sinDatos];
+
     document.getElementById('ciudades-count').textContent = `(${todasCiudades.length})`;
     renderChips(todasCiudades);
   } catch(e) {
-    document.getElementById('ciudades-chips').innerHTML =
-      '<div style="color:#e74c3c;font-size:.82em">Error cargando ciudades</div>';
+    // Fallback: solo estáticas
+    todasCiudades = [...new Set(CIUDADES_MX)].map(c => ({
+      ciudad: c, total: 0, llamados: 0, aprobados: 0, interes_pct: 0, relevancia: 0
+    }));
+    document.getElementById('ciudades-count').textContent = `(${todasCiudades.length})`;
+    renderChips(todasCiudades);
   }
 }
 
