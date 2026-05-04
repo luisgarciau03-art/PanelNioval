@@ -514,11 +514,28 @@ def api_ventas():
 
 @app.route('/api/prospectos/mensajes')
 def api_mensajes():
-    """Mensajes: fila 1 = encabezados de columna, filas 2+ = registros (estándar)."""
+    """Mensajes: detecta la primera fila con 2+ celdas no vacías como encabezados."""
     try:
         ws = get_worksheet('mensajes')
         rows = ws.get_all_values()
-        records = values_to_records(rows)
+        if not rows:
+            return jsonify([])
+        # Saltar filas de título/blank — usar primera fila con ≥2 celdas no vacías
+        header_idx = 0
+        for i, row in enumerate(rows):
+            if sum(1 for c in row if str(c).strip()) >= 2:
+                header_idx = i
+                break
+        headers = [str(h).strip() for h in rows[header_idx]]
+        records = []
+        for sheet_row, row in enumerate(rows[header_idx + 1:], start=header_idx + 2):
+            if not any(str(c).strip() for c in row):
+                continue
+            padded = list(row) + [''] * (len(headers) - len(row))
+            r = {headers[i]: str(padded[i]).strip() for i in range(len(headers))}
+            r['_row'] = sheet_row
+            records.append(r)
+        print(f"[mensajes] header_idx={header_idx} headers={headers} records={len(records)}")
         return jsonify(records)
     except Exception as e:
         print(f"[mensajes] error: {e}")
@@ -810,9 +827,26 @@ def api_mensajes_update():
         return jsonify({'error': 'Falta _row'}), 400
     fields = {k: v for k, v in body.items() if not k.startswith('_')}
     try:
-        n = _sheet_update_row('mensajes', row_num, fields)
-        print(f"[mensajes] update row={row_num} fields={list(fields.keys())} updated={n}")
-        return jsonify({'ok': True, 'updated': n})
+        import gspread.utils as gsu
+        ws = get_worksheet('mensajes')
+        all_vals = ws.get_all_values()
+        # Detectar fila de headers (primera con ≥2 celdas no vacías)
+        headers = []
+        for row in all_vals:
+            if sum(1 for c in row if str(c).strip()) >= 2:
+                headers = [str(c).strip() for c in row]
+                break
+        updates = []
+        for col_name, value in fields.items():
+            if col_name in headers:
+                col_idx = headers.index(col_name) + 1
+                a1 = gsu.rowcol_to_a1(int(row_num), col_idx)
+                updates.append({'range': a1, 'values': [[str(value)]]})
+        if updates:
+            ws.batch_update(updates, value_input_option='USER_ENTERED')
+        _cache.pop('mensajes', None)
+        print(f"[mensajes] update row={row_num} updated={len(updates)}")
+        return jsonify({'ok': True, 'updated': len(updates)})
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -1712,7 +1746,9 @@ function renderTable(key, tableId, pagId) {
   const VENTAS_COLS = ['Fecha','Cliente','ESQUEMA','MES','Monto ','Monto','Envio Costo','Num Factura','Cotizacion PDF','PAGO'];
   // Columnas clave para respuestas (Conclusión es el campo principal)
   const RESPUESTAS_COLS = ['Marca temporal','Nombre De la Tienda','Teléfono','Telefono','CIUDAD','Ciudad','Conclusión','Conclusion'];
-  const isVentas = key === 'ventas' || key === 'frecuentes';
+  // Encabezados exactos del sheet de Mensajes Iniciales
+  const MENSAJES_COLS = ['Mensaje inicial','Mensaje Seguimiento','Cotizacion','Cotizacion Seguimiento','Seguimiento Clientes','correo'];
+  const isVentas     = key === 'ventas' || key === 'frecuentes';
   const isRespuestas = key === 'respuestas';
 
   let sortedCols;
@@ -1721,6 +1757,10 @@ function renderTable(key, tableId, pagId) {
     allCols.filter(c => !VENTAS_COLS.includes(c) && c.trim() !== '').forEach(c => sortedCols.push(c));
   } else if (isRespuestas) {
     sortedCols = RESPUESTAS_COLS.filter(c => allCols.includes(c));
+  } else if (isMensajes) {
+    // Preferir columnas definidas; si no coinciden (distinto header) usar las del dataset
+    sortedCols = MENSAJES_COLS.filter(c => allCols.includes(c));
+    if (!sortedCols.length) sortedCols = allCols.filter(c => c.trim() !== '').slice(0, 10);
   } else {
     sortedCols = allCols.filter(c => c.trim() !== '').slice(0, 20);
   }
