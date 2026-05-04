@@ -173,6 +173,52 @@ def get_data(key: str, force: bool = False) -> list:
         return []
 
 
+# GIDs de todas las hojas de respuestas a combinar
+_RESPUESTAS_GIDS = [1343998886, 703691069]  # Respuestas de formulario 1, Bruce FORMS
+
+def get_all_respuestas(force: bool = False) -> list:
+    """Lee Respuestas de formulario 1 + Bruce FORMS y los combina en un dataset unificado."""
+    cache_key = 'all_respuestas'
+    now = time.time()
+    if not force and cache_key in _cache:
+        data, ts = _cache[cache_key]
+        if now - ts < CACHE_TTL:
+            return data
+    try:
+        client = get_gs_client()
+        sp = client.open_by_key(SHEET_IDS['respuestas'])
+        all_records = []
+        gid_set = set(_RESPUESTAS_GIDS)
+        for ws in sp.worksheets():
+            if ws.id in gid_set:
+                try:
+                    rows = ws.get_all_values()
+                    records = values_to_records(rows)
+                    for r in records:
+                        r['_sheet'] = ws.title
+                    all_records.extend(records)
+                    print(f"[respuestas] '{ws.title}' gid={ws.id}: {len(records)} filas")
+                except Exception as e:
+                    print(f"[respuestas] Error leyendo '{ws.title}': {e}")
+        # Normalizar: asegurar que todas las filas tengan las mismas keys públicas
+        all_keys: set = set()
+        for r in all_records:
+            all_keys.update(k for k in r.keys() if not k.startswith('_'))
+        for r in all_records:
+            for k in all_keys:
+                if k not in r:
+                    r[k] = ''
+        _cache[cache_key] = (all_records, now)
+        print(f"[respuestas] TOTAL combinado: {len(all_records)} filas")
+        return all_records
+    except Exception as e:
+        print(f"[ERROR] get_all_respuestas: {e}")
+        traceback.print_exc()
+        if cache_key in _cache:
+            return _cache[cache_key][0]
+        return []
+
+
 @app.route('/api/debug')
 def api_debug():
     """Lista todas las hojas disponibles en cada spreadsheet"""
@@ -185,6 +231,29 @@ def api_debug():
         except Exception as e:
             result[key] = {'error': str(e)}
     return jsonify(result)
+
+
+@app.route('/api/debug/respuestas')
+def api_debug_respuestas():
+    """Muestra headers y conteo de cada hoja de respuestas incluida en el dataset."""
+    try:
+        client = get_gs_client()
+        sp = client.open_by_key(SHEET_IDS['respuestas'])
+        gid_set = set(_RESPUESTAS_GIDS)
+        info = []
+        for ws in sp.worksheets():
+            if ws.id in gid_set:
+                rows = ws.get_all_values()
+                headers = rows[0] if rows else []
+                info.append({
+                    'title': ws.title, 'gid': ws.id,
+                    'total_rows': len(rows) - 1,
+                    'headers': headers[:30],
+                })
+        data = get_all_respuestas(force=True)
+        return jsonify({'hojas': info, 'total_combinado': len(data)})
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 
 @app.route('/api/test/<key>')
@@ -221,6 +290,8 @@ def api_refresh():
         _cache.clear()
     else:
         _cache.pop(key, None)
+        if key == 'respuestas':
+            _cache.pop('all_respuestas', None)
     return jsonify({'ok': True})
 
 
@@ -352,7 +423,7 @@ def upload_pago():
 @app.route('/api/prospectos/stats')
 def api_stats():
     contactos = get_data('contactos')
-    respuestas = get_data('respuestas')
+    respuestas = get_all_respuestas()
 
     total_contactos = len(contactos)
 
@@ -430,7 +501,7 @@ def api_contactos_pendientes():
 
 @app.route('/api/prospectos/respuestas')
 def api_respuestas():
-    data = get_data('respuestas')
+    data = get_all_respuestas()
     return jsonify(data)
 
 
@@ -606,7 +677,7 @@ def api_ventas_dashboard():
 @app.route('/api/prospectos/ciudades')
 def api_ciudades():
     contactos  = get_data('contactos')
-    respuestas = get_data('respuestas')
+    respuestas = get_all_respuestas()
 
     # Agrupar TODAS las respuestas por tienda (puede haber varias por contacto)
     resp_por_tienda: dict = defaultdict(list)
@@ -1047,6 +1118,11 @@ tr:hover td{background:var(--blue3)}
         <h3>📝 Respuestas del Formulario</h3>
         <div class="table-controls">
           <input type="text" id="resp-search" placeholder="🔍 Buscar..." oninput="filterTable('respuestas')">
+          <select id="resp-fuente" onchange="filterTable('respuestas')">
+            <option value="">Todas las fuentes</option>
+            <option value="Respuestas de formulario 1">Formulario 1</option>
+            <option value="Bruce FORMS">Bruce FORMS</option>
+          </select>
           <select id="resp-resultado" onchange="filterTable('respuestas')">
             <option value="">Todos los resultados</option>
             <option>APROBADO</option>
@@ -1471,9 +1547,16 @@ function filterTable(key) {
 
   // Specific filters
   if (key === 'respuestas') {
+    const fuenteEl = document.getElementById('resp-fuente');
+    const fuente = fuenteEl ? fuenteEl.value : '';
+    if (fuente) filtered = filtered.filter(r => String(r._sheet || '') === fuente);
+
     const resEl = document.getElementById('resp-resultado');
     const res = resEl ? resEl.value.toUpperCase() : '';
-    if (res) filtered = filtered.filter(r => String(r.Resultado || '').toUpperCase() === res);
+    if (res) filtered = filtered.filter(r => {
+      const val = String(r.Compatible || r.Resultado || '').toUpperCase();
+      return val === res;
+    });
   }
   if (key === 'contactos' || key === 'pendientes') {
     const ciudadEl = document.getElementById(`${key}-ciudad`);
