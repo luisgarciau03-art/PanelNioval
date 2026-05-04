@@ -873,6 +873,11 @@ body{font-family:'Segoe UI',sans-serif;background:#f0f4ff;display:flex;min-heigh
 .table-controls{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
 .table-controls input,.table-controls select{padding:7px 12px;border:1px solid #dde;border-radius:8px;font-size:.83em;outline:none;transition:border .2s}
 .table-controls input:focus,.table-controls select:focus{border-color:var(--blue)}
+.seg-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.seg-tab{padding:8px 18px;border-radius:20px;background:#f1f5f9;color:#475569;cursor:pointer;font-size:.83em;font-weight:600;border:2px solid transparent;transition:all .2s;white-space:nowrap}
+.seg-tab:hover{background:#e2e8f0;color:#1e293b}
+.seg-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.seg-tab .tab-count{font-size:.75em;opacity:.75;margin-left:3px}
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:.82em}
 th{background:var(--blue);color:#fff;padding:9px 10px;text-align:left;font-weight:600;white-space:nowrap}
@@ -1144,10 +1149,11 @@ tr:hover td{background:var(--blue3)}
       <div class="cards" id="seg-cards">
         <div class="loading"><div class="spinner"></div><br>Cargando...</div>
       </div>
+      <div class="seg-tabs" id="seg-tabs"></div>
       <div class="table-box">
-        <h3>🔄 Tabla de Seguimiento</h3>
+        <h3 id="seg-tab-title">🔄 Seguimiento</h3>
         <div class="table-controls">
-          <input type="text" id="seg-search" placeholder="🔍 Buscar..." oninput="filterTable('seguimiento')">
+          <input type="text" id="seg-search" placeholder="🔍 Buscar en este panel..." oninput="filterSegTab()">
         </div>
         <div class="tbl-wrap" id="seguimiento-table"><div class="loading"><div class="spinner"></div></div></div>
         <div class="pagination" id="seguimiento-pag"></div>
@@ -1841,30 +1847,88 @@ function renderCiudades(data) {
 }
 
 // ─── SEGUIMIENTO ────────────────────────────────────────────────────────────
+const SEG_ICONS = {
+  callback:'📞', llamar:'📞', 'volver a llamar':'📞', rellamar:'📞',
+  'buzón':'📬', buzon:'📬', voz:'📬',
+  respondió:'✅', respondio:'✅', contestó:'✅', contesto:'✅',
+  'no contesta':'❌', 'no contest':'❌', 'no respondió':'❌', 'no respondio':'❌',
+  incorrecto:'⚠️', equivocado:'⚠️', inexistente:'⚠️',
+  pedido:'🛒', interesado:'🌟', aprobado:'✅',
+  negado:'🚫', rechazado:'🚫',
+};
+function segIcon(val) {
+  const v = (val || '').toLowerCase();
+  for (const [k, icon] of Object.entries(SEG_ICONS)) { if (v.includes(k)) return icon; }
+  return '📋';
+}
+
+let _segGroups = {};
+let _segActiveTab = 'todos';
+let _segResultKey = null;
+
 async function loadSeguimiento() {
   const data = await fetchAPI('/api/seguimiento');
   state.data['seguimiento'] = data;
-  state.filtered['seguimiento'] = data;
-  state.page['seguimiento'] = 1;
 
-  // Simple KPIs from seguimiento data
-  const total = data.length;
-  // Try to detect status column
-  const statusKey = data.length ? Object.keys(data[0]).find(k => k.toLowerCase().includes('estado') || k.toLowerCase().includes('status') || k.toLowerCase().includes('etapa')) : null;
-  let statusCounts = {};
-  if (statusKey) {
+  // Detectar columna "Resultado Llamada" o similar
+  if (data.length) {
+    const keys = Object.keys(data[0]);
+    _segResultKey = keys.find(k => /resultado/i.test(k))
+      || keys.find(k => /estado/i.test(k))
+      || keys.find(k => /status/i.test(k))
+      || null;
+  }
+
+  // Agrupar por valor de resultado
+  _segGroups = { todos: data };
+  if (_segResultKey) {
     data.forEach(r => {
-      const s = String(r[statusKey] || '').trim() || 'Sin estado';
-      statusCounts[s] = (statusCounts[s] || 0) + 1;
+      const v = String(r[_segResultKey] || '').trim() || 'Sin resultado';
+      if (!_segGroups[v]) _segGroups[v] = [];
+      _segGroups[v].push(r);
     });
   }
 
-  let cardsHtml = `<div class="card"><div class="label">Total Seguimiento</div><div class="value">${total}</div><div class="sub">Registros</div></div>`;
-  Object.entries(statusCounts).slice(0,5).forEach(([s, n]) => {
-    cardsHtml += `<div class="card"><div class="label">${s}</div><div class="value">${n}</div><div class="sub">${((n/total)*100).toFixed(0)}%</div></div>`;
+  // KPI cards
+  const total = data.length;
+  let cardsHtml = `<div class="card"><div class="label">Total</div><div class="value">${total}</div><div class="sub">Registros</div></div>`;
+  Object.entries(_segGroups).filter(([k]) => k !== 'todos').forEach(([s, arr]) => {
+    const pct = total > 0 ? ((arr.length / total) * 100).toFixed(0) : 0;
+    cardsHtml += `<div class="card"><div class="label">${s}</div><div class="value">${arr.length}</div><div class="sub">${pct}%</div></div>`;
   });
   document.getElementById('seg-cards').innerHTML = cardsHtml;
 
+  // Tabs
+  const tabKeys = ['todos', ...Object.keys(_segGroups).filter(k => k !== 'todos')];
+  document.getElementById('seg-tabs').innerHTML = tabKeys.map(k => {
+    const count = (_segGroups[k] || []).length;
+    const icon  = k === 'todos' ? '🔄' : segIcon(k);
+    const label = k === 'todos' ? 'Todos' : k;
+    return `<div class="seg-tab${k==='todos'?' active':''}" data-tab="${k.replace(/"/g,'&quot;')}" onclick="switchSegTab(this)">${icon} ${label} <span class="tab-count">(${count})</span></div>`;
+  }).join('');
+
+  _segActiveTab = 'todos';
+  renderSegTab();
+}
+
+function switchSegTab(el) {
+  _segActiveTab = el.dataset.tab;
+  document.querySelectorAll('#seg-tabs .seg-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('seg-search').value = '';
+  renderSegTab();
+}
+
+function filterSegTab() { renderSegTab(); }
+
+function renderSegTab() {
+  const raw = _segGroups[_segActiveTab] || [];
+  const q = (document.getElementById('seg-search')?.value || '').toLowerCase();
+  const filtered = q ? raw.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q))) : raw;
+  const label = _segActiveTab === 'todos' ? 'Todos' : _segActiveTab;
+  document.getElementById('seg-tab-title').textContent = `🔄 Seguimiento — ${label} (${filtered.length})`;
+  state.filtered['seguimiento'] = filtered;
+  state.page['seguimiento'] = 1;
   renderTable('seguimiento', 'seguimiento-table', 'seguimiento-pag');
 }
 
