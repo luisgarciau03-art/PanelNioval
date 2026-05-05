@@ -1342,6 +1342,7 @@ function showSection(name) {
 // ─── LOAD SECTION ───────────────────────────────────────────────────────────
 async function loadSection(name) {
   state.loaded[name] = true;
+  try {
   switch(name) {
     case 'dashboard':   await loadDashboard(); break;
     case 'frecuentes':  await loadFrecuentes(); break;
@@ -1366,12 +1367,26 @@ async function loadSection(name) {
     case 'mensajes':    await loadTableSection('mensajes',    '/api/prospectos/mensajes',    'mensajes-table',    'mensajes-pag',    ['mensajes-search']); break;
     case 'seguimiento': await loadSeguimiento(); break;
   }
+  } catch(e) {
+    console.error('loadSection error:', name, e);
+    const tableEl = document.getElementById(name + '-table') || document.getElementById('sec-' + name)?.querySelector('.tbl-wrap');
+    if (tableEl) tableEl.innerHTML = `<div class="empty" style="color:#e74c3c">⚠️ Error al cargar: ${e.message}</div>`;
+    const cardsEl = document.getElementById(name.replace('-','') + '-cards') || document.getElementById('pend-cards');
+    if (name === 'pendientes' && cardsEl) cardsEl.innerHTML = `<div class="empty" style="color:#e74c3c">⚠️ Error: ${e.message}</div>`;
+    state.loaded[name] = false; // permitir reintento
+  }
 }
 
 // ─── FETCH ──────────────────────────────────────────────────────────────────
 async function fetchAPI(url) {
   const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+function showSectionError(sectionId, msg) {
+  const el = document.getElementById(sectionId);
+  if (el) el.innerHTML = `<div class="empty" style="color:#e74c3c">⚠️ ${msg}</div>`;
 }
 
 // ─── DASHBOARD ──────────────────────────────────────────────────────────────
@@ -1750,6 +1765,8 @@ function renderTable(key, tableId, pagId) {
   const MENSAJES_COLS = ['Mensaje inicial','Mensaje Seguimiento','Cotizacion','Cotizacion Seguimiento','Seguimiento Clientes','correo'];
   const isVentas     = key === 'ventas' || key === 'frecuentes';
   const isRespuestas = key === 'respuestas';
+  const isSeguimiento = key === 'seguimiento';
+  const isMensajes    = key === 'mensajes';
 
   let sortedCols;
   if (isVentas) {
@@ -1764,9 +1781,6 @@ function renderTable(key, tableId, pagId) {
   } else {
     sortedCols = allCols.filter(c => c.trim() !== '').slice(0, 20);
   }
-
-  const isSeguimiento = key === 'seguimiento';
-  const isMensajes    = key === 'mensajes';
   const isEditable    = isSeguimiento || isMensajes;
   const openFn        = isMensajes ? 'openEditMen' : 'openEditSeg';
   const arrow = c => c === sc ? (sd ? ' ▲' : ' ▼') : ' ⇅';
