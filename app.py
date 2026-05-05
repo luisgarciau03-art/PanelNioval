@@ -2925,8 +2925,16 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
 </div>
 
 <script>
+const _ventanasAbiertas = [];
 function abrirVentana(url) {
-  window.open(url, '_blank', 'noopener,noreferrer,width=1000,height=700,left=100,top=80');
+  const w = window.open(url, '_blank', 'width=1000,height=700,left=100,top=80');
+  if (w) _ventanasAbiertas.push(w);
+}
+function cerrarVentanasContacto() {
+  while (_ventanasAbiertas.length) {
+    const w = _ventanasAbiertas.pop();
+    try { if (w && !w.closed) w.close(); } catch(e) {}
+  }
 }
 
 const O = {
@@ -2957,6 +2965,7 @@ function setProgress(stepId, actual, total) {
 }
 
 async function cargarContacto() {
+  cerrarVentanasContacto();
   showStep('loading');
   document.getElementById('header-sub').textContent = 'Cargando contacto...';
   const r = await fetch(`/api/formulario/siguiente?skip=${O.skip}`);
