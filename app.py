@@ -514,28 +514,41 @@ def api_ventas():
 
 @app.route('/api/prospectos/mensajes')
 def api_mensajes():
-    """Mensajes: detecta la primera fila con 2+ celdas no vacías como encabezados."""
+    """Mensajes: una entrada por columna (tipo de mensaje → contenido)."""
     try:
         ws = get_worksheet('mensajes')
         rows = ws.get_all_values()
         if not rows:
             return jsonify([])
-        # Saltar filas de título/blank — usar primera fila con ≥2 celdas no vacías
+        # Primera fila con ≥2 celdas no vacías = encabezados
         header_idx = 0
         for i, row in enumerate(rows):
             if sum(1 for c in row if str(c).strip()) >= 2:
                 header_idx = i
                 break
         headers = [str(h).strip() for h in rows[header_idx]]
+        data_rows = rows[header_idx + 1:]
+        # Una entrada por columna
         records = []
-        for sheet_row, row in enumerate(rows[header_idx + 1:], start=header_idx + 2):
-            if not any(str(c).strip() for c in row):
+        for col_idx, col_name in enumerate(headers):
+            if not col_name:
                 continue
-            padded = list(row) + [''] * (len(headers) - len(row))
-            r = {headers[i]: str(padded[i]).strip() for i in range(len(headers))}
-            r['_row'] = sheet_row
-            records.append(r)
-        print(f"[mensajes] header_idx={header_idx} headers={headers} records={len(records)}")
+            # Tomar el primer valor no vacío de las filas de datos
+            content = ''
+            data_row_num = header_idx + 2  # default: primera fila de datos (1-based)
+            for dr_idx, dr in enumerate(data_rows):
+                cell = dr[col_idx].strip() if col_idx < len(dr) else ''
+                if cell:
+                    content = cell
+                    data_row_num = header_idx + 2 + dr_idx
+                    break
+            records.append({
+                'Tipo': col_name,
+                'Contenido': content,
+                '_col': col_idx + 1,
+                '_row': data_row_num,
+            })
+        print(f"[mensajes] {len(records)} columnas desde header_idx={header_idx}")
         return jsonify(records)
     except Exception as e:
         print(f"[mensajes] error: {e}")
@@ -822,31 +835,19 @@ def api_seguimiento_update():
 @app.route('/api/mensajes/update', methods=['POST'])
 def api_mensajes_update():
     body = request.json or {}
+    col_num = body.get('_col')
     row_num = body.get('_row')
-    if not row_num:
-        return jsonify({'error': 'Falta _row'}), 400
-    fields = {k: v for k, v in body.items() if not k.startswith('_')}
+    contenido = body.get('Contenido', '')
+    if not col_num or not row_num:
+        return jsonify({'error': 'Falta _col o _row'}), 400
     try:
         import gspread.utils as gsu
         ws = get_worksheet('mensajes')
-        all_vals = ws.get_all_values()
-        # Detectar fila de headers (primera con ≥2 celdas no vacías)
-        headers = []
-        for row in all_vals:
-            if sum(1 for c in row if str(c).strip()) >= 2:
-                headers = [str(c).strip() for c in row]
-                break
-        updates = []
-        for col_name, value in fields.items():
-            if col_name in headers:
-                col_idx = headers.index(col_name) + 1
-                a1 = gsu.rowcol_to_a1(int(row_num), col_idx)
-                updates.append({'range': a1, 'values': [[str(value)]]})
-        if updates:
-            ws.batch_update(updates, value_input_option='USER_ENTERED')
+        a1 = gsu.rowcol_to_a1(int(row_num), int(col_num))
+        ws.update(a1, [[str(contenido)]], value_input_option='USER_ENTERED')
         _cache.pop('mensajes', None)
-        print(f"[mensajes] update row={row_num} updated={len(updates)}")
-        return jsonify({'ok': True, 'updated': len(updates)})
+        print(f"[mensajes] update col={col_num} row={row_num}")
+        return jsonify({'ok': True})
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -1020,6 +1021,12 @@ tr:hover td{background:var(--blue3)}
 .section-header{font-size:1.05em;font-weight:700;color:var(--blue);margin-bottom:18px;padding-bottom:8px;border-bottom:2px solid var(--blue3)}
 .btn-upload-pago{background:var(--blue3);border:1px solid var(--blue);color:var(--blue);padding:3px 9px;border-radius:6px;cursor:pointer;font-size:.75em;font-weight:600;white-space:nowrap;transition:all .2s}
 .btn-upload-pago:hover{background:var(--blue);color:#fff}
+.men-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;padding:4px 0}
+.men-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;border-left:4px solid var(--blue);padding:16px 18px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 6px rgba(0,71,204,.07)}
+.men-card-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.men-card-tipo{font-size:.8em;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--blue)}
+.men-card-content{font-size:.82em;color:#334155;line-height:1.55;white-space:pre-wrap;max-height:130px;overflow-y:auto;border-top:1px solid #f1f5f9;padding-top:8px;word-break:break-word}
+.men-card-empty{font-size:.8em;color:#aaa;font-style:italic;border-top:1px solid #f1f5f9;padding-top:8px}
 </style>
 </head>
 <body>
@@ -1242,7 +1249,7 @@ tr:hover td{background:var(--blue3)}
       <div class="table-box">
         <h3>💬 Mensajes Iniciales</h3>
         <div class="table-controls">
-          <input type="text" id="mensajes-search" placeholder="🔍 Buscar..." oninput="filterTable('mensajes')">
+          <input type="text" id="mensajes-search" placeholder="🔍 Buscar mensaje..." oninput="filterMensajes(this.value)">
         </div>
         <div class="tbl-wrap" id="mensajes-table"><div class="loading"><div class="spinner"></div></div></div>
         <div class="pagination" id="mensajes-pag"></div>
@@ -1364,7 +1371,7 @@ async function loadSection(name) {
         }
       }
       break;
-    case 'mensajes':    await loadTableSection('mensajes',    '/api/prospectos/mensajes',    'mensajes-table',    'mensajes-pag',    ['mensajes-search']); break;
+    case 'mensajes':    await loadMensajes(); break;
     case 'seguimiento': await loadSeguimiento(); break;
   }
   } catch(e) {
@@ -1793,7 +1800,6 @@ function renderTable(key, tableId, pagId) {
 
   slice.forEach(row => {
     if (isSeguimiento && row._row) _segRowMap[row._row] = row;
-    if (isMensajes    && row._row) _menRowMap[row._row] = row;
     const editKey = row._row;
     const editTd = isEditable && editKey
       ? `<td><button class="btn-edit-row" onclick="${openFn}(${editKey})">✏️ Editar</button></td>`
@@ -2132,7 +2138,7 @@ function renderSegTab() {
 
 // ─── EDICIÓN GENÉRICA (Seguimiento + Mensajes) ───────────────────────────────
 const _segRowMap = {};
-const _menRowMap = {};
+const _menColMap = {};
 let _segColumnOptions = {};
 let _editCtx = { endpoint: '', rowMap: {}, reload: null, label: '' };
 
@@ -2267,14 +2273,60 @@ function openEditSeg(rowNum) {
   }, rowNum);
 }
 
-function openEditMen(rowNum) {
-  openEdit({ endpoint: '/api/mensajes/update', rowMap: _menRowMap,
-    columnOptions: {}, label: 'Mensajes',
-    reload: async () => {
-      delete state.loaded['mensajes'];
-      await loadTableSection('mensajes', '/api/prospectos/mensajes', 'mensajes-table', 'mensajes-pag', ['mensajes-search']);
-    }
-  }, colNum);
+async function loadMensajes() {
+  const data = await fetchAPI('/api/prospectos/mensajes');
+  // Poblar mapa por columna
+  Object.keys(_menColMap).forEach(k => delete _menColMap[k]);
+  data.forEach(d => { _menColMap[d._col] = d; });
+
+  const container = document.getElementById('mensajes-table');
+  document.getElementById('mensajes-pag').innerHTML = '';
+  if (!data.length) {
+    container.innerHTML = '<div class="empty">No hay mensajes configurados</div>';
+    return;
+  }
+  container.innerHTML = `<div class="men-grid">${data.map(d => `
+    <div class="men-card">
+      <div class="men-card-header">
+        <span class="men-card-tipo">💬 ${d.Tipo}</span>
+        <button class="btn-edit-row" onclick="openEditMen(${d._col})">✏️ Editar</button>
+      </div>
+      ${d.Contenido
+        ? `<div class="men-card-content">${d.Contenido.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`
+        : `<div class="men-card-empty">(Sin contenido)</div>`
+      }
+    </div>`).join('')}</div>`;
+}
+
+function filterMensajes(q) {
+  const lq = q.toLowerCase();
+  document.querySelectorAll('.men-card').forEach(card => {
+    const text = card.textContent.toLowerCase();
+    card.style.display = (!lq || text.includes(lq)) ? '' : 'none';
+  });
+}
+
+function openEditMen(colKey) {
+  const row = _menColMap[colKey];
+  if (!row) return;
+  _editCtx = {
+    endpoint: '/api/mensajes/update',
+    rowMap: _menColMap,
+    label: 'Mensajes',
+    reload: async () => { delete state.loaded['mensajes']; await loadMensajes(); }
+  };
+  const modal = document.getElementById('edit-seg-modal');
+  document.getElementById('edit-color-section').style.display = 'none';
+  modal._color = undefined;
+  modal._rowNum = colKey;
+  document.getElementById('edit-modal-title').textContent = `✏️ ${row.Tipo}`;
+  document.getElementById('edit-modal-subtitle').textContent = '';
+  document.getElementById('edit-seg-fields').innerHTML = `
+    <div class="edit-field-group" style="grid-column:1/-1">
+      <label>Contenido</label>
+      <textarea data-field="Contenido" rows="10" style="min-height:180px">${(row.Contenido || '').replace(/</g,'&lt;')}</textarea>
+    </div>`;
+  modal.style.display = 'block';
 }
 
 function closeEditSeg() {
