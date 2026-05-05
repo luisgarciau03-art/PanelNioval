@@ -2706,11 +2706,7 @@ def formulario_siguiente():
 def formulario_guardar():
     try:
         datos = request.json
-        row          = datos.get('row')
-        col_respuesta = datos.get('col_respuesta', 6)
         ok = guardar_respuesta_formulario(datos)
-        if ok and row:
-            marcar_contacto_procesado(int(row), int(col_respuesta))
         return jsonify({'ok': ok})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
