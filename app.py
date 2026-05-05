@@ -2655,13 +2655,15 @@ def guardar_respuesta_formulario(datos):
 
         # Columna J — igual que llenar_formularios.py
         col_j = ''
-        if r7 == 'Colgo':                  col_j = 'Colgo'
-        elif r0 == 'Buzon':                col_j = 'BUZON'
-        elif r0 == 'Telefono Incorrecto':  col_j = 'TELEFONO INCORRECTO'
-        elif resultado == 'NEGADO':        col_j = 'No apto'
-        elif resultado == 'NO COMPATIBLE': col_j = 'No compatible'
-        elif resultado == 'MARCA UNICA':   col_j = 'Marca Unica'
-        elif r7:                           col_j = r7
+        if r7 == 'Colgo':                        col_j = 'Colgo'
+        elif r7 == 'Enc No Disponible':          col_j = 'Enc No Disponible'
+        elif resultado == 'Enc No Disponible':   col_j = 'Enc No Disponible'
+        elif r0 == 'Buzon':                      col_j = 'BUZON'
+        elif r0 == 'Telefono Incorrecto':        col_j = 'TELEFONO INCORRECTO'
+        elif resultado == 'NEGADO':              col_j = 'No apto'
+        elif resultado == 'NO COMPATIBLE':       col_j = 'No compatible'
+        elif resultado == 'MARCA UNICA':         col_j = 'Marca Unica'
+        elif r7:                                 col_j = r7
 
         # Solo celdas con valor — igual que llenar_formularios.py
         f = ultima_fila
@@ -2795,6 +2797,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
         <button class="btn btn-orange" onclick="decidir('NO COMPATIBLE')">⊘ No Compatible</button>
         <button class="btn btn-purple" onclick="decidir('MARCA UNICA')">◈ Marca Única</button>
       </div>
+      <button class="btn btn-gray" onclick="encNoDisp()" style="width:100%;margin-top:4px;font-size:.85em;background:#7f8c8d">👤 Enc. Compras No Disponible</button>
       <button class="btn btn-gray" onclick="saltarContacto()" style="width:100%;margin-top:8px;font-size:.82em">⟶ Saltar este contacto</button>
     </div>
 
@@ -2815,7 +2818,10 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
       <div class="section-title">¿Algo que requiera tener un proveedor para poder comprar?</div>
       <div id="sel-p1" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px"></div>
       <button class="btn btn-blue" id="btn-p1" onclick="enviarP1()" disabled>→ Continuar</button>
-      <button class="btn btn-gray" onclick="colgo()" style="margin-top:8px;width:100%;font-size:.82em">📵 Colgó</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-gray" onclick="colgo()" style="font-size:.82em;flex:1">📵 Colgó</button>
+        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:#7f8c8d">👤 Enc. No Dispo</button>
+      </div>
     </div>
 
     <!-- PREGUNTA 2 -->
@@ -2826,7 +2832,10 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
         <button class="btn btn-green" onclick="resp2('Sí')">✓ Sí</button>
         <button class="btn btn-red"   onclick="resp2('No')">✗ No</button>
       </div>
-      <button class="btn btn-gray" onclick="colgo()" style="margin-top:8px;width:100%;font-size:.82em">📵 Colgó</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-gray" onclick="colgo()" style="font-size:.82em;flex:1">📵 Colgó</button>
+        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:#7f8c8d">👤 Enc. No Dispo</button>
+      </div>
     </div>
 
     <!-- PREGUNTA 3 -->
@@ -2837,7 +2846,10 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
         <button class="btn btn-green" onclick="resp3('Crear Pedido Inicial Sugerido')">✓ Crear Pedido Inicial Sugerido</button>
         <button class="btn btn-red"   onclick="resp3('No')">✗ No</button>
       </div>
-      <button class="btn btn-gray" onclick="colgo()" style="margin-top:8px;width:100%;font-size:.82em">📵 Colgó</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-gray" onclick="colgo()" style="font-size:.82em;flex:1">📵 Colgó</button>
+        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:#7f8c8d">👤 Enc. No Dispo</button>
+      </div>
     </div>
 
     <!-- PREGUNTA 4 -->
@@ -2848,7 +2860,10 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
         <button class="btn btn-green" onclick="resp4('Sí')">✓ Sí</button>
         <button class="btn btn-red"   onclick="resp4('No')">✗ No</button>
       </div>
-      <button class="btn btn-gray" onclick="colgo()" style="margin-top:8px;width:100%;font-size:.82em">📵 Colgó</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-gray" onclick="colgo()" style="font-size:.82em;flex:1">📵 Colgó</button>
+        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:#7f8c8d">👤 Enc. No Dispo</button>
+      </div>
     </div>
 
     <!-- PREGUNTA 5 -->
@@ -2860,7 +2875,10 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
         <button class="btn btn-red"    onclick="resp5('No')">✗ No</button>
         <button class="btn btn-orange" onclick="resp5('Tal vez')">? Tal vez</button>
       </div>
-      <button class="btn btn-gray" onclick="colgo()" style="margin-top:8px;width:100%;font-size:.82em">📵 Colgó</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-gray" onclick="colgo()" style="font-size:.82em;flex:1">📵 Colgó</button>
+        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:#7f8c8d">👤 Enc. No Dispo</button>
+      </div>
     </div>
 
     <!-- PREGUNTA 6 -->
@@ -2872,7 +2890,10 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
         <button class="btn btn-red"    onclick="resp6('No')">✗ No</button>
         <button class="btn btn-orange" onclick="resp6('Tal vez')">? Tal vez</button>
       </div>
-      <button class="btn btn-gray" onclick="colgo()" style="margin-top:8px;width:100%;font-size:.82em">📵 Colgó</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-gray" onclick="colgo()" style="font-size:.82em;flex:1">📵 Colgó</button>
+        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:#7f8c8d">👤 Enc. No Dispo</button>
+      </div>
     </div>
 
     <!-- PREGUNTA 7: Conclusión -->
@@ -3063,6 +3084,7 @@ function resp6(v) { O.r6=v; setProgress('prog7',7,TOTAL_PREGUNTAS); showStep('p7
 function resp7(v) { O.r7=v; guardar(); }
 
 function colgo() { O.r7='Colgo'; guardar(); }
+function encNoDisp() { O.resultado='Enc No Disponible'; O.r0='Respondio'; O.r7='Enc No Disponible'; guardar(); }
 
 function saltarContacto() { O.skip++; cargarContacto(); }
 
