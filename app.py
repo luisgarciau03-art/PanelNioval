@@ -2925,6 +2925,10 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
 </div>
 
 <script>
+function abrirVentana(url) {
+  window.open(url, '_blank', 'noopener,noreferrer,width=1000,height=700,left=100,top=80');
+}
+
 const O = {
   skip: 0,
   procesados: 0,
@@ -2988,8 +2992,8 @@ function renderContacto(c) {
   ).join('');
 
   const links = [];
-  if (maps && maps.startsWith('http')) links.push(`<a class="link-btn" href="${maps}" target="_blank">🗺️ Google Maps</a>`);
-  if (link && link.startsWith('http')) links.push(`<a class="link-btn" href="${link}" target="_blank">🌐 Sitio Web</a>`);
+  if (maps && maps.startsWith('http')) links.push(`<button class="link-btn" onclick="abrirVentana('${maps.replace(/'/g,"\\'")}')">🗺️ Google Maps</button>`);
+  if (link && link.startsWith('http')) links.push(`<button class="link-btn" onclick="abrirVentana('${link.replace(/'/g,"\\'")}')">🌐 Sitio Web</button>`);
   if (tel) links.push(`<a class="link-btn" href="tel:${tel}">📞 Llamar</a>`);
   document.getElementById('links-contacto').innerHTML = links.join('');
 
