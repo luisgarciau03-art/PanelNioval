@@ -32,6 +32,7 @@ SHEET_IDS = {
     'respuestas':  '1U_z1KNqCxSRZVi7wvO2FQH4zIdS_wxuafxj6YHdHEqg',
     'mensajes':    '1oEtAiYaYVdOnEum3tbp_BminBUdj06JzXqJhaOVQFlk',
     'seguimiento': '1i0bWYQG7d5GVvOjuklZRpsg1bQfsScdY0bg7lytMXKM',
+    'bruce':       '1i0bWYQG7d5GVvOjuklZRpsg1bQfsScdY0bg7lytMXKM',  # worksheet PROSPECTOS BRUCE dentro del mismo sheet
 }
 # GIDs directos de cada hoja (más confiable que nombres)
 SHEET_GIDS = {
@@ -1021,6 +1022,14 @@ tr:hover td{background:var(--blue3)}
 .section-header{font-size:1.05em;font-weight:700;color:var(--blue);margin-bottom:18px;padding-bottom:8px;border-bottom:2px solid var(--blue3)}
 .btn-upload-pago{background:var(--blue3);border:1px solid var(--blue);color:var(--blue);padding:3px 9px;border-radius:6px;cursor:pointer;font-size:.75em;font-weight:600;white-space:nowrap;transition:all .2s}
 .btn-upload-pago:hover{background:var(--blue);color:#fff}
+.bruce-form{background:#f0f4ff;border-radius:12px;padding:18px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bruce-form input,.bruce-form select,.bruce-form textarea{width:100%;padding:9px 12px;border:1.5px solid #c5d8ff;border-radius:8px;font-size:.86em;font-family:inherit;outline:none;transition:border .2s}
+.bruce-form input:focus,.bruce-form select:focus,.bruce-form textarea:focus{border-color:var(--blue)}
+.bruce-form label{font-size:.72em;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:block}
+.bruce-form .full{grid-column:1/-1}
+.bruce-form textarea{resize:vertical;min-height:60px}
+.bruce-casilla{cursor:pointer;font-size:1.2em;text-align:center;user-select:none;transition:transform .15s}
+.bruce-casilla:hover{transform:scale(1.3)}
 .men-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;padding:4px 0}
 .men-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;border-left:4px solid var(--blue);padding:16px 18px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 6px rgba(0,71,204,.07)}
 .men-card-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -1078,6 +1087,9 @@ tr:hover td{background:var(--blue3)}
     <div class="nav-label">Seguimiento</div>
     <div class="nav-item" onclick="showSection('seguimiento')">
       <span class="icon">🔄</span> Seguimiento
+    </div>
+    <div class="nav-item" onclick="showSection('bruce')">
+      <span class="icon">🤖</span> Prospectos Bruce
     </div>
   </div>
 
@@ -1272,6 +1284,55 @@ tr:hover td{background:var(--blue3)}
       </div>
     </div>
 
+    <!-- ═══ PROSPECTOS BRUCE ═══ -->
+    <div class="section" id="sec-bruce">
+      <div class="table-box">
+        <h3>🤖 Prospectos Bruce — Agregar Nuevo</h3>
+        <div class="bruce-form" id="bruce-form">
+          <div>
+            <label>Nombre *</label>
+            <input id="bf-nombre" placeholder="Nombre de la tienda o contacto">
+          </div>
+          <div>
+            <label>Número de Teléfono</label>
+            <input id="bf-tel" placeholder="10 dígitos" type="tel">
+          </div>
+          <div>
+            <label>Tipo de Interés</label>
+            <input id="bf-tipo" placeholder="Ej: Abarrotes, Ferretería..." list="bruce-tipos-list">
+            <datalist id="bruce-tipos-list">
+              <option value="Abarrotes">
+              <option value="Ferretería">
+              <option value="Farmacia">
+              <option value="Papelería">
+              <option value="Ropa">
+              <option value="Electrónica">
+              <option value="Otro">
+            </datalist>
+          </div>
+          <div>
+            <label>Fecha</label>
+            <input id="bf-fecha" disabled style="background:#e8edf5;color:#888">
+          </div>
+          <div class="full">
+            <label>NOTA</label>
+            <textarea id="bf-nota" placeholder="Observaciones, contexto, seguimiento..."></textarea>
+          </div>
+          <div class="full" style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn btn-blue" onclick="agregarBruce()" style="max-width:200px">➕ Agregar Prospecto</button>
+          </div>
+        </div>
+      </div>
+      <div class="table-box">
+        <h3>📋 Lista de Prospectos</h3>
+        <div class="table-controls">
+          <input type="text" id="bruce-search" placeholder="🔍 Buscar..." oninput="filterBruce(this.value)">
+        </div>
+        <div class="tbl-wrap" id="bruce-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="pagination" id="bruce-pag"></div>
+      </div>
+    </div>
+
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -1326,6 +1387,7 @@ const SECTION_TITLES = {
   respuestas:  '📝 Respuestas del Formulario',
   mensajes:    '💬 Mensajes Iniciales',
   seguimiento: '🔄 Seguimiento',
+  bruce:       '🤖 Prospectos Bruce',
 };
 
 let charts = {};
@@ -1373,6 +1435,7 @@ async function loadSection(name) {
       break;
     case 'mensajes':    await loadMensajes(); break;
     case 'seguimiento': await loadSeguimiento(); break;
+    case 'bruce':       await loadBruce(); break;
   }
   } catch(e) {
     console.error('loadSection error:', name, e);
@@ -2532,6 +2595,125 @@ document.addEventListener('click', function(e) {
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 loadSection('dashboard');
+
+// ─── PROSPECTOS BRUCE ────────────────────────────────────────────────────────
+let _bruceData = [];
+
+function _initBruceForm() {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2,'0');
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const yy = now.getFullYear();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mi = String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('bf-fecha').value = `${dd}/${mm}/${yy} ${hh}:${mi}`;
+}
+
+async function loadBruce() {
+  _initBruceForm();
+  const data = await fetchAPI('/api/bruce/prospectos');
+  _bruceData = data;
+  renderBruceTable(data);
+}
+
+function filterBruce(q) {
+  const lq = q.toLowerCase();
+  const filtered = lq ? _bruceData.filter(r =>
+    Object.values(r).some(v => String(v).toLowerCase().includes(lq))
+  ) : _bruceData;
+  renderBruceTable(filtered);
+}
+
+function renderBruceTable(data) {
+  const container = document.getElementById('bruce-table');
+  document.getElementById('bruce-pag').innerHTML = '';
+  if (!data.length) {
+    container.innerHTML = '<div class="empty">Sin prospectos aún</div>';
+    return;
+  }
+  let html = `<table><thead><tr>
+    <th>Fecha</th><th>Nombre</th><th>Teléfono</th><th>Tipo de Interés</th>
+    <th style="text-align:center">Casilla</th><th>NOTA</th><th style="width:60px"></th>
+  </tr></thead><tbody>`;
+  data.forEach(r => {
+    const casilla = (r['Casilla'] || '').trim() === '✓';
+    html += `<tr>
+      <td style="white-space:nowrap;font-size:.8em">${r['Fecha'] || ''}</td>
+      <td style="font-weight:600">${r['Nombre'] || ''}</td>
+      <td>${r['Teléfono'] || ''}</td>
+      <td>${r['Tipo de Interés'] || ''}</td>
+      <td style="text-align:center">
+        <span class="bruce-casilla" onclick="toggleCasillaBruce(${r._row}, this)" title="Marcar/desmarcar">
+          ${casilla ? '✅' : '⬜'}
+        </span>
+      </td>
+      <td style="font-size:.82em;max-width:220px;word-break:break-word">${(r['NOTA'] || '').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</td>
+      <td><button class="btn-edit-row" onclick="editNotaBruce(${r._row})">✏️</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+async function agregarBruce() {
+  const nombre = document.getElementById('bf-nombre').value.trim();
+  if (!nombre) { alert('El Nombre es obligatorio'); return; }
+  const payload = {
+    'Nombre':         nombre,
+    'Teléfono':       document.getElementById('bf-tel').value.trim(),
+    'Tipo de Interés':document.getElementById('bf-tipo').value.trim(),
+    'NOTA':           document.getElementById('bf-nota').value.trim(),
+  };
+  const btn = document.querySelector('#bruce-form .btn-blue');
+  btn.textContent = '⏳ Guardando...'; btn.disabled = true;
+  try {
+    const res = await fetch('/api/bruce/agregar', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if (d.ok) {
+      ['bf-nombre','bf-tel','bf-tipo','bf-nota'].forEach(id => document.getElementById(id).value = '');
+      delete state.loaded['bruce'];
+      await loadBruce();
+    } else { alert('Error: ' + (d.error || 'No se pudo guardar')); }
+  } catch(e) { alert('Error de conexión'); }
+  btn.textContent = '➕ Agregar Prospecto'; btn.disabled = false;
+}
+
+async function toggleCasillaBruce(rowNum, el) {
+  const actual = el.textContent.trim() === '✅';
+  const nuevo  = actual ? '' : '✓';
+  el.textContent = nuevo ? '✅' : '⬜';
+  await fetch('/api/bruce/actualizar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ _row: rowNum, 'Casilla': nuevo })
+  });
+  const rec = _bruceData.find(r => r._row === rowNum);
+  if (rec) rec['Casilla'] = nuevo;
+}
+
+function editNotaBruce(rowNum) {
+  const rec = _bruceData.find(r => r._row === rowNum);
+  if (!rec) return;
+  _editCtx = {
+    endpoint: '/api/bruce/actualizar',
+    rowMap: Object.fromEntries(_bruceData.map(r => [r._row, r])),
+    label: 'Bruce',
+    reload: async () => { delete state.loaded['bruce']; await loadBruce(); }
+  };
+  const modal = document.getElementById('edit-seg-modal');
+  document.getElementById('edit-color-section').style.display = 'none';
+  modal._color = undefined;
+  modal._rowNum = rowNum;
+  document.getElementById('edit-modal-title').textContent = `✏️ ${rec['Nombre'] || 'Prospecto'}`;
+  document.getElementById('edit-modal-subtitle').textContent = rec['Tipo de Interés'] || '';
+  document.getElementById('edit-seg-fields').innerHTML = `
+    <div class="edit-field-group" style="grid-column:1/-1">
+      <label>NOTA</label>
+      <textarea data-field="NOTA" rows="8" style="min-height:160px">${(rec['NOTA'] || '').replace(/</g,'&lt;')}</textarea>
+    </div>`;
+  modal.style.display = 'block';
+}
 </script>
 
 <!-- MODAL UPLOAD COMPROBANTE -->
@@ -2691,6 +2873,99 @@ def guardar_respuesta_formulario(datos):
         print(f"[formulario] ERROR guardar: {e}")
         traceback.print_exc()
         return False
+
+
+_BRUCE_HEADERS = ['Fecha', 'Nombre', 'Teléfono', 'Tipo de Interés', 'Casilla', 'NOTA']
+
+def get_bruce_ws():
+    """Obtiene o crea la hoja PROSPECTOS BRUCE."""
+    client = get_gs_client()
+    sp = client.open_by_key(SHEET_IDS['bruce'])
+    try:
+        return sp.worksheet('PROSPECTOS BRUCE')
+    except Exception:
+        ws = sp.add_worksheet(title='PROSPECTOS BRUCE', rows=1000, cols=10)
+        ws.append_row(_BRUCE_HEADERS)
+        return ws
+
+
+def get_bruce_records(force=False):
+    now = time.time()
+    if not force and 'bruce' in _cache:
+        data, ts = _cache['bruce']
+        if now - ts < CACHE_TTL:
+            return data
+    try:
+        ws = get_bruce_ws()
+        rows = ws.get_all_values()
+        if not rows or len(rows) < 2:
+            return []
+        headers = [str(h).strip() for h in rows[0]]
+        records = []
+        for i, row in enumerate(rows[1:], start=2):
+            if not any(str(c).strip() for c in row):
+                continue
+            padded = list(row) + [''] * (len(headers) - len(row))
+            r = {headers[j]: str(padded[j]).strip() for j in range(len(headers))}
+            r['_row'] = i
+            records.append(r)
+        _cache['bruce'] = (records, now)
+        return records
+    except Exception as e:
+        print(f"[bruce] get error: {e}")
+        return []
+
+
+@app.route('/api/bruce/prospectos')
+def api_bruce_prospectos():
+    return jsonify(get_bruce_records())
+
+
+@app.route('/api/bruce/agregar', methods=['POST'])
+def api_bruce_agregar():
+    body = request.json or {}
+    nombre   = str(body.get('Nombre', '')).strip()
+    telefono = str(body.get('Teléfono', '')).strip()
+    tipo     = str(body.get('Tipo de Interés', '')).strip()
+    nota     = str(body.get('NOTA', '')).strip()
+    if not nombre:
+        return jsonify({'error': 'Nombre requerido'}), 400
+    try:
+        ws = get_bruce_ws()
+        fecha = datetime.now().strftime('%d/%m/%Y %H:%M')
+        ws.append_row([fecha, nombre, telefono, tipo, '', nota])
+        _cache.pop('bruce', None)
+        return jsonify({'ok': True})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/bruce/actualizar', methods=['POST'])
+def api_bruce_actualizar():
+    body    = request.json or {}
+    row_num = body.get('_row')
+    if not row_num:
+        return jsonify({'error': 'Falta _row'}), 400
+    try:
+        import gspread.utils as gsu
+        ws = get_bruce_ws()
+        headers = [str(h).strip() for h in ws.row_values(1)]
+        updates = []
+        for field, value in body.items():
+            if field.startswith('_'):
+                continue
+            if field in headers:
+                col = headers.index(field) + 1
+                a1  = gsu.rowcol_to_a1(int(row_num), col)
+                updates.append({'range': a1, 'values': [[str(value)]]})
+        if updates:
+            ws.batch_update(updates, value_input_option='USER_ENTERED')
+        _cache.pop('bruce', None)
+        return jsonify({'ok': True})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/formulario/siguiente')
