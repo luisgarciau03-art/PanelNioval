@@ -2633,17 +2633,17 @@ function renderBruceTable(data) {
   }
   let html = `<table><thead><tr>
     <th>Fecha</th><th>Nombre</th><th>Teléfono</th><th>Tipo de Interés</th>
-    <th style="text-align:center">Casilla</th><th>NOTA</th><th style="width:60px"></th>
+    <th style="text-align:center">Contactado</th><th>NOTA</th><th style="width:60px"></th>
   </tr></thead><tbody>`;
   data.forEach(r => {
-    const casilla = (r['Casilla'] || '').trim() === '✓';
+    const casilla = (r['Contactado'] || '').trim() === '✓';
     html += `<tr>
       <td style="white-space:nowrap;font-size:.8em">${r['Fecha'] || ''}</td>
       <td style="font-weight:600">${r['Nombre'] || ''}</td>
       <td>${r['Teléfono'] || ''}</td>
       <td>${r['Tipo de Interés'] || ''}</td>
       <td style="text-align:center">
-        <span class="bruce-casilla" onclick="toggleCasillaBruce(${r._row}, this)" title="Marcar/desmarcar">
+        <span class="bruce-casilla" onclick="toggleContactadoBruce(${r._row}, this)" title="Marcar/desmarcar">
           ${casilla ? '✅' : '⬜'}
         </span>
       </td>
@@ -2680,16 +2680,16 @@ async function agregarBruce() {
   btn.textContent = '➕ Agregar Prospecto'; btn.disabled = false;
 }
 
-async function toggleCasillaBruce(rowNum, el) {
+async function toggleContactadoBruce(rowNum, el) {
   const actual = el.textContent.trim() === '✅';
   const nuevo  = actual ? '' : '✓';
   el.textContent = nuevo ? '✅' : '⬜';
   await fetch('/api/bruce/actualizar', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ _row: rowNum, 'Casilla': nuevo })
+    body: JSON.stringify({ _row: rowNum, 'Contactado': nuevo })
   });
   const rec = _bruceData.find(r => r._row === rowNum);
-  if (rec) rec['Casilla'] = nuevo;
+  if (rec) rec['Contactado'] = nuevo;
 }
 
 function editNotaBruce(rowNum) {
@@ -2875,7 +2875,7 @@ def guardar_respuesta_formulario(datos):
         return False
 
 
-_BRUCE_HEADERS = ['Fecha', 'Nombre', 'Teléfono', 'Tipo de Interés', 'Casilla', 'NOTA']
+_BRUCE_HEADERS = ['Fecha', 'Nombre', 'Teléfono', 'Tipo de Interés', 'Contactado', 'NOTA']
 
 def get_bruce_ws():
     """Obtiene o crea la hoja PROSPECTOS BRUCE."""
