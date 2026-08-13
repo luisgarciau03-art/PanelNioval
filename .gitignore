@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 .env
 .env.*
+# Debug de envio_catalogo.py: screenshots/HTML con PII de clientes (no versionar)
+debug_invalid_*
+debug_timeout_*
+adjuntar_fail.png

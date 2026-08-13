@@ -1,0 +1,45 @@
+"""Configuración de pytest para PanelNioval.
+
+`envio_catalogo.py` importa Selenium, webdriver_manager, pyperclip y oauth2client
+en la cabecera del módulo. Esas dependencias solo existen en la PC del owner (no
+en CI/Railway), así que las stubbeamos en ``sys.modules`` ANTES de importar el
+módulo. Ninguna de las funciones puras que caracterizamos usa Selenium en runtime;
+solo necesitan que el módulo importe sin error.
+"""
+import sys
+import types
+from unittest.mock import MagicMock
+
+
+class _StubModule(types.ModuleType):
+    """Módulo falso: cualquier atributo devuelve un MagicMock (soporta `from x import Y`)."""
+
+    def __getattr__(self, name):  # noqa: D401
+        return MagicMock(name=f"{self.__name__}.{name}")
+
+
+# Rutas de módulo (incluidos submódulos) que `envio_catalogo` importa y que
+# no están instaladas en el entorno de test.
+_STUBBED_MODULES = [
+    "oauth2client",
+    "oauth2client.service_account",
+    "selenium",
+    "selenium.webdriver",
+    "selenium.webdriver.common",
+    "selenium.webdriver.common.by",
+    "selenium.webdriver.common.keys",
+    "selenium.webdriver.common.action_chains",
+    "selenium.webdriver.chrome",
+    "selenium.webdriver.chrome.service",
+    "selenium.webdriver.chrome.options",
+    "selenium.webdriver.support",
+    "selenium.webdriver.support.ui",
+    "selenium.common",
+    "selenium.common.exceptions",
+    "webdriver_manager",
+    "webdriver_manager.chrome",
+]
+
+for _mod_name in _STUBBED_MODULES:
+    if _mod_name not in sys.modules:
+        sys.modules[_mod_name] = _StubModule(_mod_name)
