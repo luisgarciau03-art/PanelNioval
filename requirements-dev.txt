@@ -1,0 +1,11 @@
+# Dependencias de desarrollo/test de PanelNioval.
+# Baseline oficial: python -m pytest tests/ -q
+pytest>=8.0.0
+
+# Dependencias RUNTIME de envio_catalogo.py (no en requirements.txt del panel Flask).
+# El script solo corre en la PC del owner; los tests las stubbean en conftest.py.
+# Se listan aquí para instalación reproducible cuando se ejecute el script real.
+selenium>=4.20.0
+webdriver-manager>=4.0.0
+pyperclip>=1.8.0
+oauth2client>=4.1.3

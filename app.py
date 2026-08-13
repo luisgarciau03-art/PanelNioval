@@ -3557,8 +3557,10 @@ def _exportar_a_sheets(resultados, categoria, ciudad):
 
 def _enviar_telegram_importador(ciudad, total, desglose, tiempo_min):
     try:
-        token   = os.environ.get('TELEGRAM_TOKEN', '8404009072:AAGZC4Lb46ELP9-8zrRDWJG61a5F5lHjmSw')
-        chat_id = os.environ.get('TELEGRAM_CHAT_ID', '5838212022')
+        token   = os.environ.get('TELEGRAM_TOKEN')
+        chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+        if not token or not chat_id:
+            return
         msg = f"<b>📥 Importador Completado</b>\n\n<b>Ciudad:</b> {ciudad}\n<b>Total:</b> {total} contactos\n<b>Tiempo:</b> {tiempo_min:.1f} min\n\n"
         for cat, n in desglose.items():
             msg += f"  {cat}: {n}\n"
