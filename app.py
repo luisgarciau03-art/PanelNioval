@@ -17,7 +17,7 @@ from gspread.exceptions import WorksheetNotFound
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-import os, json, time, io, base64, re, requests as req_lib
+import os, json, time, io, base64, re, hmac, requests as req_lib
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
@@ -27,6 +27,40 @@ import nucleo_catalogo as nc  # lógica pura de la cola de envíos de catálogo 
 app = Flask(__name__)
 app.json.sort_keys = False
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
+# Cookie de sesión endurecida (el panel corre tras TLS en Railway).
+app.config.update(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE='Lax', SESSION_COOKIE_HTTPONLY=True)
+# Si se activa la auth del panel pero SECRET_KEY no es fija, la cookie de sesión no será
+# consistente entre los 2 workers de gunicorn → avisar (el owner debe fijar SECRET_KEY).
+if os.environ.get('PANEL_DASHBOARD_TOKEN') and not os.environ.get('SECRET_KEY'):
+    print('[auth] ADVERTENCIA: PANEL_DASHBOARD_TOKEN activo sin SECRET_KEY fija; '
+          'fija SECRET_KEY en Railway para que la sesión funcione entre workers.')
+
+
+# ─── AUTENTICACIÓN OPCIONAL DEL PANEL (mejora M1, Plan 5) ────────────────────
+# Si PANEL_DASHBOARD_TOKEN está definido en Railway, TODAS las rutas exigen el token
+# (header X-Dashboard-Token, ?token=, o cookie de sesión tras el primer acceso con
+# ?token=). Si NO está definido, el panel queda abierto (comportamiento actual),
+# de modo que activarlo es una decisión del owner (gate T5.3) sin romper el deploy.
+_RUTAS_EXENTAS_AUTH = ('/api/catalogo/heartbeat',)  # el worker usa su propio WORKER_TOKEN
+
+
+@app.before_request
+def _requiere_token_panel():
+    token = os.environ.get('PANEL_DASHBOARD_TOKEN')
+    if not token:
+        return  # auth desactivada
+    path = request.path or ''
+    if path.startswith(_RUTAS_EXENTAS_AUTH):
+        return
+    provisto = (request.headers.get('X-Dashboard-Token')
+                or request.args.get('token')
+                or session.get('dashboard_token'))
+    if provisto and hmac.compare_digest(str(provisto), str(token)):
+        if request.args.get('token') and hmac.compare_digest(str(request.args.get('token')), str(token)):
+            session['dashboard_token'] = token  # recordar para la sesión del navegador
+        return
+    return jsonify({'ok': False, 'error': 'no autorizado'}), 401
+
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────
 SHEET_IDS = {
@@ -3259,6 +3293,40 @@ def catalogo_reintentar():
         print("[catalogo] reintentar error")
         traceback.print_exc()
         return jsonify({'ok': False, 'error': 'No se pudo reintentar'}), 500
+
+
+# ─── HEARTBEAT DEL WORKER LOCAL (Plan 5, transporte B) ───────────────────────
+# El worker local (PC del owner) hace POST cada corrida; el panel consulta el estado.
+# Nota: con 2 gunicorn workers en Railway el heartbeat en memoria es best-effort;
+# para estado definitivo, el worker también deja timestamp en ENVIOS_CATALOGO.
+_worker_heartbeat = {'ts': None, 'resumen': None}
+WORKER_HEARTBEAT_TTL = 15 * 60  # 15 min sin heartbeat → "muerto"
+
+
+@app.route('/api/catalogo/heartbeat', methods=['POST'])
+def catalogo_heartbeat():
+    """El worker local reporta que está vivo. Protegido por WORKER_TOKEN si está definido."""
+    esperado = os.environ.get('WORKER_TOKEN')
+    if esperado:
+        provisto = request.headers.get('X-Worker-Token') or ''
+        if not hmac.compare_digest(str(provisto), str(esperado)):
+            return jsonify({'ok': False, 'error': 'no autorizado'}), 401
+    body = request.json or {}
+    _worker_heartbeat['ts'] = time.time()
+    _worker_heartbeat['resumen'] = body.get('resumen')
+    return jsonify({'ok': True})
+
+
+@app.route('/api/catalogo/worker-estado')
+def catalogo_worker_estado():
+    """Estado del worker según el último heartbeat (vivo/desconocido)."""
+    ts = _worker_heartbeat['ts']
+    vivo = bool(ts) and (time.time() - ts) < WORKER_HEARTBEAT_TTL
+    return jsonify({
+        'vivo': vivo,
+        'ultimo_heartbeat': ts,
+        'resumen': _worker_heartbeat['resumen'],
+    })
 
 
 FORMULARIO_HTML = r"""<!DOCTYPE html>

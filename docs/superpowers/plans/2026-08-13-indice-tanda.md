@@ -5,7 +5,7 @@
 
 ## Progreso global
 
-**Planes completados: 4 / 5** · Baseline oficial: `pytest tests/ -q` → **137 passed**
+**Planes completados: 5 / 5** · Baseline oficial: `pytest tests/ -q` → **144 passed**
 
 | Plan | Documento | Estado |
 |---|---|---|
@@ -13,7 +13,9 @@
 | 2 | [2026-08-13-plan2-evaluacion-formulario-llamadas.md](2026-08-13-plan2-evaluacion-formulario-llamadas.md) | ✅ COMPLETO (5/5) |
 | 3 | [2026-08-13-plan3-integracion-catalogo.md](2026-08-13-plan3-integracion-catalogo.md) | ✅ COMPLETO (corrida real WA = gate owner) |
 | 4 | [2026-08-13-plan4-captura-correo-colT.md](2026-08-13-plan4-captura-correo-colT.md) | ✅ COMPLETO (4/4) |
-| 5 | [2026-08-13-plan5-operacion-railway.md](2026-08-13-plan5-operacion-railway.md) | PENDIENTE |
+| 5 | [2026-08-13-plan5-operacion-railway.md](2026-08-13-plan5-operacion-railway.md) | ✅ COMPLETO (transporte B; corrida real WA = gate owner) |
+
+**Gates del owner pendientes para go-live:** (1) rotar `TELEGRAM_TOKEN` (bot 8404009072) y la Google Places key, cargarlos en Railway; (2) activar `PANEL_DASHBOARD_TOKEN` (M1); (3) corrida real de WhatsApp (T3.6/T5.5); (4) instalar el worker local (`instalar-worker.ps1`).
 
 ## Orden de ejecución y dependencias
 
