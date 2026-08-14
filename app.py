@@ -3633,10 +3633,12 @@ def importador_page():
 def importador_iniciar():
     global _import_job
     ciudad       = request.json.get('ciudad', '').strip()
-    gmaps_api_key = os.environ.get('GMAPS_API_KEY', 'AIzaSyANnZsLqkul5Z8x1PlVsaihlHkpJHqDhJU')
+    gmaps_api_key = os.environ.get('GMAPS_API_KEY')
 
     if not ciudad:
         return jsonify({'ok': False, 'error': 'Ciudad requerida'})
+    if not gmaps_api_key:
+        return jsonify({'ok': False, 'error': 'GMAPS_API_KEY no configurada'})
 
     with _import_lock:
         if _import_job['status'] == 'running':

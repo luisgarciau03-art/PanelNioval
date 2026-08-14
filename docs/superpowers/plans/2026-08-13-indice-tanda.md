@@ -5,12 +5,12 @@
 
 ## Progreso global
 
-**Planes completados: 1 / 5** · Tareas Plan 1: 5 / 5 · Baseline oficial creado: `pytest tests/ -q` → 33 passed
+**Planes completados: 2 / 5** · Baseline oficial: `pytest tests/ -q` → **61 passed**
 
 | Plan | Documento | Estado |
 |---|---|---|
 | 1 | [2026-08-13-plan1-evaluacion-22py.md](2026-08-13-plan1-evaluacion-22py.md) | ✅ COMPLETO (5/5) |
-| 2 | [2026-08-13-plan2-evaluacion-formulario-llamadas.md](2026-08-13-plan2-evaluacion-formulario-llamadas.md) | PENDIENTE |
+| 2 | [2026-08-13-plan2-evaluacion-formulario-llamadas.md](2026-08-13-plan2-evaluacion-formulario-llamadas.md) | ✅ COMPLETO (5/5) |
 | 3 | [2026-08-13-plan3-integracion-catalogo.md](2026-08-13-plan3-integracion-catalogo.md) | PENDIENTE |
 | 4 | [2026-08-13-plan4-captura-correo-colT.md](2026-08-13-plan4-captura-correo-colT.md) | PENDIENTE |
 | 5 | [2026-08-13-plan5-operacion-railway.md](2026-08-13-plan5-operacion-railway.md) | PENDIENTE |

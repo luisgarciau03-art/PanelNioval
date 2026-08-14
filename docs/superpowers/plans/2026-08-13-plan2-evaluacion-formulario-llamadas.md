@@ -73,11 +73,11 @@
 
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
-| T2.1 | Contexto y mapeo del módulo | PENDIENTE | | |
-| T2.2 | Matriz de flujo exhaustiva | PENDIENTE | | |
-| T2.3 | Auditoría calidad + seguridad | PENDIENTE | | |
-| T2.4 | Tests caracterización guardado | PENDIENTE | | |
-| T2.5 | E2E ligero + PR + cierre | PENDIENTE | | |
+| T2.1 | Contexto y mapeo del módulo | HECHO | Diagrama de secuencia + mapeo UI→API→gspread en `docs/analisis/2026-08-13-matriz-formulario.md` §1 | 2026-08-13 |
+| T2.2 | Matriz de flujo exhaustiva | HECHO | 15 rutas botón→estado→celdas (A..T) + mapa col J con precedencia, citadas al código; contrato Plan 3/4 marcado | 2026-08-13 |
+| T2.3 | Auditoría calidad + seguridad | HECHO | 4 reviewers → 20 hallazgos (4C·6H·6M·4L) en `docs/auditoria/2026-08-13-auditoria-formulario.md`; se pronunció sobre (a)-(g) del criterio | 2026-08-13 |
+| T2.4 | Tests caracterización guardado | HECHO | `tests/test_formulario.py` (23) + `test_formulario_e2e.py` (6); baseline total **61 passed**; pr-test-analyzer sin HIGH | 2026-08-13 |
+| T2.5 | E2E ligero + PR + cierre | HECHO | E2E vía Flask test client (3 rutas: /formulario, /siguiente, /guardar) + `pytest.ini` (ancla rootdir); PR a main. **Playwright+screenshots = gate owner (requiere credenciales)** | 2026-08-13 |
 
 ## 6. Riesgos y rollback
 
