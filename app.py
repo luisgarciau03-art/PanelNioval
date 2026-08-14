@@ -17,7 +17,7 @@ from gspread.exceptions import WorksheetNotFound
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-import os, json, time, io, base64, requests as req_lib
+import os, json, time, io, base64, re, requests as req_lib
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
@@ -1965,9 +1965,12 @@ function renderCell(col, val, row) {
     </span>`;
   }
 
-  if (val.startsWith('http')) return `<a href="${val}" target="_blank" style="color:var(--blue);font-size:.8em">Ver →</a>`;
-  if (val.length > 80) return `<span title="${val.replace(/"/g,'&quot;')}">${val.slice(0,78)}…</span>`;
-  return val;
+  // Escape HTML para columnas de texto plano (datos de hoja/importador Places): cierra XSS almacenado.
+  const _esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  if (val.startsWith('http')) return `<a href="${_esc(val)}" target="_blank" style="color:var(--blue);font-size:.8em">Ver →</a>`;
+  if (val.length > 80) return `<span title="${_esc(val)}">${_esc(val.slice(0,78))}…</span>`;
+  return _esc(val);
 }
 
 // ─── CONTACTOS ──────────────────────────────────────────────────────────────
@@ -2991,6 +2994,62 @@ def formulario_guardar():
         return jsonify({'ok': False, 'error': str(e)})
 
 
+# ─── CAPTURA DE CORREO (Plan 4): conclusión "Correo" → columna T de LISTA DE CONTACTOS ──
+COL_CORREO_CONTACTOS = 20  # columna T (1-based). Confirmado libre por el owner (T4.1).
+# Allowlist estricto (RFC-razonable): excluye < > " ' y metacaracteres → cierra el vector
+# de XSS almacenado (un correo con HTML no pasa validación y nunca se escribe en la hoja).
+_EMAIL_RE = re.compile(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$')
+
+
+def _sanitizar_correo(correo):
+    """Anti formula-injection en Sheets: prefija ' si empieza con =,+,-,@.
+    (Se escribe con RAW, que ya evita ejecución de fórmulas; esto es defensa en profundidad.)"""
+    correo = (correo or '').strip()
+    if correo and correo[0] in ('=', '+', '-', '@'):
+        return "'" + correo
+    return correo
+
+
+def _correo_valido(correo):
+    correo = (correo or '').strip()
+    return bool(correo) and len(correo) <= 254 and _EMAIL_RE.match(correo) is not None
+
+
+@app.route('/api/formulario/correo', methods=['POST'])
+def formulario_correo():
+    """Guarda el correo del cliente en la celda T{row} de LISTA DE CONTACTOS."""
+    body = request.json or {}
+    row = body.get('row')
+    correo = str(body.get('correo', '')).strip()
+    if not row:
+        return jsonify({'ok': False, 'error': 'row requerido'}), 400
+    try:
+        row = int(row)
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'error': 'row inválido'}), 400
+    if row < 2:
+        return jsonify({'ok': False, 'error': 'row fuera de rango'}), 400
+    if not _correo_valido(correo):
+        return jsonify({'ok': False, 'error': 'Correo inválido'}), 400
+    try:
+        client = get_gs_client()
+        wsc = client.open_by_key(SHEET_IDS['contactos']).worksheet('LISTA DE CONTACTOS')
+        total = len(wsc.get_all_values())
+        if row > total:  # cota superior: no escribir fuera del rango de contactos reales
+            return jsonify({'ok': False, 'error': 'row fuera de rango'}), 400
+        wsc.batch_update(
+            [{'range': gsu.rowcol_to_a1(row, COL_CORREO_CONTACTOS),
+              'values': [[_sanitizar_correo(correo)]]}],
+            value_input_option='RAW',
+        )
+        _cache.pop('contactos', None)
+        return jsonify({'ok': True})
+    except Exception:
+        print(f"[correo] no se pudo guardar en LISTA DE CONTACTOS row={row}")
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': 'No se pudo guardar el correo'}), 500
+
+
 # ─── COLA DE ENVÍO DE CATÁLOGO (Plan 3) ──────────────────────────────────────
 # La cola vive en la worksheet ENVIOS_CATALOGO del spreadsheet de respuestas.
 # El transporte real (envío por WhatsApp) lo hace el worker local `envio_catalogo.py`
@@ -3434,6 +3493,20 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
       </div>
     </div>
 
+    <!-- MODAL: captura de correo (Plan 4, conclusión "Correo") -->
+    <div id="modal-correo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:16px">
+      <div style="background:#fff;border-radius:16px;max-width:460px;width:100%;padding:22px">
+        <h3 style="margin-bottom:6px;color:var(--blue2)">📧 Correo del cliente</h3>
+        <p style="font-size:.88em;color:var(--gray);margin-bottom:12px">Captura el correo o continúa sin correo.</p>
+        <input id="correo-input" type="email" autocomplete="off" placeholder="cliente@dominio.com"
+               style="width:100%;padding:11px;border:1px solid #ccd;border-radius:8px;font-size:1em"
+               oninput="validarCorreo()" onkeydown="correoKeydown(event)">
+        <p id="correo-error" style="color:var(--red);font-size:.82em;min-height:16px;margin:4px 0"></p>
+        <button id="correo-btn" class="btn btn-green" style="width:100%" disabled onclick="guardarCorreo()">Guardar correo</button>
+        <button class="btn btn-gray" style="width:100%;margin-top:8px" onclick="continuarSinCorreo()">Continuar sin correo</button>
+      </div>
+    </div>
+
     <!-- FIN TOTAL -->
     <div class="step" id="step-fin">
       <div class="fin">
@@ -3586,14 +3659,66 @@ function resp3(v) { O.r3=v; setProgress('prog4',4,TOTAL_PREGUNTAS); showStep('p4
 function resp4(v) { O.r4=v; setProgress('prog5',5,TOTAL_PREGUNTAS); showStep('p5'); }
 function resp5(v) { O.r5=v; setProgress('prog6',6,TOTAL_PREGUNTAS); showStep('p6'); }
 function resp6(v) { O.r6=v; setProgress('prog7',7,TOTAL_PREGUNTAS); showStep('p7'); }
-function resp7(v) { O.r7=v; guardar(); }
+function resp7(v) {
+  O.r7 = v;
+  if (v === 'Correo') { abrirModalCorreo(); return; }  // Plan 4: capturar correo antes de guardar
+  guardar();
+}
+
+// ─── Plan 4: captura de correo (conclusión "Correo") ───
+function abrirModalCorreo() {
+  _enviandoCorreo = false;
+  document.getElementById('modal-correo').style.display = 'flex';
+  const inp = document.getElementById('correo-input');
+  inp.value = ''; inp.disabled = false; inp.focus();
+  document.getElementById('correo-error').textContent = '';
+  document.getElementById('correo-btn').disabled = true;
+}
+function validarCorreo() {
+  const v = document.getElementById('correo-input').value.trim();
+  const ok = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/.test(v) && v.length <= 254;
+  document.getElementById('correo-btn').disabled = !ok;
+  document.getElementById('correo-error').textContent = (v && !ok) ? 'Correo inválido.' : '';
+  return ok;
+}
+function correoKeydown(e) {
+  if (e.key === 'Enter') { e.preventDefault(); guardarCorreo(); }
+  else if (e.key === 'Escape') { continuarSinCorreo(); }
+}
+let _enviandoCorreo = false;
+async function guardarCorreo() {
+  if (_enviandoCorreo || !validarCorreo()) return;  // guard de reentrancia (doble Enter)
+  _enviandoCorreo = true;
+  const btn = document.getElementById('correo-btn');
+  const inp = document.getElementById('correo-input');
+  btn.disabled = true; inp.disabled = true;
+  const fallar = (msg) => {
+    document.getElementById('correo-error').textContent = msg;
+    btn.disabled = false; inp.disabled = false; _enviandoCorreo = false;
+  };
+  try {
+    const r = await fetch('/api/formulario/correo', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ row: O.contacto ? O.contacto._row : null,
+                             correo: inp.value.trim() })
+    });
+    const d = await r.json();
+    if (d.ok) { cerrarModalCorreo(); guardar(); }  // guardar() tiene su propio guard
+    else fallar(d.error || 'No se pudo guardar el correo.');
+  } catch(e) { fallar('Error de conexión.'); }
+}
+function continuarSinCorreo() { if (_enviandoCorreo) return; cerrarModalCorreo(); guardar(); }  // sin escribir T
+function cerrarModalCorreo() { document.getElementById('modal-correo').style.display = 'none'; }
 
 function colgo() { O.r7='Colgo'; guardar(); }
 function encNoDisp() { O.resultado='Enc No Disponible'; O.r0='Respondio'; O.r7='Enc No Disponible'; guardar(); }
 
 function saltarContacto() { O.skip++; cargarContacto(); }
 
+let _guardando = false;
 async function guardar() {
+  if (_guardando) return;  // guard de reentrancia: evita filas duplicadas por doble envío
+  _guardando = true;
   showStep('guardando');
   const tienda = O.contacto ? (O.contacto.TIENDA || O.contacto.Tienda || O.contacto.Nombre || '') : '';
   const payload = {
@@ -3611,6 +3736,7 @@ async function guardar() {
     });
     const d = await r.json();
     if (!d.ok) {
+      _guardando = false;
       showStep('contacto');
       alert('⚠️ Error al guardar: ' + (d.error || 'No se pudo guardar en la hoja. Intenta de nuevo.'));
       return;
@@ -3623,7 +3749,9 @@ async function guardar() {
     showStep('siguiente');
     // Plan 3: si la conclusión dispara catálogo (Pedido / Revisará el Catálogo), encolar el envío.
     encolarCatalogo(tienda);
+    _guardando = false;
   } catch(e) {
+    _guardando = false;
     showStep('contacto');
     alert('⚠️ Error de conexión al guardar. Verifica tu internet e intenta de nuevo.');
   }
