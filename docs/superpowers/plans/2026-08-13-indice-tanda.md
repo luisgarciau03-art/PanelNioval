@@ -5,14 +5,14 @@
 
 ## Progreso global
 
-**Planes completados: 3 / 5** · Baseline oficial: `pytest tests/ -q` → **117 passed**
+**Planes completados: 4 / 5** · Baseline oficial: `pytest tests/ -q` → **137 passed**
 
 | Plan | Documento | Estado |
 |---|---|---|
 | 1 | [2026-08-13-plan1-evaluacion-22py.md](2026-08-13-plan1-evaluacion-22py.md) | ✅ COMPLETO (5/5) |
 | 2 | [2026-08-13-plan2-evaluacion-formulario-llamadas.md](2026-08-13-plan2-evaluacion-formulario-llamadas.md) | ✅ COMPLETO (5/5) |
 | 3 | [2026-08-13-plan3-integracion-catalogo.md](2026-08-13-plan3-integracion-catalogo.md) | ✅ COMPLETO (corrida real WA = gate owner) |
-| 4 | [2026-08-13-plan4-captura-correo-colT.md](2026-08-13-plan4-captura-correo-colT.md) | PENDIENTE |
+| 4 | [2026-08-13-plan4-captura-correo-colT.md](2026-08-13-plan4-captura-correo-colT.md) | ✅ COMPLETO (4/4) |
 | 5 | [2026-08-13-plan5-operacion-railway.md](2026-08-13-plan5-operacion-railway.md) | PENDIENTE |
 
 ## Orden de ejecución y dependencias

@@ -69,10 +69,17 @@
 
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
-| T4.1 | Verificación hoja real + contrato | PENDIENTE | | |
-| T4.2 | Endpoint guardado correo (TDD) | PENDIENTE | | |
-| T4.3 | Modal de captura | PENDIENTE | | |
-| T4.4 | E2E + PR + cierre | PENDIENTE | | |
+| T4.1 | Verificación hoja real + contrato | HECHO | Owner confirmó col T libre; tool `tools/inspeccionar_contactos.py` (solo lectura) entregado; contrato `POST /api/formulario/correo {row,correo}` → `T{row}` | 2026-08-13 |
+| T4.2 | Endpoint guardado correo (TDD) | HECHO | `formulario_correo` (col T=20, RAW + anti-formula, regex estricta, cota de row); 20 tests | 2026-08-13 |
+| T4.3 | Modal de captura | HECHO | `resp7('Correo')`→modal; validación cliente=servidor; Enter/Esc; guard de reentrancia | 2026-08-13 |
+| T4.4 | E2E + PR + cierre | HECHO | Tests vía Flask test client; 2 reviewers → **CRITICAL XSS** (regex laxa) + HIGH (reentrancia) corregidos; PR a main | 2026-08-13 |
+
+## Notas de review (T4.4)
+
+**CRITICAL corregido — XSS almacenado vía correo:** la regex original `[^@\s]+@...` admitía `< > " '`; un correo `<img onerror=...>@a.b` pasaba y se renderizaba sin escapar en la tabla de Contactos (`renderCell`). **Fix:** (a) regex estricta allowlist en cliente y servidor (no entra HTML); (b) `renderCell` ahora escapa las ramas de texto plano (defensa del sink). 
+**HIGH corregido — reentrancia:** doble Enter / doble botón podía duplicar la fila de respuesta. **Fix:** guards `_enviandoCorreo` (modal) y `_guardando` (guardar()), input/botones deshabilitados en vuelo.
+**Diferido (pre-existente, no de Plan 4):** `renderCell`/`renderContacto` renderizan datos de hoja sin escape en varias ramas (links, PAGO) — XSS de todo el dashboard, misma clase que FC2/FH1. Recomendado: escape sistemático + `SL_DASHBOARD_TOKEN` (M1/Plan 5).
+**MEDIUM (nota owner):** si el guardado de la respuesta falla tras escribir el correo y el operador reintenta con otra conclusión, la col T puede quedar con un correo sin conclusión "Correo" en J (inconsistencia de baja probabilidad).
 
 ## 6. Riesgos y rollback
 
