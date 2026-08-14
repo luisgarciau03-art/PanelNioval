@@ -12,6 +12,8 @@ try:
 except ImportError:
     GMAPS_OK = False
 import gspread
+import gspread.utils as gsu
+from gspread.exceptions import WorksheetNotFound
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -19,6 +21,8 @@ import os, json, time, io, base64, requests as req_lib
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
+
+import nucleo_catalogo as nc  # lógica pura de la cola de envíos de catálogo (Plan 3)
 
 app = Flask(__name__)
 app.json.sort_keys = False
@@ -2987,6 +2991,217 @@ def formulario_guardar():
         return jsonify({'ok': False, 'error': str(e)})
 
 
+# ─── COLA DE ENVÍO DE CATÁLOGO (Plan 3) ──────────────────────────────────────
+# La cola vive en la worksheet ENVIOS_CATALOGO del spreadsheet de respuestas.
+# El transporte real (envío por WhatsApp) lo hace el worker local `envio_catalogo.py`
+# (decisión owner Plan 5 = B). El panel solo encola/consulta/corrige/reintenta.
+
+ENVIOS_WS_NAME = 'ENVIOS_CATALOGO'
+
+
+def _abrir_ws_envios(crear=True):
+    """Devuelve la worksheet ENVIOS_CATALOGO; la crea con encabezados si no existe.
+    Distingue 'hoja no existe' (WorksheetNotFound) de errores reales de la API."""
+    client = get_gs_client()
+    sp = client.open_by_key(SHEET_IDS['respuestas'])
+    try:
+        return sp.worksheet(ENVIOS_WS_NAME)
+    except WorksheetNotFound:
+        if not crear:
+            raise
+        ws = sp.add_worksheet(title=ENVIOS_WS_NAME, rows=2000, cols=len(nc.COLUMNAS_ENVIOS))
+        ws.append_row(nc.COLUMNAS_ENVIOS, value_input_option='RAW')
+        return ws
+
+
+def _leer_envios(ws):
+    """Devuelve (filas, col) donde `col` mapea nombre→índice 1-based a partir de
+    los ENCABEZADOS REALES de la hoja (robusto ante reordenamientos)."""
+    filas = ws.get_all_values()
+    headers = filas[0] if filas else nc.COLUMNAS_ENVIOS
+    return filas, nc.columnas_indexadas(headers)
+
+
+def _valor_fila(filas, col, envio_row, nombre):
+    """Lee la celda `nombre` de la fila `envio_row` (1-based) ya cargada."""
+    idx = col.get(nombre)
+    if not idx or envio_row - 1 >= len(filas):
+        return ''
+    fila = filas[envio_row - 1]
+    return fila[idx - 1] if idx - 1 < len(fila) else ''
+
+
+def encolar_envio_catalogo(tienda, telefono, referencia, conclusion):
+    """Encola un envío PENDIENTE si la conclusión es elegible. Idempotente por
+    `referencia` (fila del contacto en LISTA DE CONTACTOS): no duplica.
+    Devuelve dict {ok, estado|motivo, numero_valido}."""
+    if not nc.conclusion_elegible(conclusion):
+        return {'ok': False, 'motivo': 'conclusion_no_elegible'}
+    numero_valido = nc.validar_numero(telefono)
+    ws = _abrir_ws_envios()
+    filas = ws.get_all_values()
+    if nc.indice_por_fila_respuesta(filas, referencia) is not None:
+        return {'ok': True, 'estado': 'ya_encolado', 'numero_valido': numero_valido}
+    ws.append_row(
+        nc.nueva_fila_envio(tienda, telefono, referencia, conclusion),
+        value_input_option='RAW',
+    )
+    _cache.pop('envios_catalogo', None)
+    # numero_valido=False: el worker lo dejará NUMERO_INVALIDO; el frontend puede avisar ya.
+    return {'ok': True, 'estado': nc.PENDIENTE, 'numero_valido': numero_valido}
+
+
+@app.route('/api/catalogo/encolar', methods=['POST'])
+def catalogo_encolar():
+    body = request.json or {}
+    tienda      = str(body.get('tienda', '')).strip()
+    telefono    = str(body.get('telefono', '')).strip()
+    referencia  = body.get('referencia')
+    conclusion  = str(body.get('conclusion', '')).strip()
+    if not tienda or referencia in (None, ''):
+        return jsonify({'ok': False, 'error': 'tienda y referencia requeridos'}), 400
+    try:
+        referencia = int(referencia)
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'error': 'referencia inválida'}), 400
+    try:
+        return jsonify(encolar_envio_catalogo(tienda, telefono, referencia, conclusion))
+    except Exception:
+        print(f"[catalogo] encolar error tel={nc.enmascarar_telefono(telefono)}")
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': 'No se pudo encolar'}), 500
+
+
+@app.route('/api/catalogo/envios')
+def catalogo_envios():
+    """Lista los envíos, opcionalmente filtrados por estado."""
+    estado = request.args.get('estado', '').strip().upper()
+    try:
+        ws = _abrir_ws_envios(crear=False)
+    except WorksheetNotFound:
+        return jsonify({'envios': []})  # aún no se ha encolado nada (caso benigno)
+    except Exception:
+        print("[catalogo] envios: error abriendo ENVIOS_CATALOGO")
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': 'No se pudo leer la cola'}), 500
+    filas = ws.get_all_values()
+    if not filas:
+        return jsonify({'envios': []})
+    headers = filas[0]
+    envios = []
+    for i, fila in enumerate(filas[1:], start=2):
+        reg = {headers[j]: (fila[j] if j < len(fila) else '') for j in range(len(headers))}
+        reg['_row'] = i
+        if estado and str(reg.get('estado', '')).strip().upper() != estado:
+            continue
+        envios.append(reg)
+    return jsonify({'envios': envios})
+
+
+@app.route('/api/catalogo/corregir-numero', methods=['POST'])
+def catalogo_corregir_numero():
+    """Corrige el teléfono de un envío NUMERO_INVALIDO/FALLO, lo actualiza en
+    LISTA DE CONTACTOS y re-encola (estado → PENDIENTE, intentos+1)."""
+    body = request.json or {}
+    envio_row    = body.get('envio_row')
+    nuevo_tel    = str(body.get('telefono', '')).strip()
+    contacto_row = body.get('contacto_row')
+    if not envio_row:
+        return jsonify({'ok': False, 'error': 'envio_row requerido'}), 400
+    if not nc.validar_numero(nuevo_tel):
+        return jsonify({'ok': False, 'error': 'Número inválido (deben ser 10 a 13 dígitos)'}), 400
+    try:
+        envio_row = int(envio_row)
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'error': 'envio_row inválido'}), 400
+    try:
+        ws = _abrir_ws_envios(crear=False)
+        filas, col = _leer_envios(ws)
+        if not (2 <= envio_row <= len(filas)):
+            return jsonify({'ok': False, 'error': 'envio_row fuera de rango'}), 400
+        # Validar transición: solo se corrige un envío reintentable (NUMERO_INVALIDO/FALLO).
+        estado_actual = str(_valor_fila(filas, col, envio_row, 'estado')).strip().upper()
+        if not nc.transicion_valida(estado_actual, nc.PENDIENTE):
+            return jsonify({'ok': False, 'error': f'No se puede corregir desde {estado_actual}'}), 400
+        tel_norm = nc.normalizar_telefono(nuevo_tel)
+        ahora = datetime.now().strftime(nc.FMT_TIMESTAMP)
+        try:
+            intentos_actual = int(_valor_fila(filas, col, envio_row, 'intentos') or 0)
+        except (TypeError, ValueError):
+            intentos_actual = 0
+        ws.batch_update([
+            {'range': gsu.rowcol_to_a1(envio_row, col['telefono']), 'values': [[tel_norm]]},
+            {'range': gsu.rowcol_to_a1(envio_row, col['estado']), 'values': [[nc.PENDIENTE]]},
+            {'range': gsu.rowcol_to_a1(envio_row, col['intentos']), 'values': [[str(intentos_actual + 1)]]},
+            {'range': gsu.rowcol_to_a1(envio_row, col['timestamp_estado']), 'values': [[ahora]]},
+            {'range': gsu.rowcol_to_a1(envio_row, col['detalle']), 'values': [['número corregido, re-encolado']]},
+        ], value_input_option='RAW')
+        # Actualizar el teléfono en LISTA DE CONTACTOS. Si falla, se REPORTA (no se traga).
+        contacto_actualizado = None
+        if contacto_row:
+            contacto_actualizado = False
+            try:
+                spc = get_gs_client().open_by_key(SHEET_IDS['contactos'])
+                wsc = spc.worksheet('LISTA DE CONTACTOS')
+                headers = wsc.row_values(1)
+                tel_col = next((i + 1 for i, h in enumerate(headers)
+                                if str(h).strip().upper() in ('TELÉFONO', 'TELEFONO')), None)
+                if tel_col:
+                    wsc.batch_update(
+                        [{'range': gsu.rowcol_to_a1(int(contacto_row), tel_col), 'values': [[tel_norm]]}],
+                        value_input_option='RAW',
+                    )
+                    contacto_actualizado = True
+                _cache.pop('contactos', None)
+            except Exception:
+                print(f"[catalogo] corregir: no se pudo actualizar LISTA DE CONTACTOS "
+                      f"contacto_row={contacto_row} tel={nc.enmascarar_telefono(nuevo_tel)}")
+                traceback.print_exc()
+        _cache.pop('envios_catalogo', None)
+        resp = {'ok': True, 'estado': nc.PENDIENTE}
+        if contacto_actualizado is not None:
+            resp['contacto_actualizado'] = contacto_actualizado
+            if not contacto_actualizado:
+                resp['aviso'] = 'Envío re-encolado, pero no se pudo actualizar el teléfono del contacto.'
+        return jsonify(resp)
+    except Exception:
+        print(f"[catalogo] corregir error tel={nc.enmascarar_telefono(nuevo_tel)}")
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': 'No se pudo corregir'}), 500
+
+
+@app.route('/api/catalogo/reintentar', methods=['POST'])
+def catalogo_reintentar():
+    """Re-encola un envío FALLO/NUMERO_INVALIDO sin cambiar el número (estado → PENDIENTE)."""
+    body = request.json or {}
+    envio_row = body.get('envio_row')
+    if not envio_row:
+        return jsonify({'ok': False, 'error': 'envio_row requerido'}), 400
+    try:
+        envio_row = int(envio_row)
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'error': 'envio_row inválido'}), 400
+    try:
+        ws = _abrir_ws_envios(crear=False)
+        filas, col = _leer_envios(ws)
+        if not (2 <= envio_row <= len(filas)):
+            return jsonify({'ok': False, 'error': 'envio_row fuera de rango'}), 400
+        estado_actual = str(_valor_fila(filas, col, envio_row, 'estado')).strip().upper()
+        if not nc.transicion_valida(estado_actual, nc.PENDIENTE):
+            return jsonify({'ok': False, 'error': f'No se puede reintentar desde {estado_actual}'}), 400
+        ahora = datetime.now().strftime(nc.FMT_TIMESTAMP)
+        ws.batch_update([
+            {'range': gsu.rowcol_to_a1(envio_row, col['estado']), 'values': [[nc.PENDIENTE]]},
+            {'range': gsu.rowcol_to_a1(envio_row, col['timestamp_estado']), 'values': [[ahora]]},
+        ], value_input_option='RAW')
+        _cache.pop('envios_catalogo', None)
+        return jsonify({'ok': True, 'estado': nc.PENDIENTE})
+    except Exception:
+        print("[catalogo] reintentar error")
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': 'No se pudo reintentar'}), 500
+
+
 FORMULARIO_HTML = r"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -3192,11 +3407,30 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
         <div class="icon">✅</div>
         <h2>Contacto Guardado</h2>
         <p id="resumen-guardado"></p>
+        <p id="catalogo-nota" style="margin-top:8px;font-size:.9em;color:var(--blue)"></p>
         <div class="stat-row">
           <div class="stat"><div class="n" id="stat-procesados">0</div><div class="l">Procesados</div></div>
           <div class="stat"><div class="n" id="stat-pendientes">—</div><div class="l">Restantes</div></div>
         </div>
         <button class="btn btn-green" onclick="cargarSiguiente()" style="margin-top:20px;width:100%">→ Siguiente Contacto</button>
+        <button class="btn btn-orange" onclick="abrirEnviosProblema()" style="margin-top:8px;width:100%;font-size:.9em">📖 Revisar envíos con problema</button>
+      </div>
+    </div>
+
+    <!-- MODAL: envíos de catálogo con problema + corrección de número (Plan 3) -->
+    <div id="modal-catalogo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:16px">
+      <div style="background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:85vh;overflow:auto;padding:22px">
+        <h3 style="margin-bottom:12px;color:var(--blue2)">📖 Envíos de catálogo con problema</h3>
+        <div id="envios-lista" style="font-size:.9em"></div>
+        <div id="corregir-box" style="display:none;margin-top:14px;border-top:1px solid #eef;padding-top:12px">
+          <p style="font-size:.9em;margin-bottom:6px">Corregir número de <b id="corregir-tienda"></b>:</p>
+          <input id="corregir-input" type="tel" inputmode="numeric" placeholder="10 a 13 dígitos"
+                 style="width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;font-size:1em"
+                 oninput="validarCorregir()">
+          <p id="corregir-error" style="color:var(--red);font-size:.82em;min-height:16px;margin:4px 0"></p>
+          <button id="corregir-btn" class="btn btn-green" style="width:100%" disabled onclick="guardarCorreccion()">Guardar y reintentar</button>
+        </div>
+        <button class="btn btn-gray" style="width:100%;margin-top:12px" onclick="cerrarModalCatalogo()">Cerrar</button>
       </div>
     </div>
 
@@ -3385,12 +3619,111 @@ async function guardar() {
     document.getElementById('stat-procesados').textContent = O.procesados;
     document.getElementById('resumen-guardado').textContent =
       `${tienda} → ${O.resultado}${O.r0 && O.r0 !== 'Respondio' ? ' ('+O.r0+')' : ''}`;
+    document.getElementById('catalogo-nota').textContent = '';
     showStep('siguiente');
+    // Plan 3: si la conclusión dispara catálogo (Pedido / Revisará el Catálogo), encolar el envío.
+    encolarCatalogo(tienda);
   } catch(e) {
     showStep('contacto');
     alert('⚠️ Error de conexión al guardar. Verifica tu internet e intenta de nuevo.');
   }
 }
+
+// Conclusiones elegibles (mismo criterio que nucleo_catalogo.CONCLUSIONES_ELEGIBLES).
+const CONCLUSIONES_CATALOGO = ['pedido', 'revisara el catalogo'];
+
+function telContacto(c) {
+  return c ? (c['TELÉFONO'] || c['Teléfono'] || c.TELEFONO || c.Telefono || '') : '';
+}
+
+async function encolarCatalogo(tienda) {
+  if (!O.r7 || CONCLUSIONES_CATALOGO.indexOf(O.r7.trim().toLowerCase()) === -1) return;
+  const nota = document.getElementById('catalogo-nota');
+  try {
+    const r = await fetch('/api/catalogo/encolar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        tienda,
+        telefono: telContacto(O.contacto),
+        referencia: O.contacto ? O.contacto._row : null,
+        conclusion: O.r7,
+      })
+    });
+    const d = await r.json();
+    if (d && d.ok) nota.textContent = '📖 Catálogo encolado para envío (' + (d.estado || 'PENDIENTE') + ').';
+    else nota.textContent = '⚠️ No se pudo encolar el catálogo.';
+  } catch(e) { nota.textContent = '⚠️ No se pudo encolar el catálogo (sin conexión).'; }
+}
+
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+let _envioSel = null;
+
+async function abrirEnviosProblema() {
+  document.getElementById('modal-catalogo').style.display = 'flex';
+  document.getElementById('corregir-box').style.display = 'none';
+  const cont = document.getElementById('envios-lista');
+  cont.textContent = 'Cargando...';
+  try {
+    const [inv, fall] = await Promise.all([
+      fetch('/api/catalogo/envios?estado=NUMERO_INVALIDO').then(r=>r.json()),
+      fetch('/api/catalogo/envios?estado=FALLO').then(r=>r.json()),
+    ]);
+    const envios = [].concat(inv.envios||[], fall.envios||[]);
+    if (!envios.length) { cont.innerHTML = '<p style="color:var(--gray)">Sin envíos con problema. 🎉</p>'; return; }
+    cont.innerHTML = envios.map(e =>
+      `<div style="border:1px solid #eef;border-radius:8px;padding:8px;margin-bottom:6px">
+        <b>${escHtml(e.tienda)}</b> — <span style="color:var(--red)">${escHtml(e.estado)}</span><br>
+        <span style="color:var(--gray);font-size:.85em">${escHtml(e.telefono)} · intentos: ${escHtml(e.intentos)}</span><br>
+        <button class="btn btn-blue" style="margin-top:4px;font-size:.82em;padding:6px 10px"
+          onclick='abrirCorregir(${JSON.stringify(e).replace(/'/g,"&#39;")})'>✏️ Corregir número</button>
+      </div>`
+    ).join('');
+  } catch(e) { cont.textContent = 'Error cargando envíos.'; }
+}
+
+function abrirCorregir(envio) {
+  _envioSel = envio;
+  document.getElementById('corregir-box').style.display = 'block';
+  document.getElementById('corregir-tienda').textContent = envio.tienda || '';
+  const inp = document.getElementById('corregir-input');
+  inp.value = ''; inp.focus();
+  document.getElementById('corregir-error').textContent = '';
+  document.getElementById('corregir-btn').disabled = true;
+}
+
+function validarCorregir() {
+  const v = document.getElementById('corregir-input').value;
+  const dig = (v.match(/\d/g) || []).length;
+  const ok = dig >= 10 && dig <= 13;
+  document.getElementById('corregir-btn').disabled = !ok;
+  document.getElementById('corregir-error').textContent = (v && !ok) ? 'Deben ser 10 a 13 dígitos.' : '';
+  return ok;
+}
+
+async function guardarCorreccion() {
+  if (!validarCorregir() || !_envioSel) return;
+  const btn = document.getElementById('corregir-btn');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/catalogo/corregir-numero', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        envio_row: _envioSel._row,
+        telefono: document.getElementById('corregir-input').value,
+        contacto_row: _envioSel.fila_respuesta,
+      })
+    });
+    const d = await r.json();
+    if (d.ok) { abrirEnviosProblema(); }
+    else { document.getElementById('corregir-error').textContent = d.error || 'No se pudo corregir.'; btn.disabled = false; }
+  } catch(e) { document.getElementById('corregir-error').textContent = 'Error de conexión.'; btn.disabled = false; }
+}
+
+function cerrarModalCatalogo() { document.getElementById('modal-catalogo').style.display = 'none'; }
 
 function cargarSiguiente() {
   O.skip = 0;  // Resetear skip — el contacto anterior ya fue marcado
