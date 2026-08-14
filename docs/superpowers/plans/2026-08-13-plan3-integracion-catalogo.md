@@ -84,12 +84,12 @@
 
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
-| T3.1 | Diseño cola + contrato estados | PENDIENTE | | |
-| T3.2 | Encolado desde el formulario | PENDIENTE | | |
-| T3.3 | Worker de cola (refactor script) | PENDIENTE | | |
-| T3.4 | Panel estados + modal corrección número | PENDIENTE | | |
-| T3.5 | [OPCIONAL] Copy mensaje catálogo | PENDIENTE | | |
-| T3.6 | E2E + PR + cierre | PENDIENTE | | |
+| T3.1 | Diseño cola + contrato estados | HECHO | `docs/superpowers/plans/2026-08-13-plan3-diseno-cola.md`; owner T3.1=Pedido+Revisará; `nucleo_catalogo.py` (34 tests) | 2026-08-13 |
+| T3.2 | Encolado desde el formulario | HECHO | Endpoints `/api/catalogo/encolar,envios` + cableo JS en `guardar()`; idempotencia por referencia; 12 tests | 2026-08-13 |
+| T3.3 | Worker de cola (refactor script) | HECHO | `worker_catalogo.py` (transport-agnostic, lock EN_PROCESO, excepción→FALLO); 8 tests con transporte FAKE | 2026-08-13 |
+| T3.4 | Panel estados + modal corrección número | HECHO | Modal en FORMULARIO_HTML (escHtml anti-XSS) + endpoints corregir-numero/reintentar (FSM validada); tests | 2026-08-13 |
+| T3.5 | [OPCIONAL] Copy mensaje catálogo | N/A | Opcional; el owner no lo pidió (no se tocó la hoja Mensajes) | 2026-08-13 |
+| T3.6 | E2E + PR + cierre | HECHO (parcial) | E2E con transporte FAKE (procesar_cola, 3 estados) verde; **corrida real WhatsApp = gate owner T3.6 BLOQUEADA**; 4 reviewers → 1 CRITICAL + HIGH corregidos; PR a main | 2026-08-13 |
 
 ## 6. Riesgos y rollback
 
