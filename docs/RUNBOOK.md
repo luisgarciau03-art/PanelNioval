@@ -29,6 +29,14 @@ python worker_catalogo_run.py
 
 Quitar la tarea: `Unregister-ScheduledTask -TaskName NIOVAL_WorkerCatalogo -Confirm:$false`.
 
+## Gate de seguridad de envío (contraseña)
+
+El worker **no envía nada** sin autorización explícita (para evitar disparos accidentales):
+
+- Define `WA_ENVIO_PASSWORD` (ej. una contraseña fuerte) en la PC del owner.
+- **Corrida manual** (`python worker_catalogo_run.py` en una terminal): el worker **solicita la contraseña** y la valida antes de abrir WhatsApp.
+- **Tarea Programada** (no interactiva): además de `WA_ENVIO_PASSWORD`, se exige `WA_ENVIO_ARMADO=1` para que envíe. Sin ese flag, la corrida no envía (queda "desarmada"). Así puedes tener la tarea instalada pero pausada hasta que la armes.
+
 ## Ver estados
 
 - **Envíos:** `GET /api/catalogo/envios?estado=PENDIENTE|ENVIADO|NUMERO_INVALIDO|FALLO`.

@@ -100,6 +100,12 @@ def _reportar_heartbeat(resumen):
 def main():
     if not _adquirir_lock():
         return
+    # GATE DE SEGURIDAD: exige y valida la contraseña de envío antes de tocar WhatsApp.
+    autorizado, motivo = wc.autorizar_envio()
+    print(f"[worker] autorización de envío: {motivo}")
+    if not autorizado:
+        _liberar_lock()
+        return
     driver = None
     try:
         client = app.get_gs_client()
