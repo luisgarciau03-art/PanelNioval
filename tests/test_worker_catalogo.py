@@ -63,6 +63,37 @@ class TestProcesarEnvio:
         assert "chat no cargó" in res.detalle  # el error se conserva, no se silencia
 
 
+class TestAutorizarEnvio:
+    def test_sin_password_env_no_autoriza(self, monkeypatch):
+        monkeypatch.delenv("WA_ENVIO_PASSWORD", raising=False)
+        ok, motivo = wc.autorizar_envio(es_tty=False)
+        assert ok is False
+        assert "WA_ENVIO_PASSWORD" in motivo
+
+    def test_interactivo_password_correcta_autoriza(self, monkeypatch):
+        monkeypatch.setenv("WA_ENVIO_PASSWORD", "clave-de-prueba")
+        ok, motivo = wc.autorizar_envio(prompt_fn=lambda: "clave-de-prueba", es_tty=True)
+        assert ok is True
+
+    def test_interactivo_password_incorrecta_no_autoriza(self, monkeypatch):
+        monkeypatch.setenv("WA_ENVIO_PASSWORD", "clave-de-prueba")
+        ok, motivo = wc.autorizar_envio(prompt_fn=lambda: "mala", es_tty=True)
+        assert ok is False
+        assert "incorrecta" in motivo
+
+    def test_no_interactivo_requiere_armado(self, monkeypatch):
+        monkeypatch.setenv("WA_ENVIO_PASSWORD", "clave-de-prueba")
+        monkeypatch.delenv("WA_ENVIO_ARMADO", raising=False)
+        ok, _ = wc.autorizar_envio(es_tty=False)
+        assert ok is False
+
+    def test_no_interactivo_armado_autoriza(self, monkeypatch):
+        monkeypatch.setenv("WA_ENVIO_PASSWORD", "clave-de-prueba")
+        monkeypatch.setenv("WA_ENVIO_ARMADO", "1")
+        ok, _ = wc.autorizar_envio(es_tty=False)
+        assert ok is True
+
+
 class TestProcesarCola:
     def test_corrida_completa_mixta(self):
         ws = MagicMock()
