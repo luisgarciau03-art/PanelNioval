@@ -78,7 +78,7 @@
 
 **CRITICAL corregido — XSS almacenado vía correo:** la regex original `[^@\s]+@...` admitía `< > " '`; un correo `<img onerror=...>@a.b` pasaba y se renderizaba sin escapar en la tabla de Contactos (`renderCell`). **Fix:** (a) regex estricta allowlist en cliente y servidor (no entra HTML); (b) `renderCell` ahora escapa las ramas de texto plano (defensa del sink). 
 **HIGH corregido — reentrancia:** doble Enter / doble botón podía duplicar la fila de respuesta. **Fix:** guards `_enviandoCorreo` (modal) y `_guardando` (guardar()), input/botones deshabilitados en vuelo.
-**Diferido (pre-existente, no de Plan 4):** `renderCell`/`renderContacto` renderizan datos de hoja sin escape en varias ramas (links, PAGO) — XSS de todo el dashboard, misma clase que FC2/FH1. Recomendado: escape sistemático + `SL_DASHBOARD_TOKEN` (M1/Plan 5).
+**Diferido (pre-existente, no de Plan 4):** `renderCell`/`renderContacto` renderizan datos de hoja sin escape en varias ramas (links, PAGO) — XSS de todo el dashboard, misma clase que FC2/FH1. Recomendado: escape sistemático + `PANEL_DASHBOARD_TOKEN` (M1/Plan 5).
 **MEDIUM (nota owner):** si el guardado de la respuesta falla tras escribir el correo y el operador reintenta con otra conclusión, la col T puede quedar con un correo sin conclusión "Correo" en J (inconsistencia de baja probabilidad).
 
 ## 6. Riesgos y rollback

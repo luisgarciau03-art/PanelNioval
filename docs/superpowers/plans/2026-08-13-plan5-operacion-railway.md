@@ -80,11 +80,14 @@
 
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
-| T5.1 | ADR transporte (gate owner) | PENDIENTE | | |
-| T5.2 | Implementación transporte elegido | PENDIENTE | | |
-| T5.3 | Config Railway + secretos | PENDIENTE | | |
-| T5.4 | Smoke test + monitoreo | PENDIENTE | | |
-| T5.5 | E2E real + runbook + cierre | PENDIENTE | | |
+| T5.1 | ADR transporte (gate owner) | HECHO | Owner eligió **B (worker local)**; ADR `docs/adr/2026-08-13-transporte-catalogo.md` | 2026-08-13 |
+| T5.2 | Implementación transporte elegido (rama B) | HECHO | `worker_catalogo_run.py` (transporte Selenium + lock + heartbeat) + `instalar-worker.ps1` (Tarea Programada); heartbeat `/api/catalogo/heartbeat` + `/worker-estado`; auth opcional M1 (`PANEL_DASHBOARD_TOKEN`); 7 tests | 2026-08-13 |
+| T5.3 | Config Railway + secretos | HECHO (código) / BLOQUEADA (owner) | `.env.example` con checklist de secretos; **owner: rotar TELEGRAM_TOKEN + Places key y cargar secretos en Railway** | 2026-08-13 |
+| T5.4 | Smoke test + monitoreo | HECHO | `tools/smoke_railway.py` (GET /,/formulario,/siguiente,/envios,/worker-estado); heartbeat en panel | 2026-08-13 |
+| T5.5 | E2E real + runbook + cierre | HECHO (parcial) | `docs/RUNBOOK.md` completo; **corrida real de WhatsApp = gate owner T5.5 BLOQUEADA**; PR + cierre de tanda | 2026-08-13 |
+
+## Nota de review (security-reviewer, gate T5.2)
+**0 CRITICAL · 0 HIGH.** Fixes aplicados: comparación de tokens con `hmac.compare_digest` (timing-safe); cookie de sesión endurecida (`SECURE`/`SameSite`/`HttpOnly`); aviso si `PANEL_DASHBOARD_TOKEN` activo sin `SECRET_KEY` fija (consistencia entre workers); lock del worker con creación atómica (`open 'x'`). Documentado: activar `PANEL_DASHBOARD_TOKEN` y `WORKER_TOKEN` juntos; header `X-Dashboard-Token` preferido sobre `?token=`. Payload de heartbeat sin PII (solo contadores). Rate-limiting = mejora opcional futura.
 
 ## 6. Riesgos y rollback
 

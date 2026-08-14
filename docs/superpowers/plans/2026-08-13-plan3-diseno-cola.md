@@ -67,6 +67,6 @@ Auditado por code/python/security/silent-failure. **Fixes aplicados en este plan
 - **LOW** — `ResultadoEnvio` usaba `assert` → `raise ValueError`; `update_cell` (USER_ENTERED) → `batch_update` RAW; `enmascarar_telefono` ahora se usa en logs; rama muerta `validar_numero` → devuelve `numero_valido`. ✅
 
 **Diferido (documentado, no bloqueante):**
-- **HIGH (code)** — `/api/catalogo/encolar` es superficie de abuso (envío WhatsApp a números arbitrarios) porque **toda la app carece de auth (FC2)**. Mitigación real = token `SL_DASHBOARD_TOKEN` (mejora M1) + validar `referencia` contra fila real de `LISTA DE CONTACTOS`. → **Plan 5 T5.3**, ANTES de correr el worker desatendido.
+- **HIGH (code)** — `/api/catalogo/encolar` es superficie de abuso (envío WhatsApp a números arbitrarios) porque **toda la app carece de auth (FC2)**. Mitigación real = token `PANEL_DASHBOARD_TOKEN` (mejora M1) + validar `referencia` contra fila real de `LISTA DE CONTACTOS`. → **Plan 5 T5.3**, ANTES de correr el worker desatendido.
 - **MEDIUM** — TOCTOU en encolar (mismo patrón que FC4): con 1 operador por cierre el riesgo es bajo; upsert atómico queda pendiente si hay 2+ operadores simultáneos.
 - **NOTA owner** — idempotencia sin ventana temporal: un contacto que legítimamente vuelve a cerrar "Pedido" meses después dirá `ya_encolado` y no re-enviará. Confirmar si es el comportamiento deseado.
