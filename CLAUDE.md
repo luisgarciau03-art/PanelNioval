@@ -28,7 +28,7 @@ Panel web interno de NIOVAL (distribuidora mayorista de ferretería/plomería) p
 
 ## Reglas del proyecto
 
-- **Baseline de verificación:** `python -m pytest tests/ -q` → **33 passed** (creado en el Plan 1, tanda 2026-08-13). Es el ÚNICO baseline oficial. Nada se mergea con la suite en rojo.
+- **Baseline de verificación:** `python -m pytest tests/ -q` → **61 passed** (creado en el Plan 1, ampliado en Plan 2, tanda 2026-08-13). Es el ÚNICO baseline oficial. Nada se mergea con la suite en rojo. Nota: importar `app.py` en frío tarda ~2 min (pandas/googleapiclient + Defender); en caliente ~8s. `pytest.ini` ancla el rootdir al proyecto.
 - **Datos personales:** teléfonos/nombres/correos de clientes **no** se commitean ni se vuelcan completos en logs; enmascarar (`+52...XXXX`). `.gitignore` cubre `*.json` (credenciales) y `debug_invalid_*`/`debug_timeout_*` (screenshots con PII de `envio_catalogo.py`).
 - **Secretos:** nada hardcodeado. `GOOGLE_CREDENTIALS_JSON`, `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` van por variables de entorno en Railway. **Pendiente owner:** rotar el token Telegram `8404009072` (expuesto en el historial git; ~14 copias).
 - **Ramas:** **nunca** trabajar directo en `main` (Railway auto-deploya). Una rama por plan; PRs con `gh pr create --base main`; merge `--squash` solo con baseline verde y reviews sin CRITICAL/HIGH abiertos.
