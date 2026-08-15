@@ -32,6 +32,14 @@ def test_formulario_html_se_sirve(client):
     assert b"Formulario de Llamadas" in r.data
 
 
+def test_formulario_tiene_validador_catalogo(client):
+    # El validador PRE-envío (confirmar/corregir número) debe estar en el formulario.
+    html = client.get("/formulario").data.decode("utf-8", "ignore")
+    assert "modal-validar-catalogo" in html
+    assert "abrirValidadorCatalogo" in html
+    assert "confirmarEnviarCatalogo" in html
+
+
 def test_siguiente_devuelve_contacto(client, monkeypatch):
     ws = MagicMock()
     ws.get_all_values.return_value = [
