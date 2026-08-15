@@ -144,7 +144,13 @@ def _reportar_heartbeat(resumen):
         print("[worker] no se pudo enviar heartbeat (¿panel caído?)")
 
 
+def _modo_loop():
+    """True si se pide modo continuo: arg --loop o env WORKER_LOOP=1."""
+    return ("--loop" in sys.argv) or (os.environ.get("WORKER_LOOP") == "1")
+
+
 def main():
+    loop = _modo_loop()
     if not _adquirir_lock():
         return
     # GATE DE SEGURIDAD: exige y valida la contraseña de envío antes de tocar WhatsApp.
@@ -175,9 +181,33 @@ def main():
                   "Se intentará de todos modos.")
 
         transporte = construir_transporte_selenium(driver)
-        resumen = wc.procesar_cola(ws, transporte, mensajes, archivos)
-        print(f"[worker] corrida terminada: {resumen}")
-        _reportar_heartbeat(resumen)
+
+        if loop:
+            intervalo = int(os.environ.get("WORKER_LOOP_SECS", "15"))
+            print(f"[worker] MODO CONTINUO: procesando la cola cada {intervalo}s (Ctrl+C para salir).")
+            try:
+                while True:
+                    try:
+                        resumen = wc.procesar_cola(ws, transporte, mensajes, archivos)
+                        if resumen["procesados"]:
+                            print(f"[worker] procesados: {resumen}")
+                            _reportar_heartbeat(resumen)
+                        else:
+                            _reportar_heartbeat({"vivo": True, "procesados": 0})
+                    except KeyboardInterrupt:
+                        raise
+                    except Exception:
+                        # Resiliente: un error transitorio (red/cuota) NO mata el loop.
+                        print("[worker] error transitorio (se continúa la próxima vuelta):")
+                        traceback.print_exc()
+                        _reportar_heartbeat({"error": True})
+                    time.sleep(intervalo)
+            except KeyboardInterrupt:
+                print("[worker] detenido por el usuario (Ctrl+C).")
+        else:
+            resumen = wc.procesar_cola(ws, transporte, mensajes, archivos)
+            print(f"[worker] corrida terminada: {resumen}")
+            _reportar_heartbeat(resumen)
     except Exception:
         print("[worker] error en la corrida:")
         traceback.print_exc()

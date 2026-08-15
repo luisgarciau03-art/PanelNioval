@@ -81,6 +81,37 @@ class TestGuardarCorreo:
         ws.batch_update.assert_not_called()
 
 
+class TestActualizarTelefono:
+    def _ws(self, nfilas=10):
+        ws = MagicMock()
+        header = ["TIENDA", "TELÉFONO", "CIUDAD"]
+        ws.get_all_values.return_value = [header] + [["x", "111", "y"]] * (nfilas - 1)
+        return ws
+
+    def test_valido_actualiza_col_telefono(self, client, monkeypatch):
+        ws = self._ws(10)
+        monkeypatch.setattr(app, "get_gs_client", lambda: _fake_client(ws))
+        r = client.post("/api/formulario/telefono", json={"row": 5, "telefono": "5599998888"})
+        assert r.status_code == 200 and r.get_json()["ok"] is True
+        upd = ws.batch_update.call_args[0][0]
+        assert upd[0]["range"] == "B5"                 # TELÉFONO = col B, fila 5
+        assert upd[0]["values"] == [["+5599998888"]]   # normalizado con '+'
+
+    def test_invalido_400_sin_escritura(self, client, monkeypatch):
+        ws = self._ws()
+        monkeypatch.setattr(app, "get_gs_client", lambda: _fake_client(ws))
+        r = client.post("/api/formulario/telefono", json={"row": 5, "telefono": "123"})
+        assert r.status_code == 400
+        ws.batch_update.assert_not_called()
+
+    def test_row_encabezado_rechazado(self, client, monkeypatch):
+        ws = self._ws()
+        monkeypatch.setattr(app, "get_gs_client", lambda: _fake_client(ws))
+        r = client.post("/api/formulario/telefono", json={"row": 1, "telefono": "5599998888"})
+        assert r.status_code == 400
+        ws.batch_update.assert_not_called()
+
+
 class TestSanitizarCorreo:
     @pytest.mark.parametrize("entrada,esperado", [
         ("cliente@x.com", "cliente@x.com"),

@@ -30,11 +30,19 @@ setx PANEL_URL "https://<tu-app>.up.railway.app"   # opcional (heartbeat)
 # 4. Instalar como Tarea Programada (cada 15 min):
 .\instalar-worker.ps1 -IntervaloMinutos 15
 
-# 5. Probar a mano:
+# 5. Probar a mano (una corrida):
 python worker_catalogo_run.py
+
+# 5b. MODO CONTINUO (recomendado para envío casi inmediato): abre WhatsApp una vez
+#     y procesa la cola cada 15s. Déjalo corriendo en una ventana.
+python worker_catalogo_run.py --loop
+#     (intervalo configurable con  setx WORKER_LOOP_SECS 15  ; salir con Ctrl+C)
 ```
 
 Quitar la tarea: `Unregister-ScheduledTask -TaskName NIOVAL_WorkerCatalogo -Confirm:$false`.
+
+- **Modo continuo vs Tarea Programada:** en modo continuo (`--loop`) el envío ocurre a los segundos de cerrar la llamada (ideal con el validador pre-envío). La Tarea Programada (cada 15 min) sirve como respaldo si prefieres no dejar una ventana abierta. No uses ambos a la vez con la misma sesión (el perfil de Chrome no admite 2 instancias).
+- **Detener el envío:** la autorización (`WA_ENVIO_ARMADO`) se evalúa al ARRANCAR el worker; para frenar un worker ya corriendo, **ciérralo (Ctrl+C / matar el proceso)** — cambiar la env var a media corrida no lo detiene.
 
 ### Notas de operación (aprendidas en la prueba real 2026-08-15)
 

@@ -3186,6 +3186,46 @@ def _correo_valido(correo):
     return bool(correo) and len(correo) <= 254 and _EMAIL_RE.match(correo) is not None
 
 
+@app.route('/api/formulario/telefono', methods=['POST'])
+def formulario_telefono():
+    """Actualiza el TELÉFONO del contacto en LISTA DE CONTACTOS (validador pre-envío)."""
+    body = request.json or {}
+    row = body.get('row')
+    telefono = str(body.get('telefono', '')).strip()
+    if not row:
+        return jsonify({'ok': False, 'error': 'row requerido'}), 400
+    try:
+        row = int(row)
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'error': 'row inválido'}), 400
+    if row < 2:
+        return jsonify({'ok': False, 'error': 'row fuera de rango'}), 400
+    if not nc.validar_numero(telefono):
+        return jsonify({'ok': False, 'error': 'Número inválido (10 a 13 dígitos)'}), 400
+    try:
+        client = get_gs_client()
+        wsc = client.open_by_key(SHEET_IDS['contactos']).worksheet('LISTA DE CONTACTOS')
+        filas = wsc.get_all_values()
+        if row > len(filas):
+            return jsonify({'ok': False, 'error': 'row fuera de rango'}), 400
+        headers = filas[0] if filas else []
+        tel_col = next((i + 1 for i, h in enumerate(headers)
+                        if str(h).strip().upper() in ('TELÉFONO', 'TELEFONO')), None)
+        if not tel_col:
+            return jsonify({'ok': False, 'error': 'columna TELÉFONO no encontrada'}), 400
+        tel_norm = nc.normalizar_telefono(telefono)
+        wsc.batch_update(
+            [{'range': gsu.rowcol_to_a1(row, tel_col), 'values': [[tel_norm]]}],
+            value_input_option='RAW',
+        )
+        _cache.pop('contactos', None)
+        return jsonify({'ok': True, 'telefono': tel_norm})
+    except Exception:
+        print(f"[telefono] no se pudo actualizar row={row}")
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': 'No se pudo actualizar el teléfono'}), 500
+
+
 @app.route('/api/formulario/correo', methods=['POST'])
 def formulario_correo():
     """Guarda el correo del cliente en la celda T{row} de LISTA DE CONTACTOS."""
@@ -3720,6 +3760,24 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
       </div>
     </div>
 
+    <!-- MODAL: validador PRE-envío de catálogo (confirmar/corregir número) -->
+    <div id="modal-validar-catalogo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:16px">
+      <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;padding:22px">
+        <h3 style="margin-bottom:6px;color:var(--blue2)">📦 Confirmar envío de catálogo</h3>
+        <p style="font-size:.9em;color:var(--gray);margin-bottom:12px">
+          <b id="val-cat-tienda"></b> — conclusión: <b id="val-cat-conclusion"></b>.<br>
+          Verifica que el <b>número de WhatsApp</b> sea correcto antes de enviar. Si lo corriges, se actualiza en LISTA DE CONTACTOS.
+        </p>
+        <label style="font-size:.82em;color:#555;font-weight:600">Número de WhatsApp (con lada, ej. 52...)</label>
+        <input id="val-cat-tel" type="tel" inputmode="numeric" placeholder="526623534185"
+               style="width:100%;padding:11px;border:1px solid #ccd;border-radius:8px;font-size:1em;margin-top:4px"
+               oninput="validarValCat()">
+        <p id="val-cat-error" style="color:var(--red);font-size:.82em;min-height:16px;margin:4px 0"></p>
+        <button id="val-cat-btn" class="btn btn-green" style="width:100%" onclick="confirmarEnviarCatalogo()">✅ Confirmar y enviar catálogo</button>
+        <button class="btn btn-gray" style="width:100%;margin-top:8px" onclick="cerrarValidadorCatalogo()">Cancelar</button>
+      </div>
+    </div>
+
     <!-- FIN TOTAL -->
     <div class="step" id="step-fin">
       <div class="fin">
@@ -3784,6 +3842,7 @@ async function cargarContacto() {
   const d = await r.json();
   if (d.fin) { showStep('fin'); document.getElementById('stat-total').textContent = O.procesados; return; }
   O.contacto = d.contacto;
+  O._telConfirmado = null;   // reset del número confirmado por contacto
   renderContacto(d.contacto);
 }
 
@@ -3875,8 +3934,55 @@ function resp6(v) { O.r6=v; setProgress('prog7',7,TOTAL_PREGUNTAS); showStep('p7
 function resp7(v) {
   O.r7 = v;
   if (v === 'Correo') { abrirModalCorreo(); return; }  // Plan 4: capturar correo antes de guardar
+  if (v === 'Pedido' || v === 'Revisara el Catalogo') { abrirValidadorCatalogo(); return; }  // validador pre-envío
   guardar();
 }
+
+// ─── Validador PRE-envío de catálogo (confirmar/corregir número antes de encolar) ───
+function abrirValidadorCatalogo() {
+  const modal = document.getElementById('modal-validar-catalogo');
+  modal.style.display = 'flex';
+  document.getElementById('val-cat-tienda').textContent =
+    O.contacto ? (O.contacto.TIENDA || O.contacto.Tienda || O.contacto.Nombre || '') : '';
+  document.getElementById('val-cat-conclusion').textContent = O.r7;
+  const inp = document.getElementById('val-cat-tel');
+  inp.value = telContacto(O.contacto) || '';
+  validarValCat();
+  inp.focus();
+}
+function validarValCat() {
+  const v = document.getElementById('val-cat-tel').value;
+  const dig = (v.match(/\d/g) || []).length;
+  const ok = dig >= 10 && dig <= 13;
+  document.getElementById('val-cat-btn').disabled = !ok;
+  document.getElementById('val-cat-error').textContent =
+    (v && !ok) ? 'El número debe tener 10 a 13 dígitos (con lada, ej. 52...).' : '';
+  return ok;
+}
+async function confirmarEnviarCatalogo() {
+  if (!validarValCat()) return;
+  const btn = document.getElementById('val-cat-btn'); btn.disabled = true;
+  const nuevoTel = document.getElementById('val-cat-tel').value.trim();
+  const origDig = (telContacto(O.contacto) || '').replace(/\D/g, '');
+  const nuevoDig = nuevoTel.replace(/\D/g, '');
+  try {
+    // Si el número cambió, actualízalo en LISTA DE CONTACTOS (para este envío y los próximos).
+    if (nuevoDig !== origDig && O.contacto && O.contacto._row) {
+      const r = await fetch('/api/formulario/telefono', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ row: O.contacto._row, telefono: nuevoTel })
+      });
+      const d = await r.json();
+      if (!d.ok) { document.getElementById('val-cat-error').textContent = d.error || 'No se pudo actualizar el número.'; btn.disabled = false; return; }
+    }
+    O._telConfirmado = nuevoTel;   // encolarCatalogo usará este número
+    cerrarValidadorCatalogo();
+    guardar();                     // guarda la respuesta y encola con el número confirmado
+  } catch(e) {
+    document.getElementById('val-cat-error').textContent = 'Error de conexión.'; btn.disabled = false;
+  }
+}
+function cerrarValidadorCatalogo() { document.getElementById('modal-validar-catalogo').style.display = 'none'; }
 
 // ─── Plan 4: captura de correo (conclusión "Correo") ───
 function abrirModalCorreo() {
@@ -3985,7 +4091,7 @@ async function encolarCatalogo(tienda) {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         tienda,
-        telefono: telContacto(O.contacto),
+        telefono: O._telConfirmado || telContacto(O.contacto),
         referencia: O.contacto ? O.contacto._row : null,
         conclusion: O.r7,
       })
