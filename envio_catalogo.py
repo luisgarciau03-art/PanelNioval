@@ -467,20 +467,29 @@ def enviar_mensaje(driver: webdriver.Chrome, mensaje: str):
         print("Error general enviando mensaje:", ex)
 
 def click_attach_button(driver):
-    try:
-        attach_btn = WebDriverWait(driver, 15).until(
-            EC.element_to_be_clickable((By.XPATH, '//span[@data-icon="plus-rounded"]'))
-        )
-        attach_btn.click()
-        sleep(0.8)
-        return True
-    except Exception as e:
-        print("No se pudo hacer click en el botón Adjuntar:", e)
+    # Reintenta hasta 3 veces; si el click normal queda interceptado por un overlay
+    # (típico al enviar varios archivos seguidos), cae a click por JavaScript.
+    for intento in range(3):
         try:
-            driver.save_screenshot('adjuntar_fail.png')
-        except Exception:
-            pass
-        return False
+            attach_btn = WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.XPATH, '//span[@data-icon="plus-rounded"]'))
+            )
+            try:
+                attach_btn.click()
+            except Exception:
+                # click interceptado / no clickable → forzar por JS
+                driver.execute_script("arguments[0].click();", attach_btn)
+            sleep(0.9)
+            return True
+        except Exception as e:
+            print(f"[adjuntar] intento {intento+1}/3 falló: {e}")
+            sleep(1.5)  # dar tiempo a que el overlay del envío anterior desaparezca
+    print("No se pudo hacer click en el botón Adjuntar tras 3 intentos.")
+    try:
+        driver.save_screenshot('adjuntar_fail.png')
+    except Exception:
+        pass
+    return False
 
 def click_documentos(driver):
     try:
@@ -528,35 +537,95 @@ def tipo_archivo(path):
         return "documento"
     return None
 
+def find_file_input_by_accept(driver, tipo="documento", timeout=8):
+    """Busca el <input type=file> correcto por su atributo `accept` (robusto ante
+    cambios de los íconos del submenú de WhatsApp Web):
+      - media: input cuyo accept incluye image/video.
+      - documento: input que NO restringe a image/video (accept '*' o vacío).
+    """
+    end_time = time.time() + timeout
+    while time.time() < end_time:
+        inputs = driver.find_elements(By.XPATH, '//input[@type="file"]')
+        for inp in inputs:
+            try:
+                accept = (inp.get_attribute("accept") or "").lower()
+            except Exception:
+                accept = ""
+            es_media = ("image" in accept) or ("video" in accept)
+            if tipo == "media" and es_media:
+                return inp
+            if tipo == "documento" and not es_media:
+                return inp
+        sleep(0.3)
+    return None
+
+def _click_menu_por_texto(driver, textos, timeout=6):
+    """Hace clic en una opción del menú de adjuntar por su TEXTO visible (robusto a
+    cambios de íconos). Usa click por JS para evitar intercepciones. True si clicó."""
+    fin = time.time() + timeout
+    while time.time() < fin:
+        for t in textos:
+            try:
+                els = driver.find_elements(By.XPATH, f'//*[normalize-space(text())="{t}"]')
+                for el in els:
+                    try:
+                        if el.is_displayed():
+                            driver.execute_script("arguments[0].click();", el)
+                            return True
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+        sleep(0.3)
+    return False
+
+
 def enviar_archivo(driver, archivo_path):
     tipo = tipo_archivo(archivo_path)
-    if tipo == "media":
-        print("Detectado imagen/video:", archivo_path)
-        if not click_attach_button(driver): return
-        if not click_media(driver): return
-        inp = find_file_input_by_position(driver, tipo="media")
-    elif tipo == "documento":
-        print("Detectado documento:", archivo_path)
-        if not click_attach_button(driver): return
-        if not click_documentos(driver): return
-        inp = find_file_input_by_position(driver, tipo="documento")
-    else:
+    if tipo not in ("media", "documento"):
         print("Tipo de archivo no soportado:", archivo_path)
         return
-
+    print(f"Detectado {tipo}:", archivo_path)
+    # Abrir el menú de adjuntar (botón '+').
+    if not click_attach_button(driver):
+        print("No se pudo abrir el menú de adjuntar.")
+        return
+    sleep(1.0)
+    # WhatsApp Web solo expone el input correcto tras elegir la opción del menú por TEXTO
+    # (los íconos data-icon del submenú cambian; el texto es estable). Para 'media' el input
+    # image/* ya suele estar; para 'documento' hay que abrir "Documento" para que aparezca.
+    if tipo == "documento":
+        if _click_menu_por_texto(driver, ["Documento", "Documentos", "Document"]):
+            sleep(1.0)
+        else:
+            print("[adjuntar] no se encontró la opción 'Documento' en el menú.")
+    else:
+        _click_menu_por_texto(driver, ["Fotos y videos", "Fotos y vídeos", "Photos & videos", "Fotos"])
+        sleep(0.6)
+    # DIAGNÓSTICO: listar los <input type=file> y su accept.
+    try:
+        _dbg = driver.find_elements(By.XPATH, '//input[@type="file"]')
+        _accepts = [(i, (e.get_attribute("accept") or "")[:60]) for i, e in enumerate(_dbg)]
+        print(f"[adjuntar][diag] {len(_dbg)} input(s) file: {_accepts}")
+    except Exception:
+        pass
+    # Selección por `accept` (robusto); fallback por posición.
+    inp = find_file_input_by_accept(driver, tipo=tipo)
+    if not inp:
+        inp = find_file_input_by_position(driver, tipo=tipo)
     if not inp:
         print("No se encontró input para cargar archivo.")
         return
 
     inp.send_keys(archivo_path)
     print("Archivo cargado:", archivo_path)
-    sleep(2)
+    sleep(3)
 
     actions = ActionChains(driver)
     actions.send_keys(Keys.ENTER)
     actions.perform()
     print("Simulación de tecla ENTER para enviar.")
-    sleep(2)
+    sleep(3)
 
 def main():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']

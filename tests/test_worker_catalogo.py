@@ -64,33 +64,37 @@ class TestProcesarEnvio:
 
 
 class TestAutorizarEnvio:
-    def test_sin_password_env_no_autoriza(self, monkeypatch):
+    def test_sin_password_no_autoriza(self, monkeypatch):
         monkeypatch.delenv("WA_ENVIO_PASSWORD", raising=False)
-        ok, motivo = wc.autorizar_envio(es_tty=False)
+        monkeypatch.setenv("WA_ENVIO_ARMADO", "1")
+        ok, motivo = wc.autorizar_envio()
         assert ok is False
         assert "WA_ENVIO_PASSWORD" in motivo
 
-    def test_interactivo_password_correcta_autoriza(self, monkeypatch):
-        monkeypatch.setenv("WA_ENVIO_PASSWORD", "clave-de-prueba")
-        ok, motivo = wc.autorizar_envio(prompt_fn=lambda: "clave-de-prueba", es_tty=True)
-        assert ok is True
-
-    def test_interactivo_password_incorrecta_no_autoriza(self, monkeypatch):
-        monkeypatch.setenv("WA_ENVIO_PASSWORD", "clave-de-prueba")
-        ok, motivo = wc.autorizar_envio(prompt_fn=lambda: "mala", es_tty=True)
-        assert ok is False
-        assert "incorrecta" in motivo
-
-    def test_no_interactivo_requiere_armado(self, monkeypatch):
+    def test_password_sin_armado_no_autoriza(self, monkeypatch):
         monkeypatch.setenv("WA_ENVIO_PASSWORD", "clave-de-prueba")
         monkeypatch.delenv("WA_ENVIO_ARMADO", raising=False)
-        ok, _ = wc.autorizar_envio(es_tty=False)
+        ok, motivo = wc.autorizar_envio()
         assert ok is False
+        assert "armado" in motivo.lower()
 
-    def test_no_interactivo_armado_autoriza(self, monkeypatch):
+    def test_password_mas_armado_autoriza(self, monkeypatch):
         monkeypatch.setenv("WA_ENVIO_PASSWORD", "clave-de-prueba")
         monkeypatch.setenv("WA_ENVIO_ARMADO", "1")
-        ok, _ = wc.autorizar_envio(es_tty=False)
+        ok, _ = wc.autorizar_envio()
+        assert ok is True
+
+    def test_armado_distinto_de_1_no_autoriza(self, monkeypatch):
+        monkeypatch.setenv("WA_ENVIO_PASSWORD", "clave-de-prueba")
+        monkeypatch.setenv("WA_ENVIO_ARMADO", "0")
+        ok, _ = wc.autorizar_envio()
+        assert ok is False
+
+    def test_tolera_espacios_sobrantes(self, monkeypatch):
+        # `set VAR=valor ` en cmd puede dejar un espacio final; no debe romper la validación.
+        monkeypatch.setenv("WA_ENVIO_PASSWORD", "clave-de-prueba ")
+        monkeypatch.setenv("WA_ENVIO_ARMADO", "1 ")
+        ok, _ = wc.autorizar_envio()
         assert ok is True
 
 
