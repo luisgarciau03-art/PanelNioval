@@ -9,10 +9,7 @@ aquí toda excepción de transporte se convierte en estado `FALLO` con detalle.
 """
 from __future__ import annotations
 
-import getpass
-import hmac
 import os
-import sys
 from datetime import datetime
 from typing import Callable, Optional
 
@@ -36,33 +33,23 @@ class ResultadoEnvio:
 Transporte = Callable[[str, list, list], ResultadoEnvio]
 
 
-def autorizar_envio(prompt_fn: Optional[Callable[[], str]] = None,
-                    es_tty: Optional[bool] = None) -> tuple:
-    """Gate de seguridad: exige y valida una contraseña ANTES de enviar por WhatsApp.
+def autorizar_envio() -> tuple:
+    """Gate de seguridad: el worker NO envía nada sin autorización explícita.
 
-    - La contraseña esperada se toma de la variable de entorno `WA_ENVIO_PASSWORD`
-      (la fija el owner en la PC; NUNCA se hardcodea).
-    - En terminal interactiva: se SOLICITA la contraseña al operador y se valida
-      (comparación de tiempo constante).
-    - En corrida no interactiva (Tarea Programada): se exige `WA_ENVIO_ARMADO=1`
-      como armado explícito; si no está, NO se envía nada.
+    Requiere DOS variables de entorno que el owner define en su PC (robusto tanto en
+    corrida manual como en Tarea Programada; sin prompts frágiles de consola):
+      - `WA_ENVIO_PASSWORD`: contraseña de envío (no vacía).
+      - `WA_ENVIO_ARMADO=1`: armado explícito para autorizar el envío.
 
-    `prompt_fn`/`es_tty` se inyectan en tests. Devuelve (autorizado: bool, motivo: str).
+    Así se evita cualquier envío accidental: mientras no estén AMBAS, no se envía.
+    Devuelve (autorizado: bool, motivo: str).
     """
-    esperada = os.environ.get("WA_ENVIO_PASSWORD")
-    if not esperada:
+    passw = (os.environ.get("WA_ENVIO_PASSWORD") or "").strip()
+    if not passw:
         return False, "envío deshabilitado: falta WA_ENVIO_PASSWORD"
-    if es_tty is None:
-        es_tty = bool(getattr(sys.stdin, "isatty", lambda: False)())
-    if es_tty:
-        pedir = prompt_fn or (lambda: getpass.getpass("Contraseña para iniciar el envío de catálogos: "))
-        intento = pedir() or ""
-        if hmac.compare_digest(str(intento), str(esperada)):
-            return True, "autorizado (contraseña correcta)"
-        return False, "contraseña incorrecta; no se enviará nada"
-    if os.environ.get("WA_ENVIO_ARMADO") == "1":
-        return True, "autorizado (armado por WA_ENVIO_ARMADO=1)"
-    return False, "corrida no interactiva sin WA_ENVIO_ARMADO=1; no se enviará nada"
+    if (os.environ.get("WA_ENVIO_ARMADO") or "").strip() != "1":
+        return False, "envío NO armado: define WA_ENVIO_ARMADO=1 para autorizar"
+    return True, "autorizado (WA_ENVIO_PASSWORD definida + WA_ENVIO_ARMADO=1)"
 
 
 def seleccionar_pendientes(filas: list) -> list:

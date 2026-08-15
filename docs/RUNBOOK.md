@@ -13,21 +13,37 @@ Guía operativa para el owner. Arquitectura: **panel en Railway** + **worker loc
 ## Puesta en marcha del worker (PC del owner)
 
 ```powershell
-# 1. Variables de entorno del sistema (una vez):
-setx TELEGRAM_TOKEN "<token rotado>"
-setx TELEGRAM_CHAT_ID "5838212022"
-setx PANEL_URL "https://<tu-app>.up.railway.app"
-setx WORKER_TOKEN "<opcional>"
-# (y GOOGLE_CREDENTIALS_JSON o el .json local del panel en la carpeta)
+# 1. Credencial de Google en la carpeta del proyecto (el .json del service account,
+#    p.ej. bubbly-subject-412101-c969f4a975c5.json) — o la env GOOGLE_CREDENTIALS_JSON.
 
-# 2. Instalar como Tarea Programada (cada 15 min):
+# 2. Variables de entorno persistentes (una vez):
+setx WA_ENVIO_PASSWORD "<tu-contraseña>"   # gate de envío
+setx WA_ENVIO_ARMADO 1                      # 1 = autoriza envío automático; 0 = pausa
+setx TELEGRAM_TOKEN "<token rotado>"        # opcional (reportes)
+setx TELEGRAM_CHAT_ID "5838212022"
+setx PANEL_URL "https://<tu-app>.up.railway.app"   # opcional (heartbeat)
+
+# 3. Iniciar sesión de WhatsApp Web en el perfil del worker (SOLO la primera vez o si expira):
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="C:\Users\PC 1\ChromeSeleniumProfile" --profile-directory=Default https://web.whatsapp.com
+#   → escanea el QR, espera a que carguen TODOS tus chats, y CIERRA esa ventana.
+
+# 4. Instalar como Tarea Programada (cada 15 min):
 .\instalar-worker.ps1 -IntervaloMinutos 15
 
-# 3. Correr una vez a mano para escanear el QR de WhatsApp Web la primera vez:
+# 5. Probar a mano:
 python worker_catalogo_run.py
 ```
 
 Quitar la tarea: `Unregister-ScheduledTask -TaskName NIOVAL_WorkerCatalogo -Confirm:$false`.
+
+### Notas de operación (aprendidas en la prueba real 2026-08-15)
+
+- **El worker usa un Chrome/perfil APARTE** (`ChromeSeleniumProfile`), no tu Chrome de siempre. Su sesión de WhatsApp se inicia una vez (paso 3) y persiste.
+- **Cierra cualquier Chrome que use ese perfil antes de correr el worker** (el perfil no admite 2 instancias a la vez).
+- Si ves `spinner`/timeout al abrir chats, casi siempre es que **WhatsApp Web no terminó de sincronizar** o **la sesión expiró** (repite el paso 3).
+- El arranque del worker tarda ~1 min en cargar dependencias (imprime `[worker] cargando dependencias...`); es normal, **no lo interrumpas**.
+- **Formato de teléfono México:** `52` + 10 dígitos (ej. `526623534185`).
+- **`Video1.mp4`** debe existir en `C:\Users\PC 1\Files mensajes` para enviar el video; si falta, el resto de archivos igual se envían.
 
 ## Gate de seguridad de envío (contraseña)
 

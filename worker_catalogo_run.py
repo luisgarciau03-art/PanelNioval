@@ -14,21 +14,51 @@ Uso (PC del owner):
 
 Instalar como Tarea Programada de Windows: ver `instalar-worker.ps1`.
 """
+import json
 import os
 import sys
 import tempfile
 import time
 import traceback
 
+print("[worker] cargando dependencias (la primera vez puede tardar ~1-2 min; NO cierres)...", flush=True)
+
+import gspread
+from gspread.exceptions import WorksheetNotFound
+from google.oauth2.service_account import Credentials
 import requests
 
-import app                      # get_gs_client, SHEET_IDS, _abrir_ws_envios
 import envio_catalogo as ec     # transporte Selenium (WhatsApp Web)
 import nucleo_catalogo as nc
 import worker_catalogo as wc
 
+# El worker es INDEPENDIENTE de la app Flask (no importa app.py → arranca en
+# segundos en vez de ~2 min con pandas/googleapiclient). Solo necesita gspread.
+_DIR = os.path.dirname(os.path.abspath(__file__))
+RESPUESTAS_SHEET_ID = "1U_z1KNqCxSRZVi7wvO2FQH4zIdS_wxuafxj6YHdHEqg"  # = SHEET_IDS['respuestas']
+ENVIOS_WS_NAME = "ENVIOS_CATALOGO"
+CRED_FILE = os.path.join(_DIR, "bubbly-subject-412101-c969f4a975c5.json")
+
 LOCK_PATH = os.path.join(tempfile.gettempdir(), "worker_catalogo.lock")
 LOCK_TTL = 30 * 60  # 30 min: un lock más viejo se considera huérfano
+
+
+def _get_client():
+    """Cliente gspread desde GOOGLE_CREDENTIALS_JSON (env) o el .json local."""
+    scopes = ["https://www.googleapis.com/auth/spreadsheets",
+              "https://www.googleapis.com/auth/drive"]
+    creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+    if creds_json:
+        creds = Credentials.from_service_account_info(json.loads(creds_json), scopes=scopes)
+    else:
+        creds = Credentials.from_service_account_file(CRED_FILE, scopes=scopes)
+    return gspread.authorize(creds)
+
+
+def _abrir_ws_envios(client):
+    """Worksheet ENVIOS_CATALOGO del spreadsheet de respuestas."""
+    sp = client.open_by_key(RESPUESTAS_SHEET_ID)
+    return sp.worksheet(ENVIOS_WS_NAME)
 
 
 def _adquirir_lock():
@@ -65,7 +95,9 @@ def _liberar_lock():
 def construir_transporte_selenium(driver):
     """Devuelve un transporte con la interfaz enviar(tel, mensajes, archivos)->ResultadoEnvio."""
     def transporte(telefono, mensajes, archivos):
-        estado = ec.abrir_chat(driver, telefono)
+        # WhatsApp Web puede tardar en abrir un chat nuevo; damos margen (configurable).
+        espera = int(os.environ.get("WA_CHAT_WAIT_SECS", "45"))
+        estado = ec.abrir_chat(driver, telefono, max_wait_override=espera)
         if estado == "invalido":
             return wc.ResultadoEnvio(nc.NUMERO_INVALIDO, "popup 'número no válido'")
         if estado != "ok":
@@ -77,9 +109,24 @@ def construir_transporte_selenium(driver):
             ruta = ec.resolve_media_path(nombre)
             if ruta:
                 ec.enviar_archivo(driver, ruta)
-                time.sleep(2)
+                time.sleep(4)  # dejar que la UI termine de enviar antes del siguiente adjunto
         return wc.ResultadoEnvio(nc.ENVIADO, "mensajes y archivos enviados")
     return transporte
+
+
+def esperar_whatsapp_listo(driver, timeout):
+    """Espera a que WhatsApp Web termine de cargar (lista de chats visible) antes
+    de intentar abrir chats. Evita el 'spinner infinito' justo tras escanear el QR."""
+    from selenium.webdriver.common.by import By
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        try:
+            if driver.find_elements(By.CSS_SELECTOR, "#side, #pane-side, div[aria-label='Lista de chats']"):
+                return True
+        except Exception:
+            pass
+        time.sleep(2)
+    return False
 
 
 def _reportar_heartbeat(resumen):
@@ -108,17 +155,24 @@ def main():
         return
     driver = None
     try:
-        client = app.get_gs_client()
+        client = _get_client()
         # Mensajes y archivos del catálogo (misma fuente que envio_catalogo.py).
         sheet_msg = client.open_by_key(ec.SPREADSHEET_ID_TELEFONOS).worksheet(ec.SHEET_NAME_MENSAJE)
         mensajes = ec.obtener_mensajes(sheet_msg)
         archivos = ec.IMAGENES
 
-        ws = app._abrir_ws_envios(crear=False)
+        ws = _abrir_ws_envios(client)
         driver = ec.iniciar_driver(ec.FALLBACK_PROFILE_DIR, "Default")
         driver.get("https://web.whatsapp.com/")
         print("[worker] Abre WhatsApp Web y escanea el QR si corresponde.")
-        time.sleep(ec.T_CHAT_LOAD + 3)
+        sync_wait = int(os.environ.get("WA_SYNC_WAIT_SECS", "120"))
+        print(f"[worker] Esperando a que WhatsApp cargue tus chats (hasta {sync_wait}s)...")
+        if esperar_whatsapp_listo(driver, sync_wait):
+            print("[worker] WhatsApp Web listo (lista de chats cargada).")
+            time.sleep(3)
+        else:
+            print("[worker] AVISO: no se detectó la lista de chats (¿sigue sincronizando o falta QR?). "
+                  "Se intentará de todos modos.")
 
         transporte = construir_transporte_selenium(driver)
         resumen = wc.procesar_cola(ws, transporte, mensajes, archivos)
