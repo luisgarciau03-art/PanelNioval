@@ -1119,6 +1119,10 @@ tr:hover td{background:var(--blue3)}
     <div class="nav-item" onclick="showSection('mensajes')">
       <span class="icon">💬</span> Mensajes
     </div>
+    <div class="nav-item" onclick="showSection('catalogo')">
+      <span class="icon">📖</span> Envíos Catálogo
+      <span id="cat-badge" style="display:none;margin-left:auto;background:#e74c3c;color:#fff;border-radius:10px;padding:1px 7px;font-size:.72em;font-weight:700"></span>
+    </div>
   </div>
 
   <div class="nav-group">
@@ -1306,6 +1310,37 @@ tr:hover td{background:var(--blue3)}
       </div>
     </div>
 
+    <!-- ═══ ENVÍOS DE CATÁLOGO (números a corregir) ═══ -->
+    <div class="section" id="sec-catalogo">
+      <div class="table-box">
+        <h3>📖 Envíos de Catálogo — números a corregir</h3>
+        <p style="color:#777;font-size:.85em;margin:4px 0 10px">Cuando el envío falla por número inválido/erróneo, aquí lo corriges: se actualiza el teléfono en <b>LISTA DE CONTACTOS</b> y se reintenta.</p>
+        <div class="table-controls">
+          <select id="cat-filtro" onchange="loadCatalogo()" style="padding:6px 10px;border:1px solid #ccd;border-radius:8px;font-size:.85em">
+            <option value="problema">⚠️ Con problema (corregir número)</option>
+            <option value="">Todos</option>
+            <option value="PENDIENTE">Pendientes</option>
+            <option value="ENVIADO">Enviados</option>
+          </select>
+          <button class="btn-refresh" onclick="loadCatalogo()">↻ Actualizar</button>
+        </div>
+        <div class="tbl-wrap" id="catalogo-table"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Modal corrección de número (dashboard) -->
+    <div id="modal-corregir-cat" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center;padding:16px">
+      <div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+        <h3 style="margin-bottom:6px">✏️ Corregir número</h3>
+        <p style="font-size:.88em;color:#777;margin-bottom:12px">Tienda: <b id="cat-corr-tienda"></b></p>
+        <input id="cat-corr-input" type="tel" inputmode="numeric" placeholder="52 + 10 dígitos (ej. 526623534185)"
+               style="width:100%;padding:11px;border:1px solid #ccd;border-radius:8px;font-size:1em" oninput="catValidarCorregir()">
+        <p id="cat-corr-error" style="color:#e74c3c;font-size:.82em;min-height:16px;margin:4px 0"></p>
+        <button id="cat-corr-btn" class="btn-refresh" style="width:100%;background:#00CC47;border-color:#00CC47;color:#fff;padding:10px" disabled onclick="catGuardarCorreccion()">Guardar y reintentar</button>
+        <button class="btn-refresh" style="width:100%;margin-top:8px" onclick="catCerrarModal()">Cancelar</button>
+      </div>
+    </div>
+
     <!-- ═══ SEGUIMIENTO ═══ -->
     <div class="section" id="sec-seguimiento">
       <div class="cards" id="seg-cards">
@@ -1424,6 +1459,7 @@ const SECTION_TITLES = {
   ciudades:    '🗺️ Ciudades por Interés',
   respuestas:  '📝 Respuestas del Formulario',
   mensajes:    '💬 Mensajes Iniciales',
+  catalogo:    '📖 Envíos de Catálogo',
   seguimiento: '🔄 Seguimiento',
   bruce:       '🤖 Prospectos Bruce',
 };
@@ -1472,6 +1508,7 @@ async function loadSection(name) {
       }
       break;
     case 'mensajes':    await loadMensajes(); break;
+    case 'catalogo':    await loadCatalogo(); break;
     case 'seguimiento': await loadSeguimiento(); break;
     case 'bruce':       await loadBruce(); break;
   }
@@ -2634,8 +2671,108 @@ document.addEventListener('click', function(e) {
   if (full || link) verImagen(link, full);
 });
 
+// ─── ENVÍOS DE CATÁLOGO — números a corregir ─────────────────────────────────
+const CAT_ESTADOS_PROBLEMA = ['NUMERO_INVALIDO', 'FALLO'];
+let _catSel = null;
+function _catEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function _catFetchProblema(){
+  const [inv, fall] = await Promise.all([
+    fetch('/api/catalogo/envios?estado=NUMERO_INVALIDO').then(r=>r.json()),
+    fetch('/api/catalogo/envios?estado=FALLO').then(r=>r.json()),
+  ]);
+  return [].concat(inv.envios||[], fall.envios||[]);
+}
+
+function _catTag(estado){
+  const e = String(estado||'').toUpperCase();
+  if (e==='ENVIADO') return '<span class="tag aprobado">Enviado</span>';
+  if (e==='NUMERO_INVALIDO') return '<span class="tag negado">Número inválido</span>';
+  if (e==='FALLO') return '<span class="tag no-compatible">Falló</span>';
+  if (e==='PENDIENTE') return '<span class="tag buzon">Pendiente</span>';
+  if (e==='EN_PROCESO') return '<span class="tag default">En proceso</span>';
+  return '<span class="tag default">'+_catEsc(estado)+'</span>';
+}
+
+async function loadCatalogo(){
+  const filtro = document.getElementById('cat-filtro').value;
+  const cont = document.getElementById('catalogo-table');
+  cont.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  let envios = [];
+  try {
+    if (filtro === 'problema') envios = await _catFetchProblema();
+    else { const d = await fetch('/api/catalogo/envios'+(filtro?('?estado='+filtro):'')).then(r=>r.json()); envios = d.envios||[]; }
+  } catch(e){ cont.innerHTML = '<div class="empty" style="color:#e74c3c">⚠️ Error al cargar los envíos.</div>'; return; }
+  renderCatalogo(envios);
+  actualizarBadgeCatalogo();
+}
+
+function renderCatalogo(envios){
+  const cont = document.getElementById('catalogo-table');
+  if (!envios.length){ cont.innerHTML = '<div class="empty">Sin envíos en este filtro. 🎉</div>'; return; }
+  const rows = envios.map(e=>{
+    const prob = CAT_ESTADOS_PROBLEMA.includes(String(e.estado).toUpperCase());
+    const acc = prob
+      ? `<button class="btn-refresh" style="padding:4px 10px;font-size:.76em" onclick='catAbrirCorregir(${JSON.stringify(e).replace(/'/g,"&#39;")})'>✏️ Corregir</button> `
+        + `<button class="btn-refresh" style="padding:4px 10px;font-size:.76em" onclick="catReintentar(${e._row})">🔁 Reintentar</button>`
+      : '—';
+    return `<tr><td>${_catEsc(e.tienda)}</td><td>${_catEsc(e.telefono)}</td><td>${_catTag(e.estado)}</td>`
+         + `<td style="text-align:center">${_catEsc(e.intentos)}</td><td style="font-size:.8em;color:#777">${_catEsc(e.timestamp_estado)}</td><td>${acc}</td></tr>`;
+  }).join('');
+  cont.innerHTML = `<table><thead><tr><th>Tienda</th><th>Teléfono</th><th>Estado</th><th>Intentos</th><th>Actualizado</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function actualizarBadgeCatalogo(){
+  try {
+    const envios = await _catFetchProblema();
+    const badge = document.getElementById('cat-badge');
+    if (!badge) return;
+    if (envios.length){ badge.textContent = envios.length; badge.style.display='inline-block'; }
+    else badge.style.display='none';
+  } catch(e){ /* silencioso */ }
+}
+
+function catAbrirCorregir(e){
+  _catSel = e;
+  document.getElementById('modal-corregir-cat').style.display = 'flex';
+  document.getElementById('cat-corr-tienda').textContent = e.tienda || '';
+  const inp = document.getElementById('cat-corr-input'); inp.value = ''; inp.focus();
+  document.getElementById('cat-corr-error').textContent = '';
+  document.getElementById('cat-corr-btn').disabled = true;
+}
+function catValidarCorregir(){
+  const v = document.getElementById('cat-corr-input').value;
+  const dig = (v.match(/\d/g)||[]).length; const ok = dig>=10 && dig<=13;
+  document.getElementById('cat-corr-btn').disabled = !ok;
+  document.getElementById('cat-corr-error').textContent = (v && !ok) ? 'Deben ser 10 a 13 dígitos.' : '';
+  return ok;
+}
+async function catGuardarCorreccion(){
+  if (!catValidarCorregir() || !_catSel) return;
+  const btn = document.getElementById('cat-corr-btn'); btn.disabled = true;
+  try {
+    const r = await fetch('/api/catalogo/corregir-numero', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ envio_row: _catSel._row, telefono: document.getElementById('cat-corr-input').value, contacto_row: _catSel.fila_respuesta })
+    });
+    const d = await r.json();
+    if (d.ok) { catCerrarModal(); loadCatalogo(); }
+    else { document.getElementById('cat-corr-error').textContent = d.error || 'No se pudo corregir.'; btn.disabled = false; }
+  } catch(e){ document.getElementById('cat-corr-error').textContent = 'Error de conexión.'; btn.disabled = false; }
+}
+async function catReintentar(row){
+  try {
+    const r = await fetch('/api/catalogo/reintentar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ envio_row: row }) });
+    const d = await r.json();
+    if (!d.ok) alert('⚠️ ' + (d.error || 'No se pudo reintentar.'));
+    loadCatalogo();
+  } catch(e){ alert('⚠️ Error de conexión.'); }
+}
+function catCerrarModal(){ document.getElementById('modal-corregir-cat').style.display = 'none'; }
+
 // ─── INIT ────────────────────────────────────────────────────────────────────
 loadSection('dashboard');
+actualizarBadgeCatalogo();  // badge de "números a corregir" desde el arranque
 
 // ─── PROSPECTOS BRUCE ────────────────────────────────────────────────────────
 let _bruceData = [];
@@ -3230,8 +3367,16 @@ def catalogo_corregir_numero():
             {'range': gsu.rowcol_to_a1(envio_row, col['detalle']), 'values': [['número corregido, re-encolado']]},
         ], value_input_option='RAW')
         # Actualizar el teléfono en LISTA DE CONTACTOS. Si falla, se REPORTA (no se traga).
+        # Fila del contacto en LISTA DE CONTACTOS: se toma del `fila_respuesta` GUARDADO en
+        # la propia fila del envío (fuente de verdad), NO del contacto_row que envía el cliente
+        # (evita sobrescribir teléfonos de filas arbitrarias / del encabezado).
+        contacto_row_real = None
+        try:
+            contacto_row_real = int(_valor_fila(filas, col, envio_row, 'fila_respuesta'))
+        except (TypeError, ValueError):
+            contacto_row_real = None
         contacto_actualizado = None
-        if contacto_row:
+        if contacto_row_real and contacto_row_real >= 2:
             contacto_actualizado = False
             try:
                 spc = get_gs_client().open_by_key(SHEET_IDS['contactos'])
@@ -3241,14 +3386,14 @@ def catalogo_corregir_numero():
                                 if str(h).strip().upper() in ('TELÉFONO', 'TELEFONO')), None)
                 if tel_col:
                     wsc.batch_update(
-                        [{'range': gsu.rowcol_to_a1(int(contacto_row), tel_col), 'values': [[tel_norm]]}],
+                        [{'range': gsu.rowcol_to_a1(contacto_row_real, tel_col), 'values': [[tel_norm]]}],
                         value_input_option='RAW',
                     )
                     contacto_actualizado = True
                 _cache.pop('contactos', None)
             except Exception:
                 print(f"[catalogo] corregir: no se pudo actualizar LISTA DE CONTACTOS "
-                      f"contacto_row={contacto_row} tel={nc.enmascarar_telefono(nuevo_tel)}")
+                      f"fila={contacto_row_real} tel={nc.enmascarar_telefono(nuevo_tel)}")
                 traceback.print_exc()
         _cache.pop('envios_catalogo', None)
         resp = {'ok': True, 'estado': nc.PENDIENTE}

@@ -125,8 +125,22 @@ class TestCorregirNumero:
             "envio_row": 2, "telefono": "5599998888",
         })
         assert r.status_code == 200
-        assert r.get_json() == {"ok": True, "estado": "PENDIENTE"}
-        ws.batch_update.assert_called_once()
+        d = r.get_json()
+        assert d["ok"] is True and d["estado"] == "PENDIENTE"
+        assert ws.batch_update.called  # se escribió el estado del envío (y el teléfono del contacto)
+
+    def test_contacto_row_del_cliente_se_ignora(self, client, monkeypatch):
+        # Fix seguridad: el teléfono se escribe en la fila del contacto GUARDADA
+        # (fila_respuesta='7'), NO en el contacto_row=1 (encabezado) que manda el cliente.
+        ws = _ws_con_envio(nc.NUMERO_INVALIDO)  # fila_respuesta = "7"
+        monkeypatch.setattr(app, "get_gs_client", lambda: _fake_client(ws))
+        r = client.post("/api/catalogo/corregir-numero", json={
+            "envio_row": 2, "telefono": "5599998888", "contacto_row": 1,
+        })
+        assert r.status_code == 200 and r.get_json()["ok"] is True
+        rangos = [u["range"] for call in ws.batch_update.call_args_list for u in call[0][0]]
+        assert any(rg.endswith("7") for rg in rangos)   # escribió en la fila 7 (fila_respuesta)
+        assert "C1" not in rangos                        # NO en la fila 1 del cliente
 
     def test_desde_enviado_rechaza_fsm(self, client, monkeypatch):
         # CRITICAL fix: no se puede corregir/re-encolar un envío ya ENVIADO.
