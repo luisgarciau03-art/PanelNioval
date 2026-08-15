@@ -43,6 +43,21 @@ class TestAuthPanel:
         assert r.status_code == 200
 
 
+# ─────────────────────── Sección "Envíos Catálogo" en el dashboard ───────────────────────
+class TestSeccionCatalogo:
+    def test_dashboard_incluye_seccion_catalogo(self, client, monkeypatch):
+        monkeypatch.delenv("PANEL_DASHBOARD_TOKEN", raising=False)
+        r = client.get("/")
+        assert r.status_code == 200
+        html = r.data.decode("utf-8", "ignore")
+        # Sección, nav, badge y funciones JS presentes.
+        assert 'id="sec-catalogo"' in html
+        assert "showSection('catalogo')" in html
+        assert 'id="cat-badge"' in html
+        assert "function loadCatalogo" in html
+        assert "catGuardarCorreccion" in html
+
+
 # ─────────────────────── Heartbeat del worker ───────────────────────
 class TestHeartbeat:
     def test_worker_token_requerido_si_definido(self, client, monkeypatch):
