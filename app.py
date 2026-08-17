@@ -123,9 +123,8 @@ def get_gs_client():
         info = json.loads(creds_json)
         creds = Credentials.from_service_account_info(info, scopes=scopes)
     else:
-        creds = Credentials.from_service_account_file(
-            'bubbly-subject-412101-c969f4a975c5.json', scopes=scopes
-        )
+        creds_file = os.environ.get('GOOGLE_CREDENTIALS_FILE', 'bubbly-subject-412101-c969f4a975c5.json')
+        creds = Credentials.from_service_account_file(creds_file, scopes=scopes)
     _gs_client = gspread.authorize(creds)
     return _gs_client
 
@@ -143,9 +142,8 @@ def get_drive_service():
         info = json.loads(creds_json)
         creds = Credentials.from_service_account_info(info, scopes=scopes)
     else:
-        creds = Credentials.from_service_account_file(
-            'bubbly-subject-412101-c969f4a975c5.json', scopes=scopes
-        )
+        creds_file = os.environ.get('GOOGLE_CREDENTIALS_FILE', 'bubbly-subject-412101-c969f4a975c5.json')
+        creds = Credentials.from_service_account_file(creds_file, scopes=scopes)
     _drive_service = build('drive', 'v3', credentials=creds)
     return _drive_service
 

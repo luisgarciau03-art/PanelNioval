@@ -5,6 +5,8 @@ services:
     build: ./app
     container_name: panel          # Caddy resuelve este nombre en reverse_proxy panel:8000
     restart: unless-stopped
+    environment:
+      - GOOGLE_CREDENTIALS_FILE=/app/credentials.json
     env_file:
       - ./secretos/.env
     volumes:
