@@ -65,6 +65,7 @@ class TestSeccionCatalogo:
 # ─────────────────────── Heartbeat del worker ───────────────────────
 class TestHeartbeat:
     def test_worker_token_requerido_si_definido(self, client, monkeypatch):
+        monkeypatch.delenv("PANEL_AUTH_DESACTIVADA", raising=False)
         monkeypatch.delenv("PANEL_DASHBOARD_TOKEN", raising=False)
         monkeypatch.setenv("WORKER_TOKEN", "w-secreto")
         r = client.post("/api/catalogo/heartbeat", json={})
@@ -72,10 +73,18 @@ class TestHeartbeat:
         r2 = client.post("/api/catalogo/heartbeat", json={}, headers={"X-Worker-Token": "w-secreto"})
         assert r2.status_code == 200
 
-    def test_estado_refleja_heartbeat(self, client, monkeypatch):
-        monkeypatch.delenv("PANEL_DASHBOARD_TOKEN", raising=False)
+    def test_sin_worker_token_cierra(self, client, monkeypatch):
+        """Sin WORKER_TOKEN el heartbeat NO acepta escrituras anonimas."""
+        monkeypatch.delenv("PANEL_AUTH_DESACTIVADA", raising=False)
         monkeypatch.delenv("WORKER_TOKEN", raising=False)
-        client.post("/api/catalogo/heartbeat", json={"resumen": {"enviados": 2, "fallos": 0}})
+        r = client.post("/api/catalogo/heartbeat", json={"resumen": {"enviados": 1}})
+        assert r.status_code == 401
+
+    def test_estado_refleja_heartbeat(self, client, monkeypatch):
+        monkeypatch.setenv("WORKER_TOKEN", "w-secreto")
+        client.post("/api/catalogo/heartbeat",
+                    json={"resumen": {"enviados": 2, "fallos": 0}},
+                    headers={"X-Worker-Token": "w-secreto"})
         r = client.get("/api/catalogo/worker-estado")
         d = r.get_json()
         assert d["vivo"] is True

@@ -3498,11 +3498,11 @@ WORKER_HEARTBEAT_TTL = 15 * 60  # 15 min sin heartbeat → "muerto"
 
 @app.route('/api/catalogo/heartbeat', methods=['POST'])
 def catalogo_heartbeat():
-    """El worker local reporta que está vivo. Protegido por WORKER_TOKEN si está definido."""
-    esperado = os.environ.get('WORKER_TOKEN')
-    if esperado:
+    """El worker local reporta que está vivo. Exige WORKER_TOKEN (fail-closed)."""
+    if not _auth_desactivada():
+        esperado = os.environ.get('WORKER_TOKEN')
         provisto = request.headers.get('X-Worker-Token') or ''
-        if not hmac.compare_digest(str(provisto), str(esperado)):
+        if not esperado or not hmac.compare_digest(str(provisto), str(esperado)):
             return jsonify({'ok': False, 'error': 'no autorizado'}), 401
     body = request.json or {}
     _worker_heartbeat['ts'] = time.time()
