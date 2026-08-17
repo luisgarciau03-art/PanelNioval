@@ -36,22 +36,30 @@ if os.environ.get('PANEL_DASHBOARD_TOKEN') and not os.environ.get('SECRET_KEY'):
           'fija SECRET_KEY en Railway para que la sesión funcione entre workers.')
 
 
-# ─── AUTENTICACIÓN OPCIONAL DEL PANEL (mejora M1, Plan 5) ────────────────────
-# Si PANEL_DASHBOARD_TOKEN está definido en Railway, TODAS las rutas exigen el token
-# (header X-Dashboard-Token, ?token=, o cookie de sesión tras el primer acceso con
-# ?token=). Si NO está definido, el panel queda abierto (comportamiento actual),
-# de modo que activarlo es una decisión del owner (gate T5.3) sin romper el deploy.
+# ─── AUTENTICACIÓN DEL PANEL (fail-closed) ───────────────────────────────────
+# El panel exige PANEL_DASHBOARD_TOKEN en TODAS las rutas (header
+# X-Dashboard-Token, ?token=, o cookie de sesión tras el primer acceso con
+# ?token=). Si la variable falta, la app no arranca (ver guardas de arranque).
+# Único bypass, explícito y ruidoso: PANEL_AUTH_DESACTIVADA=1 para desarrollo
+# local y para la suite de tests. El default NUNCA abre.
 _RUTAS_EXENTAS_AUTH = ('/api/catalogo/heartbeat',)  # el worker usa su propio WORKER_TOKEN
+
+
+def _auth_desactivada() -> bool:
+    """True solo si el operador desactivó la auth a propósito."""
+    return os.environ.get('PANEL_AUTH_DESACTIVADA') == '1'
 
 
 @app.before_request
 def _requiere_token_panel():
-    token = os.environ.get('PANEL_DASHBOARD_TOKEN')
-    if not token:
-        return  # auth desactivada
+    if _auth_desactivada():
+        return
     path = request.path or ''
     if path.startswith(_RUTAS_EXENTAS_AUTH):
         return
+    token = os.environ.get('PANEL_DASHBOARD_TOKEN')
+    if not token:
+        return jsonify({'ok': False, 'error': 'no autorizado'}), 401
     provisto = (request.headers.get('X-Dashboard-Token')
                 or request.args.get('token')
                 or session.get('dashboard_token'))

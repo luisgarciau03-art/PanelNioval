@@ -13,12 +13,17 @@ def client():
     return app.app.test_client()
 
 
-# ─────────────────────── Auth opcional del panel (M1) ───────────────────────
+# ─────────────────────── Auth del panel: fail-closed ───────────────────────
 class TestAuthPanel:
-    def test_sin_token_env_todo_abierto(self, client, monkeypatch):
+    @pytest.fixture(autouse=True)
+    def _sin_escape_hatch(self, monkeypatch):
+        """Estos tests ejercitan el gate real, no el bypass de la suite."""
+        monkeypatch.delenv("PANEL_AUTH_DESACTIVADA", raising=False)
+
+    def test_sin_token_env_cierra(self, client, monkeypatch):
         monkeypatch.delenv("PANEL_DASHBOARD_TOKEN", raising=False)
         r = client.get("/api/catalogo/worker-estado")
-        assert r.status_code == 200  # comportamiento actual: abierto
+        assert r.status_code == 401  # fail-closed: sin token no abre
 
     def test_con_token_env_sin_header_401(self, client, monkeypatch):
         monkeypatch.setenv("PANEL_DASHBOARD_TOKEN", "secreto123")
@@ -35,11 +40,10 @@ class TestAuthPanel:
         r = client.get("/api/catalogo/worker-estado?token=secreto123")
         assert r.status_code == 200
 
-    def test_heartbeat_exento_de_auth_dashboard(self, client, monkeypatch):
-        # El heartbeat no usa PANEL_DASHBOARD_TOKEN (el worker usa WORKER_TOKEN aparte).
-        monkeypatch.setenv("PANEL_DASHBOARD_TOKEN", "secreto123")
-        monkeypatch.delenv("WORKER_TOKEN", raising=False)
-        r = client.post("/api/catalogo/heartbeat", json={"resumen": {"enviados": 1}})
+    def test_escape_hatch_abre_solo_si_es_explicito(self, client, monkeypatch):
+        monkeypatch.delenv("PANEL_DASHBOARD_TOKEN", raising=False)
+        monkeypatch.setenv("PANEL_AUTH_DESACTIVADA", "1")
+        r = client.get("/api/catalogo/worker-estado")
         assert r.status_code == 200
 
 
