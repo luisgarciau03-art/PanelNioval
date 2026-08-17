@@ -1,6 +1,6 @@
 """Tests de la operación Railway (Plan 5): auth opcional del panel (M1) + heartbeat."""
 import importlib
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -138,57 +138,48 @@ class TestGuardasArranque:
 
 
 # ─────────────────────── Ruta de credenciales de Google ───────────────────────
-class TestCredentialsPath:
-    """Verifica que get_sheets_client y get_drive_service usen GOOGLE_CREDENTIALS_FILE
-    cuando está definido, con fallback al filename hardcodeado."""
+class TestRutaCredenciales:
+    """La ruta del archivo de credenciales sale de GOOGLE_CREDENTIALS_FILE.
 
-    def test_sheets_client_con_env_var(self, monkeypatch):
-        """Con GOOGLE_CREDENTIALS_FILE definido, debe usarlo."""
-        from unittest.mock import patch
+    Sin esto, el contenedor monta la credencial en /app/credentials.json y el
+    codigo busca el nombre hardcodeado: Sheets y Drive revientan en la primera
+    llamada.
+    """
+
+    DEFECTO = 'bubbly-subject-412101-c969f4a975c5.json'
+
+    @pytest.fixture(autouse=True)
+    def _sin_cache_ni_json(self, monkeypatch):
+        # GOOGLE_CREDENTIALS_JSON tiene prioridad sobre el archivo: si esta
+        # definida, la rama que probamos no se ejecuta.
         monkeypatch.delenv("GOOGLE_CREDENTIALS_JSON", raising=False)
+        monkeypatch.setattr(app, "_gs_client", None)
+        monkeypatch.setattr(app, "_drive_service", None)
+
+    def test_gs_client_usa_la_env_var(self, monkeypatch):
         monkeypatch.setenv("GOOGLE_CREDENTIALS_FILE", "/app/credentials.json")
-        with patch("app.Credentials.from_service_account_file") as mock_creds:
-            mock_creds.return_value = MagicMock()
-            # Forzar recalc del cliente
-            app._gs_client = None
-            try:
-                app.get_sheets_client()
-            except Exception:
-                pass
-            # Verifica que se haya llamado con el path de env var
-            if mock_creds.call_count > 0:
-                assert mock_creds.call_args[0][0] == "/app/credentials.json"
+        with patch("app.Credentials.from_service_account_file") as mock_creds, \
+             patch("app.gspread.authorize"):
+            app.get_gs_client()
+        assert mock_creds.call_args[0][0] == "/app/credentials.json"
 
-    def test_sheets_client_sin_env_var_usa_default(self, monkeypatch):
-        """Sin GOOGLE_CREDENTIALS_FILE, debe usar el filename hardcodeado."""
-        monkeypatch.delenv("GOOGLE_CREDENTIALS_JSON", raising=False)
+    def test_gs_client_sin_env_var_usa_el_default(self, monkeypatch):
         monkeypatch.delenv("GOOGLE_CREDENTIALS_FILE", raising=False)
-        # Verificar que el código lea de forma correcta (prueba de lógica de fallback)
-        import os
-        app._gs_client = None
-        # El fallback a 'bubbly...' solo sucede si no hay env var
-        assert os.environ.get('GOOGLE_CREDENTIALS_FILE', 'bubbly-subject-412101-c969f4a975c5.json') == 'bubbly-subject-412101-c969f4a975c5.json'
+        with patch("app.Credentials.from_service_account_file") as mock_creds, \
+             patch("app.gspread.authorize"):
+            app.get_gs_client()
+        assert mock_creds.call_args[0][0] == self.DEFECTO
 
-    def test_drive_service_con_env_var(self, monkeypatch):
-        """Con GOOGLE_CREDENTIALS_FILE definido, get_drive_service debe usarlo."""
-        from unittest.mock import patch
-        monkeypatch.delenv("GOOGLE_CREDENTIALS_JSON", raising=False)
+    def test_drive_service_usa_la_env_var(self, monkeypatch):
         monkeypatch.setenv("GOOGLE_CREDENTIALS_FILE", "/app/credentials.json")
-        with patch("app.Credentials.from_service_account_file") as mock_creds:
-            mock_creds.return_value = MagicMock()
-            app._drive_service = None
-            try:
-                app.get_drive_service()
-            except Exception:
-                pass
-            if mock_creds.call_count > 0:
-                assert mock_creds.call_args[0][0] == "/app/credentials.json"
+        with patch("app.Credentials.from_service_account_file") as mock_creds, \
+             patch("app.build"):
+            app.get_drive_service()
+        assert mock_creds.call_args[0][0] == "/app/credentials.json"
 
-    def test_drive_service_sin_env_var_usa_default(self, monkeypatch):
-        """Sin GOOGLE_CREDENTIALS_FILE, get_drive_service debe usar default."""
-        monkeypatch.delenv("GOOGLE_CREDENTIALS_JSON", raising=False)
+    def test_drive_service_sin_env_var_usa_el_default(self, monkeypatch):
         monkeypatch.delenv("GOOGLE_CREDENTIALS_FILE", raising=False)
-        # Verificar la lógica de fallback
-        import os
-        app._drive_service = None
-        assert os.environ.get('GOOGLE_CREDENTIALS_FILE', 'bubbly-subject-412101-c969f4a975c5.json') == 'bubbly-subject-412101-c969f4a975c5.json'
+        with patch("app.Credentials.from_service_account_file") as mock_creds, \
+             patch("app.build"):
+            app.get_drive_service()
+        assert mock_creds.call_args[0][0] == self.DEFECTO
