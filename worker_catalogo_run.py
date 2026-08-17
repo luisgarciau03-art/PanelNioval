@@ -138,8 +138,10 @@ def _reportar_heartbeat(resumen):
     if wt:
         headers["X-Worker-Token"] = wt
     try:
-        requests.post(f"{panel.rstrip('/')}/api/catalogo/heartbeat",
-                      json={"resumen": resumen}, headers=headers, timeout=10)
+        r = requests.post(f"{panel.rstrip('/')}/api/catalogo/heartbeat",
+                          json={"resumen": resumen}, headers=headers, timeout=10)
+        if r.status_code not in (200, 201, 202, 204):
+            print(f"[worker] heartbeat devolvio HTTP {r.status_code} (auth fallida o panel rechaza)")
     except Exception:
         print("[worker] no se pudo enviar heartbeat (¿panel caído?)")
 
