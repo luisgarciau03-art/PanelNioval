@@ -70,7 +70,7 @@ El worker **no envía nada** sin autorización explícita (para evitar disparos 
 ## Smoke test post-deploy
 
 ```bash
-python tools/smoke_railway.py https://<tu-app>.up.railway.app [--token PANEL_DASHBOARD_TOKEN]
+python tools/smoke_panel.py https://panelnioval.duckdns.org --token PANEL_DASHBOARD_TOKEN
 ```
 Debe imprimir `Todo OK ✅`. Railway auto-deploya `main`: correr el smoke tras cada merge.
 
@@ -95,3 +95,26 @@ python tools/inspeccionar_contactos.py   # confirma que la columna T está libre
 - **Rotar** `TELEGRAM_TOKEN` (bot `8404009072`, expuesto en ~14 copias del historial) y la **Google Places key**; cargarlas en Railway.
 - **Activar `PANEL_DASHBOARD_TOKEN`** para cerrar el acceso abierto del panel (FC2) antes de dejar el worker desatendido.
 - **Corrida real de WhatsApp** (T5.5): 1 llamada de prueba end-to-end con un número propio.
+
+## Operación en el VPS (desde 2026-08-17)
+
+El panel corre en `155.138.200.66` (Vultr), servido en
+`https://panelnioval.duckdns.org` por Caddy con TLS automático. Comparte
+servidor con Bruce.
+
+| Acción | Comando |
+|---|---|
+| Ver logs | `ssh root@155.138.200.66 'docker logs -f panel'` |
+| Reiniciar | `ssh root@155.138.200.66 'docker restart panel'` |
+| Desplegar cambios | `ssh root@155.138.200.66 'cd /srv/panel/app && git pull && cd /srv/panel && docker compose up -d --build'` |
+| Smoke test | `python tools/smoke_panel.py https://panelnioval.duckdns.org --token <token>` |
+| Consumo | `ssh root@155.138.200.66 'docker stats --no-stream'` |
+
+Los secretos viven en `/srv/panel/secretos/.env` (chmod 600). El panel **no
+arranca** sin `PANEL_DASHBOARD_TOKEN` ni `SECRET_KEY`: si el contenedor
+reinicia en bucle, revisar ese archivo primero con `docker logs panel`.
+
+⚠️ Bruce corre en el mismo servidor y lee las mismas hojas. Antes de escribir
+filas de prueba en `seguimiento` o `PROSPECTOS BRUCE`, pausar su scheduler
+(`WA_SCHEDULER=0` en `/srv/bruce/secretos/.env` + `docker compose up -d`) o un
+job le enviará un WhatsApp real al número de la fila.

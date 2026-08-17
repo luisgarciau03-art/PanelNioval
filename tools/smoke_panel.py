@@ -1,9 +1,9 @@
-"""Smoke test post-deploy contra la URL productiva de Railway (Plan 5, T5.4).
+"""Smoke test post-deploy contra la URL productiva del panel.
 
 Sin costo de LLM. Verifica códigos 200 y shape JSON de los endpoints clave.
 
 Uso:
-    python tools/smoke_railway.py https://<tu-app>.up.railway.app [--token TOKEN]
+    python tools/smoke_panel.py https://panelnioval.duckdns.org --token TOKEN
 """
 import argparse
 import sys
