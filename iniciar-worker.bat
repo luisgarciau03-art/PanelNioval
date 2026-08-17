@@ -9,6 +9,8 @@ title NIOVAL - Worker Catalogo (continuo)
 
 REM Armar el envio para esta ventana y apuntar el panel (heartbeat).
 set WA_ENVIO_ARMADO=1
+REM Contrasena de envio: si no esta en el entorno, se pide una vez.
+if "%WA_ENVIO_PASSWORD%"=="" set /p WA_ENVIO_PASSWORD=Contrasena de envio:
 REM WORKER_TOKEN es obligatorio: el heartbeat devuelve 401 sin el.
 :pedir_worker_token
 if "%WORKER_TOKEN%"=="" set /p WORKER_TOKEN=Token del worker:
