@@ -1,0 +1,23 @@
+# Plantilla versionada. La copia VIVA está en /srv/panel/docker-compose.yml
+# del servidor 155.138.200.66 y apunta a ./app (el clon de este repo).
+services:
+  panel:
+    build: ./app
+    container_name: panel          # Caddy resuelve este nombre en reverse_proxy panel:8000
+    restart: unless-stopped
+    env_file:
+      - ./secretos/.env
+    volumes:
+      - ./secretos/credentials.json:/app/credentials.json:ro
+    mem_limit: 768m
+    networks:
+      - web
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  web:
+    external: true

@@ -1,0 +1,5 @@
+# Añadir a /srv/proxy/Caddyfile y recargar con:
+#   docker compose -f /srv/proxy/docker-compose.yml restart caddy
+panelnioval.duckdns.org {
+	reverse_proxy panel:8000
+}
