@@ -183,7 +183,8 @@ la suite; si resulta mayor, se reporta antes de seguir.
 
 ## 5. Secretos
 
-Cinco variables en `/srv/panel/secretos/.env`, `chmod 600`, nunca en git:
+Cinco variables **críticas de arranque** en `/srv/panel/secretos/.env`, `chmod 600`, nunca
+en git:
 
 | Variable | Origen |
 |---|---|
@@ -191,6 +192,16 @@ Cinco variables en `/srv/panel/secretos/.env`, `chmod 600`, nunca en git:
 | `WORKER_TOKEN` | ídem |
 | `SECRET_KEY` | ídem |
 | `TELEGRAM_TOKEN` / `TELEGRAM_CHAT_ID` | el vigente — ver gate §8.3 |
+
+Tres variables adicionales son **de función, no de arranque**: la app arranca y sirve sin
+ellas, pero la ruta que las usa falla visiblemente (nunca en silencio) al invocarse. Deben
+cargarse en el mismo `.env` antes de dar por completo el go-live de las funciones asociadas:
+
+| Variable | Sin ella | Ruta afectada |
+|---|---|---|
+| `IMGBB_API_KEY` (`app.py:425`) | 500 al subir el comprobante | `/api/ventas/upload-pago` |
+| `GMAPS_API_KEY` (`app.py:4434`) | `{"ok": false}` sin arrancar la búsqueda | `/api/importador/iniciar` |
+| `PAGO_FOLDER_ID` (`app.py:157`) | `get_pago_folder_id()` (`app.py:158`) lanza `ValueError` si se invoca | ninguna ruta activa hoy la llama — `upload-pago` usa `IMGBB_API_KEY`, no Drive; se documenta por si el flujo Drive se reactiva |
 
 `GOOGLE_CREDENTIALS_JSON` no se usa: la service account se monta como volumen `:ro`, igual
 que Bruce. Viaja por `scp`, nunca por git (el `.gitignore` ya cubre `*.json`).
@@ -209,7 +220,7 @@ Orden estricto; cada paso se verifica antes del siguiente:
 | 1 | PR de endurecimiento → merge a `main` | baseline de tests en verde |
 | 2 | Provisionar `/srv/panel`, levantar contenedor **sin tocar DNS** | `curl -H "Host: panelnioval.duckdns.org"` por red interna |
 | 3 | Repuntar DuckDNS `panelnioval` → `155.138.200.66` | resolución + cert emitido por Caddy |
-| 4 | Smoke test contra la URL pública | `tools/smoke_railway.py` (sirve tal cual) |
+| 4 | Smoke test contra la URL pública | `tools/smoke_panel.py` (sirve tal cual) |
 | 5 | Actualizar `iniciar-worker.bat`: `PANEL_URL` + `WORKER_TOKEN` | heartbeat visible en el panel |
 | 6 | **Eliminar el servicio de Railway** | la URL vieja deja de responder |
 | 7 | Rotar `TELEGRAM_TOKEN` | alerta de prueba recibida |

@@ -19,6 +19,7 @@ Guía operativa para el owner. Arquitectura: **panel en Railway** + **worker loc
 # 2. Variables de entorno persistentes (una vez):
 setx WA_ENVIO_PASSWORD "<tu-contraseña>"   # gate de envío
 setx WA_ENVIO_ARMADO 1                      # 1 = autoriza envío automático; 0 = pausa
+setx WORKER_TOKEN "<token del worker>"      # obligatorio: el heartbeat devuelve 401 sin el
 setx TELEGRAM_TOKEN "<token rotado>"        # opcional (reportes)
 setx TELEGRAM_CHAT_ID "5838212022"
 setx PANEL_URL "https://<tu-app>.up.railway.app"   # opcional (heartbeat)
@@ -58,7 +59,7 @@ Quitar la tarea: `Unregister-ScheduledTask -TaskName NIOVAL_WorkerCatalogo -Conf
 El worker **no envía nada** sin autorización explícita (para evitar disparos accidentales):
 
 - Define `WA_ENVIO_PASSWORD` (ej. una contraseña fuerte) en la PC del owner.
-- **Corrida manual** (`python worker_catalogo_run.py` en una terminal): el worker **solicita la contraseña** y la valida antes de abrir WhatsApp.
+- **Corrida vía `iniciar-worker.bat`**: el `.bat` **solicita la contraseña** (`set /p WA_ENVIO_PASSWORD=...`) si no está ya en el entorno, antes de lanzar `worker_catalogo_run.py`, que la valida antes de abrir WhatsApp. `worker_catalogo_run.py` en sí nunca prompta: solo lee la variable de entorno.
 - **Tarea Programada** (no interactiva): además de `WA_ENVIO_PASSWORD`, se exige `WA_ENVIO_ARMADO=1` para que envíe. Sin ese flag, la corrida no envía (queda "desarmada"). Así puedes tener la tarea instalada pero pausada hasta que la armes.
 
 ## Ver estados
@@ -70,7 +71,7 @@ El worker **no envía nada** sin autorización explícita (para evitar disparos 
 ## Smoke test post-deploy
 
 ```bash
-python tools/smoke_panel.py https://panelnioval.duckdns.org --token PANEL_DASHBOARD_TOKEN
+python tools/smoke_panel.py https://panelnioval.duckdns.org --token <valor>
 ```
 Debe imprimir `Todo OK ✅`. Railway auto-deploya `main`: correr el smoke tras cada merge.
 
@@ -84,7 +85,7 @@ python tools/inspeccionar_contactos.py   # confirma que la columna T está libre
 
 | Síntoma | Causa probable | Acción |
 |---|---|---|
-| `worker-estado` = `vivo:false` | PC apagada / tarea detenida / QR expirado | Encender PC; `python worker_catalogo_run.py` y re-escanear QR |
+| `worker-estado` = `vivo:false` | `WORKER_TOKEN` ausente o incorrecto (heartbeat devuelve 401) / PC apagada / tarea detenida / QR expirado | Confirmar que el `WORKER_TOKEN` del worker coincide con el del servidor; si coincide, encender PC; `python worker_catalogo_run.py` y re-escanear QR |
 | Muchos `FALLO` | WhatsApp Web cambió selectores o sesión caída | Re-escanear QR; revisar `envio_catalogo.py` (selectores `data-icon`) |
 | Muchos `NUMERO_INVALIDO` | Teléfonos mal capturados | Corregir número desde el modal |
 | Panel 401 en todo | `PANEL_DASHBOARD_TOKEN` activo | Acceder con `?token=<valor>` una vez (queda en la sesión) |
@@ -92,8 +93,8 @@ python tools/inspeccionar_contactos.py   # confirma que la columna T está libre
 
 ## Gates del owner pendientes (seguridad)
 
-- **Rotar** `TELEGRAM_TOKEN` (bot `8404009072`, expuesto en ~14 copias del historial) y la **Google Places key**; cargarlas en Railway.
-- **Activar `PANEL_DASHBOARD_TOKEN`** para cerrar el acceso abierto del panel (FC2) antes de dejar el worker desatendido.
+- **Rotar** `TELEGRAM_TOKEN` (bot `8404009072`, expuesto en ~14 copias del historial) y la **Google Places key**; cargarlas en `/srv/panel/secretos/.env` y `/srv/bruce/secretos/.env` en el VPS (ya no en Railway).
+- **Eliminar el servicio de Railway** (`https://web-production-1d453.up.railway.app/`): corre sin `PANEL_DASHBOARD_TOKEN` definida ahí, así que sirve el panel abierto ahora mismo. `PANEL_DASHBOARD_TOKEN` dejó de ser opcional — la app no arranca sin él (ver § Operación en el VPS) — pero mientras Railway siga vivo, esa instancia vieja queda expuesta independientemente del VPS.
 - **Corrida real de WhatsApp** (T5.5): 1 llamada de prueba end-to-end con un número propio.
 
 ## Operación en el VPS (desde 2026-08-17)
@@ -113,6 +114,16 @@ servidor con Bruce.
 Los secretos viven en `/srv/panel/secretos/.env` (chmod 600). El panel **no
 arranca** sin `PANEL_DASHBOARD_TOKEN` ni `SECRET_KEY`: si el contenedor
 reinicia en bucle, revisar ese archivo primero con `docker logs panel`.
+
+Tres variables adicionales son **de función, no de arranque**: sin ellas el
+panel levanta y sirve normalmente, pero la función asociada falla en el
+momento de usarse:
+
+| Variable | Sin ella | Ruta afectada |
+|---|---|---|
+| `IMGBB_API_KEY` | 500 al subir el comprobante | `/api/ventas/upload-pago` |
+| `GMAPS_API_KEY` | `{"ok": false}` sin arrancar la búsqueda | `/api/importador/iniciar` |
+| `PAGO_FOLDER_ID` | falla `get_pago_folder_id()` (`app.py:158`) si algo la invoca; hoy ninguna ruta activa la llama (el comprobante de pago usa `IMGBB_API_KEY`, no Drive) | ninguna ruta activa hoy |
 
 ⚠️ Bruce corre en el mismo servidor y lee las mismas hojas. Antes de escribir
 filas de prueba en `seguimiento` o `PROSPECTOS BRUCE`, pausar su scheduler

@@ -652,9 +652,18 @@ ssh root@155.138.200.66 'umask 077; {
 
 Expected: `3 /srv/panel/secretos/.env`
 
-- [ ] **Step 5: Añadir las variables de Telegram**
+- [ ] **Step 5: Añadir las variables de Telegram y las de función**
 
-El owner añade `TELEGRAM_TOKEN` (el **rotado**) y `TELEGRAM_CHAT_ID` al mismo archivo:
+El owner añade `TELEGRAM_TOKEN` (el **rotado**) y `TELEGRAM_CHAT_ID` al mismo archivo, y de
+paso las tres variables de función que faltan en el inventario original (sin ellas el panel
+arranca igual, pero la ruta asociada falla visiblemente al usarse — no bloquean el arranque,
+así que es fácil olvidarlas hasta que un operador reporta el síntoma):
+
+| Variable | Sin ella | Ruta afectada |
+|---|---|---|
+| `IMGBB_API_KEY` (`app.py:425`) | 500 al subir el comprobante | `/api/ventas/upload-pago` |
+| `GMAPS_API_KEY` (`app.py:4434`) | `{"ok": false}`, no arranca la búsqueda | `/api/importador/iniciar` |
+| `PAGO_FOLDER_ID` (`app.py:157`) | `get_pago_folder_id()` lanza `ValueError` si se invoca | ninguna ruta activa hoy la llama (queda documentada por si el flujo Drive del comprobante se reactiva) |
 
 ```bash
 ssh root@155.138.200.66 'nano /srv/panel/secretos/.env'
@@ -663,10 +672,10 @@ ssh root@155.138.200.66 'nano /srv/panel/secretos/.env'
 Verificar solo la presencia, nunca el valor:
 
 ```bash
-ssh root@155.138.200.66 'grep -c "^TELEGRAM_TOKEN=" /srv/panel/secretos/.env'
+ssh root@155.138.200.66 'grep -cE "^(TELEGRAM_TOKEN|IMGBB_API_KEY|GMAPS_API_KEY|PAGO_FOLDER_ID)=" /srv/panel/secretos/.env'
 ```
 
-Expected: `1`
+Expected: `4`
 
 - [ ] **Step 6: Levantar el contenedor**
 
