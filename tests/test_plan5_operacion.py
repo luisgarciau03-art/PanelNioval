@@ -1,6 +1,6 @@
 """Tests de la operación Railway (Plan 5): auth opcional del panel (M1) + heartbeat."""
 import importlib
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
