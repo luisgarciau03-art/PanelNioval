@@ -26,14 +26,26 @@ import nucleo_catalogo as nc  # lógica pura de la cola de envíos de catálogo 
 
 app = Flask(__name__)
 app.json.sort_keys = False
+
+# ─── GUARDAS DE ARRANQUE (fail-closed) ───────────────────────────────────────
+# Sin secretos la app NO arranca. Un despliegue mal configurado revienta aquí,
+# ruidosamente, en vez de publicar el panel abierto. Bypass explícito para
+# desarrollo local y tests: PANEL_AUTH_DESACTIVADA=1.
+if os.environ.get('PANEL_AUTH_DESACTIVADA') != '1':
+    if not os.environ.get('PANEL_DASHBOARD_TOKEN'):
+        raise RuntimeError(
+            'PANEL_DASHBOARD_TOKEN no está definida. El panel expone datos de '
+            'clientes: no arranca sin token. Defínela en el entorno, o pon '
+            'PANEL_AUTH_DESACTIVADA=1 si de verdad quieres el panel abierto.')
+    if not os.environ.get('SECRET_KEY'):
+        raise RuntimeError(
+            'SECRET_KEY no está definida. Con varios workers de gunicorn una '
+            'clave aleatoria por worker rompe las cookies de sesión de forma '
+            'intermitente. Genera una fija y ponla en el entorno.')
+
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
-# Cookie de sesión endurecida (el panel corre tras TLS en Railway).
+# Cookie de sesión endurecida (el panel corre tras TLS).
 app.config.update(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE='Lax', SESSION_COOKIE_HTTPONLY=True)
-# Si se activa la auth del panel pero SECRET_KEY no es fija, la cookie de sesión no será
-# consistente entre los 2 workers de gunicorn → avisar (el owner debe fijar SECRET_KEY).
-if os.environ.get('PANEL_DASHBOARD_TOKEN') and not os.environ.get('SECRET_KEY'):
-    print('[auth] ADVERTENCIA: PANEL_DASHBOARD_TOKEN activo sin SECRET_KEY fija; '
-          'fija SECRET_KEY en Railway para que la sesión funcione entre workers.')
 
 
 # ─── AUTENTICACIÓN DEL PANEL (fail-closed) ───────────────────────────────────

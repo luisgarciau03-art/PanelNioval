@@ -49,8 +49,7 @@ class TestAuthPanel:
 
 # ─────────────────────── Sección "Envíos Catálogo" en el dashboard ───────────────────────
 class TestSeccionCatalogo:
-    def test_dashboard_incluye_seccion_catalogo(self, client, monkeypatch):
-        monkeypatch.delenv("PANEL_DASHBOARD_TOKEN", raising=False)
+    def test_dashboard_incluye_seccion_catalogo(self, client):
         r = client.get("/")
         assert r.status_code == 200
         html = r.data.decode("utf-8", "ignore")
@@ -89,3 +88,50 @@ class TestHeartbeat:
         d = r.get_json()
         assert d["vivo"] is True
         assert d["resumen"] == {"enviados": 2, "fallos": 0}
+
+
+# ─────────────────────── Guardas de arranque ───────────────────────
+class TestGuardasArranque:
+    """La app se niega a arrancar sin secretos. Un despliegue mal
+    configurado revienta ruidosamente en vez de abrir el panel en silencio."""
+
+    @pytest.fixture(autouse=True)
+    def _restaurar_modulo_app(self, monkeypatch):
+        """Un test que espera RuntimeError deja `app` a medio recargar: la
+        guarda de arranque corta la ejecución del módulo antes de que se
+        registren las rutas. Recargar aquí con un entorno válido tras cada
+        test evita que ese estado a medias se filtre a los tests que corran
+        después (incluidos los de otras clases/archivos)."""
+        yield
+        monkeypatch.setenv("PANEL_DASHBOARD_TOKEN", "t" * 32)
+        monkeypatch.setenv("SECRET_KEY", "k" * 32)
+        monkeypatch.delenv("PANEL_AUTH_DESACTIVADA", raising=False)
+        importlib.reload(app)
+
+    def test_sin_token_no_arranca(self, monkeypatch):
+        monkeypatch.delenv("PANEL_AUTH_DESACTIVADA", raising=False)
+        monkeypatch.delenv("PANEL_DASHBOARD_TOKEN", raising=False)
+        monkeypatch.setenv("SECRET_KEY", "k" * 32)
+        with pytest.raises(RuntimeError, match="PANEL_DASHBOARD_TOKEN"):
+            importlib.reload(app)
+
+    def test_sin_secret_key_no_arranca(self, monkeypatch):
+        monkeypatch.delenv("PANEL_AUTH_DESACTIVADA", raising=False)
+        monkeypatch.setenv("PANEL_DASHBOARD_TOKEN", "t" * 32)
+        monkeypatch.delenv("SECRET_KEY", raising=False)
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            importlib.reload(app)
+
+    def test_con_escape_hatch_arranca(self, monkeypatch):
+        monkeypatch.setenv("PANEL_AUTH_DESACTIVADA", "1")
+        monkeypatch.delenv("PANEL_DASHBOARD_TOKEN", raising=False)
+        monkeypatch.delenv("SECRET_KEY", raising=False)
+        importlib.reload(app)  # no lanza
+        assert app.app is not None
+
+    def test_con_secretos_arranca(self, monkeypatch):
+        monkeypatch.delenv("PANEL_AUTH_DESACTIVADA", raising=False)
+        monkeypatch.setenv("PANEL_DASHBOARD_TOKEN", "t" * 32)
+        monkeypatch.setenv("SECRET_KEY", "k" * 32)
+        importlib.reload(app)  # no lanza
+        assert app.app is not None
