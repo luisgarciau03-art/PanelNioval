@@ -1,7 +1,6 @@
 .git
 .gitignore
 *.json
-!package.json
 .env
 .env.*
 __pycache__/

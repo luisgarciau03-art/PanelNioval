@@ -31,6 +31,9 @@ app.json.sort_keys = False
 # Sin secretos la app NO arranca. Un despliegue mal configurado revienta aquí,
 # ruidosamente, en vez de publicar el panel abierto. Bypass explícito para
 # desarrollo local y tests: PANEL_AUTH_DESACTIVADA=1.
+# Lectura directa (no vía _auth_desactivada()): esta guarda corre antes de que
+# la función se defina más abajo; llamarla aquí sería un NameError. Es la
+# única lectura directa de la variable en todo el archivo.
 if os.environ.get('PANEL_AUTH_DESACTIVADA') != '1':
     if not os.environ.get('PANEL_DASHBOARD_TOKEN'):
         raise RuntimeError(
@@ -54,6 +57,10 @@ app.config.update(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE='Lax', SES
 # ?token=). Si la variable falta, la app no arranca (ver guardas de arranque).
 # Único bypass, explícito y ruidoso: PANEL_AUTH_DESACTIVADA=1 para desarrollo
 # local y para la suite de tests. El default NUNCA abre.
+# WORKER_TOKEN (a diferencia de sus dos hermanos, PANEL_DASHBOARD_TOKEN y
+# SECRET_KEY) no tiene guarda de arranque a propósito: el heartbeat es
+# telemetría, no un dato de cliente, y su ausencia falla cerrado en la propia
+# ruta (401) en vez de bloquear el arranque de todo el panel.
 _RUTAS_EXENTAS_AUTH = ('/api/catalogo/heartbeat',)  # el worker usa su propio WORKER_TOKEN
 
 
@@ -67,7 +74,7 @@ def _requiere_token_panel():
     if _auth_desactivada():
         return
     path = request.path or ''
-    if path.startswith(_RUTAS_EXENTAS_AUTH):
+    if path in _RUTAS_EXENTAS_AUTH:
         return
     token = os.environ.get('PANEL_DASHBOARD_TOKEN')
     if not token:
@@ -3500,7 +3507,7 @@ def catalogo_reintentar():
 
 # ─── HEARTBEAT DEL WORKER LOCAL (Plan 5, transporte B) ───────────────────────
 # El worker local (PC del owner) hace POST cada corrida; el panel consulta el estado.
-# Nota: con 2 gunicorn workers en Railway el heartbeat en memoria es best-effort;
+# Nota: con 2 gunicorn workers en el VPS el heartbeat en memoria es best-effort;
 # para estado definitivo, el worker también deja timestamp en ENVIOS_CATALOGO.
 _worker_heartbeat = {'ts': None, 'resumen': None}
 WORKER_HEARTBEAT_TTL = 15 * 60  # 15 min sin heartbeat → "muerto"

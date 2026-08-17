@@ -46,6 +46,14 @@ class TestAuthPanel:
         r = client.get("/api/catalogo/worker-estado")
         assert r.status_code == 200
 
+    def test_escape_hatch_typo_no_abre(self, client, monkeypatch):
+        """PANEL_AUTH_DESACTIVADA=true (typo plausible del operador) NO es
+        el valor exacto "1": debe seguir cerrando el panel."""
+        monkeypatch.delenv("PANEL_DASHBOARD_TOKEN", raising=False)
+        monkeypatch.setenv("PANEL_AUTH_DESACTIVADA", "true")
+        r = client.get("/api/catalogo/worker-estado")
+        assert r.status_code == 401
+
 
 # ─────────────────────── Sección "Envíos Catálogo" en el dashboard ───────────────────────
 class TestSeccionCatalogo:
@@ -63,7 +71,7 @@ class TestSeccionCatalogo:
 
 # ─────────────────────── Heartbeat del worker ───────────────────────
 class TestHeartbeat:
-    def test_worker_token_requerido_si_definido(self, client, monkeypatch):
+    def test_worker_token_requerido_siempre(self, client, monkeypatch):
         monkeypatch.delenv("PANEL_AUTH_DESACTIVADA", raising=False)
         monkeypatch.delenv("PANEL_DASHBOARD_TOKEN", raising=False)
         monkeypatch.setenv("WORKER_TOKEN", "w-secreto")

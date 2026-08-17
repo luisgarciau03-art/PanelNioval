@@ -9,7 +9,7 @@ Uso (PC del owner):
     set TELEGRAM_TOKEN=...        (opcional, para reportes)
     set TELEGRAM_CHAT_ID=...
     set PANEL_URL=https://<tu-app>.up.railway.app   (para heartbeat)
-    set WORKER_TOKEN=...          (si el panel lo exige)
+    set WORKER_TOKEN=...          (obligatorio: el heartbeat devuelve 401 sin el)
     python worker_catalogo_run.py
 
 Instalar como Tarea Programada de Windows: ver `instalar-worker.ps1`.
@@ -132,6 +132,7 @@ def esperar_whatsapp_listo(driver, timeout):
 def _reportar_heartbeat(resumen):
     panel = os.environ.get("PANEL_URL")
     if not panel:
+        print("[worker] heartbeat no enviado: falta PANEL_URL")
         return
     headers = {}
     wt = os.environ.get("WORKER_TOKEN")
@@ -142,8 +143,8 @@ def _reportar_heartbeat(resumen):
                           json={"resumen": resumen}, headers=headers, timeout=10)
         if r.status_code not in (200, 201, 202, 204):
             print(f"[worker] heartbeat devolvio HTTP {r.status_code} (auth fallida o panel rechaza)")
-    except Exception:
-        print("[worker] no se pudo enviar heartbeat (¿panel caído?)")
+    except Exception as e:
+        print(f"[worker] no se pudo enviar heartbeat (¿panel caído?): {e!r}")
 
 
 def _modo_loop():
