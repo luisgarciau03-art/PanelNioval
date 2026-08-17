@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Rama:** nunca trabajar directo en `main`. Este plan se ejecuta en `feat/despliegue-vultr`. PRs con `gh pr create --base main`.
-- **Baseline oficial:** `python -m pytest tests/ -q` → **144 passed**. Nada avanza en rojo. Importar `app.py` en frío tarda ~2 min (pandas/googleapiclient + Defender); en caliente ~8s.
+- **Baseline oficial:** `python -m pytest tests/ -q` → **155 passed** antes de esta rama, **164 passed** al terminarla. Nada avanza en rojo. Importar `app.py` en frío tarda ~2 min (pandas/googleapiclient + Defender); en caliente ~8s.
 - **Commits:** en español, prefijos convencionales (`fix:`, `feat:`, `test:`, `docs:`, `chore:`).
 - **Credenciales:** ningún valor de token aparece en commits, informes, ni en la conversación. Se identifican por nombre de variable y `archivo:línea`. Los tokens se generan en el servidor y se quedan ahí.
 - **Datos personales:** teléfonos y nombres de clientes no se commitean; anonimizar a `+52...XXXX`.
@@ -365,7 +365,7 @@ class TestSeccionCatalogo:
 - [ ] **Step 6: Correr la suite completa — baseline**
 
 Run: `python -m pytest tests/ -q`
-Expected: PASS. El conteo sube de 144 a **149** (5 tests nuevos: 1 en TestAuthPanel, 1 en TestHeartbeat, 4 en TestGuardasArranque, menos 1 test viejo reemplazado). Si el número no cuadra, contar antes de seguir: un test que desapareció sin querer es una regresión silenciosa.
+Expected: PASS. El conteo sube de 155 a **160** (5 tests nuevos: 1 en TestAuthPanel, 1 en TestHeartbeat, 4 en TestGuardasArranque, menos 1 test viejo reemplazado). Si el número no cuadra, contar antes de seguir: un test que desapareció sin querer es una regresión silenciosa.
 
 - [ ] **Step 7: Commit**
 
@@ -374,7 +374,7 @@ git add app.py tests/test_plan5_operacion.py
 git commit -m "feat(auth): la app no arranca sin PANEL_DASHBOARD_TOKEN ni SECRET_KEY
 
 Cierra el ultimo default silencioso: antes SECRET_KEY ausente solo
-imprimia una advertencia. Baseline 144 -> 149."
+imprimia una advertencia. Baseline 155 -> 160."
 ```
 
 ---
@@ -559,7 +559,7 @@ La URL nueva queda comentada: se activa en el corte, cuando el DNS resuelva."
 - [ ] **Step 1: Correr la suite completa una última vez**
 
 Run: `python -m pytest tests/ -q`
-Expected: **149 passed**. Si hay un solo fallo, no se abre el PR.
+Expected: **164 passed**. Si hay un solo fallo, no se abre el PR.
 
 - [ ] **Step 2: Verificar que no se coló ningún secreto**
 
@@ -595,7 +595,7 @@ ventas, contactos y seguimiento.
 
 ## Plan de pruebas
 
-- [x] `pytest tests/ -q` → 149 passed (baseline previo: 144)
+- [x] `pytest tests/ -q` → 164 passed (baseline previo: 155)
 - [ ] Despliegue en VPS y testeo de 7 capas (Fase C del plan)
 
 Spec: `docs/superpowers/specs/2026-08-17-panelnioval-vultr-design.md`
@@ -827,7 +827,7 @@ git commit -m "chore(despliegue): retira Procfile y nixpacks.toml tras apagar Ra
 - [ ] **Step 1: Capa 1 — suite unitaria**
 
 Run: `python -m pytest tests/ -q`
-Expected: **149 passed**.
+Expected: **164 passed**.
 
 - [ ] **Step 2: Capa 2 — gates desde internet**
 

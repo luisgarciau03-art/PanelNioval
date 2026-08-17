@@ -174,9 +174,9 @@ Escape hatch único, explícito y ruidoso: `PANEL_AUTH_DESACTIVADA=1` para desar
 para la suite de tests. El default deja de ser "abierto"; quien abra el panel tiene que
 escribirlo a propósito.
 
-**Coste declarado:** los 144 tests actuales llaman rutas sin token y dependen del
+**Coste declarado:** los 155 tests actuales (antes de esta rama) llaman rutas sin token y dependen del
 comportamiento fail-open. La corrección esperada es fijar `PANEL_AUTH_DESACTIVADA=1` en
-`conftest.py` — es el `conftest`, no 144 tests. El alcance exacto no se conoce hasta correr
+`conftest.py` — es el `conftest`, no 155 tests. Esta rama suma 9 tests más. El alcance exacto no se conoce hasta correr
 la suite; si resulta mayor, se reporta antes de seguir.
 
 ---
@@ -230,7 +230,7 @@ Siete capas. El sistema bajo prueba incluye a Bruce: se le añade un servicio a 
 así que un testeo que no verifique su no-regresión no está completo.
 
 ### Capa 1 — Suite unitaria
-`python -m pytest tests/ -q` → **144 passed**, el baseline oficial. Nada avanza en rojo.
+`python -m pytest tests/ -q` → **155 passed**, el baseline oficial antes de esta rama; esta rama sube a **164 passed**. Nada avanza en rojo.
 
 ### Capa 2 — Arranque y gates
 - La app se niega a arrancar sin `PANEL_DASHBOARD_TOKEN` / `SECRET_KEY`
@@ -325,7 +325,7 @@ La migración está terminada cuando **todo** esto es cierto y está evidenciado
 1. `panelnioval.duckdns.org` sirve el panel por TLS válido desde `155.138.200.66`
 2. Sin token, cualquier ruta del panel devuelve 401 — verificado, no supuesto
 3. La app no arranca sin sus secretos
-4. `pytest tests/ -q` → 144 passed
+4. `pytest tests/ -q` → 164 passed
 5. Las 7 capas de prueba pasan, con su evidencia registrada
 6. El worker local opera contra la URL nueva y su heartbeat se ve en el panel
 7. Railway está eliminado y su URL no responde
