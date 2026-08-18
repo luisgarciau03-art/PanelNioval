@@ -26,32 +26,59 @@ import nucleo_catalogo as nc  # lógica pura de la cola de envíos de catálogo 
 
 app = Flask(__name__)
 app.json.sort_keys = False
+
+# ─── GUARDAS DE ARRANQUE (fail-closed) ───────────────────────────────────────
+# Sin secretos la app NO arranca. Un despliegue mal configurado revienta aquí,
+# ruidosamente, en vez de publicar el panel abierto. Bypass explícito para
+# desarrollo local y tests: PANEL_AUTH_DESACTIVADA=1.
+# Lectura directa (no vía _auth_desactivada()): esta guarda corre antes de que
+# la función se defina más abajo; llamarla aquí sería un NameError. Es la
+# única lectura directa de la variable en todo el archivo.
+if os.environ.get('PANEL_AUTH_DESACTIVADA') != '1':
+    if not os.environ.get('PANEL_DASHBOARD_TOKEN'):
+        raise RuntimeError(
+            'PANEL_DASHBOARD_TOKEN no está definida. El panel expone datos de '
+            'clientes: no arranca sin token. Defínela en el entorno, o pon '
+            'PANEL_AUTH_DESACTIVADA=1 si de verdad quieres el panel abierto.')
+    if not os.environ.get('SECRET_KEY'):
+        raise RuntimeError(
+            'SECRET_KEY no está definida. Con varios workers de gunicorn una '
+            'clave aleatoria por worker rompe las cookies de sesión de forma '
+            'intermitente. Genera una fija y ponla en el entorno.')
+
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
-# Cookie de sesión endurecida (el panel corre tras TLS en Railway).
+# Cookie de sesión endurecida (el panel corre tras TLS).
 app.config.update(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE='Lax', SESSION_COOKIE_HTTPONLY=True)
-# Si se activa la auth del panel pero SECRET_KEY no es fija, la cookie de sesión no será
-# consistente entre los 2 workers de gunicorn → avisar (el owner debe fijar SECRET_KEY).
-if os.environ.get('PANEL_DASHBOARD_TOKEN') and not os.environ.get('SECRET_KEY'):
-    print('[auth] ADVERTENCIA: PANEL_DASHBOARD_TOKEN activo sin SECRET_KEY fija; '
-          'fija SECRET_KEY en Railway para que la sesión funcione entre workers.')
 
 
-# ─── AUTENTICACIÓN OPCIONAL DEL PANEL (mejora M1, Plan 5) ────────────────────
-# Si PANEL_DASHBOARD_TOKEN está definido en Railway, TODAS las rutas exigen el token
-# (header X-Dashboard-Token, ?token=, o cookie de sesión tras el primer acceso con
-# ?token=). Si NO está definido, el panel queda abierto (comportamiento actual),
-# de modo que activarlo es una decisión del owner (gate T5.3) sin romper el deploy.
+# ─── AUTENTICACIÓN DEL PANEL (fail-closed) ───────────────────────────────────
+# El panel exige PANEL_DASHBOARD_TOKEN en TODAS las rutas (header
+# X-Dashboard-Token, ?token=, o cookie de sesión tras el primer acceso con
+# ?token=). Si la variable falta, la app no arranca (ver guardas de arranque).
+# Único bypass, explícito y ruidoso: PANEL_AUTH_DESACTIVADA=1 para desarrollo
+# local y para la suite de tests. El default NUNCA abre.
+# WORKER_TOKEN (a diferencia de sus dos hermanos, PANEL_DASHBOARD_TOKEN y
+# SECRET_KEY) no tiene guarda de arranque a propósito: el heartbeat es
+# telemetría, no un dato de cliente, y su ausencia falla cerrado en la propia
+# ruta (401) en vez de bloquear el arranque de todo el panel.
 _RUTAS_EXENTAS_AUTH = ('/api/catalogo/heartbeat',)  # el worker usa su propio WORKER_TOKEN
+
+
+def _auth_desactivada() -> bool:
+    """True solo si el operador desactivó la auth a propósito."""
+    return os.environ.get('PANEL_AUTH_DESACTIVADA') == '1'
 
 
 @app.before_request
 def _requiere_token_panel():
+    if _auth_desactivada():
+        return
+    path = request.path or ''
+    if path in _RUTAS_EXENTAS_AUTH:
+        return
     token = os.environ.get('PANEL_DASHBOARD_TOKEN')
     if not token:
-        return  # auth desactivada
-    path = request.path or ''
-    if path.startswith(_RUTAS_EXENTAS_AUTH):
-        return
+        return jsonify({'ok': False, 'error': 'no autorizado'}), 401
     provisto = (request.headers.get('X-Dashboard-Token')
                 or request.args.get('token')
                 or session.get('dashboard_token'))
@@ -103,9 +130,8 @@ def get_gs_client():
         info = json.loads(creds_json)
         creds = Credentials.from_service_account_info(info, scopes=scopes)
     else:
-        creds = Credentials.from_service_account_file(
-            'bubbly-subject-412101-c969f4a975c5.json', scopes=scopes
-        )
+        creds_file = os.environ.get('GOOGLE_CREDENTIALS_FILE', 'bubbly-subject-412101-c969f4a975c5.json')
+        creds = Credentials.from_service_account_file(creds_file, scopes=scopes)
     _gs_client = gspread.authorize(creds)
     return _gs_client
 
@@ -123,9 +149,8 @@ def get_drive_service():
         info = json.loads(creds_json)
         creds = Credentials.from_service_account_info(info, scopes=scopes)
     else:
-        creds = Credentials.from_service_account_file(
-            'bubbly-subject-412101-c969f4a975c5.json', scopes=scopes
-        )
+        creds_file = os.environ.get('GOOGLE_CREDENTIALS_FILE', 'bubbly-subject-412101-c969f4a975c5.json')
+        creds = Credentials.from_service_account_file(creds_file, scopes=scopes)
     _drive_service = build('drive', 'v3', credentials=creds)
     return _drive_service
 
@@ -3482,7 +3507,7 @@ def catalogo_reintentar():
 
 # ─── HEARTBEAT DEL WORKER LOCAL (Plan 5, transporte B) ───────────────────────
 # El worker local (PC del owner) hace POST cada corrida; el panel consulta el estado.
-# Nota: con 2 gunicorn workers en Railway el heartbeat en memoria es best-effort;
+# Nota: con 2 gunicorn workers en el VPS el heartbeat en memoria es best-effort;
 # para estado definitivo, el worker también deja timestamp en ENVIOS_CATALOGO.
 _worker_heartbeat = {'ts': None, 'resumen': None}
 WORKER_HEARTBEAT_TTL = 15 * 60  # 15 min sin heartbeat → "muerto"
@@ -3490,11 +3515,11 @@ WORKER_HEARTBEAT_TTL = 15 * 60  # 15 min sin heartbeat → "muerto"
 
 @app.route('/api/catalogo/heartbeat', methods=['POST'])
 def catalogo_heartbeat():
-    """El worker local reporta que está vivo. Protegido por WORKER_TOKEN si está definido."""
-    esperado = os.environ.get('WORKER_TOKEN')
-    if esperado:
+    """El worker local reporta que está vivo. Exige WORKER_TOKEN (fail-closed)."""
+    if not _auth_desactivada():
+        esperado = os.environ.get('WORKER_TOKEN')
         provisto = request.headers.get('X-Worker-Token') or ''
-        if not hmac.compare_digest(str(provisto), str(esperado)):
+        if not esperado or not hmac.compare_digest(str(provisto), str(esperado)):
             return jsonify({'ok': False, 'error': 'no autorizado'}), 401
     body = request.json or {}
     _worker_heartbeat['ts'] = time.time()

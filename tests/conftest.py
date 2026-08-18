@@ -6,6 +6,13 @@ en CI/Railway), así que las stubbeamos en ``sys.modules`` ANTES de importar el
 módulo. Ninguna de las funciones puras que caracterizamos usa Selenium en runtime;
 solo necesitan que el módulo importe sin error.
 """
+import os
+
+# La app es fail-closed: sin PANEL_DASHBOARD_TOKEN no arranca (ver app.py).
+# La suite no prueba autenticación salvo en TestAuthPanel, que borra esta
+# variable con monkeypatch para ejercitar el gate real.
+os.environ.setdefault("PANEL_AUTH_DESACTIVADA", "1")
+
 import sys
 import types
 from unittest.mock import MagicMock

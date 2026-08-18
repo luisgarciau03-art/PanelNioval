@@ -7,11 +7,20 @@ REM ============================================================
 cd /d "%~dp0"
 title NIOVAL - Worker Catalogo (continuo)
 
-REM Contrasena de envio: si no esta en el entorno, se pide una vez.
-if "%WA_ENVIO_PASSWORD%"=="" set /p WA_ENVIO_PASSWORD=Contrasena de envio:
 REM Armar el envio para esta ventana y apuntar el panel (heartbeat).
 set WA_ENVIO_ARMADO=1
+REM Contrasena de envio: si no esta en el entorno, se pide una vez.
+if "%WA_ENVIO_PASSWORD%"=="" set /p WA_ENVIO_PASSWORD=Contrasena de envio:
+REM WORKER_TOKEN es obligatorio: el heartbeat devuelve 401 sin el.
+:pedir_worker_token
+if "%WORKER_TOKEN%"=="" set /p WORKER_TOKEN=Token del worker:
+if "%WORKER_TOKEN%"=="" (
+    echo El token del worker es obligatorio: el heartbeat devuelve 401 sin el.
+    goto pedir_worker_token
+)
 set PANEL_URL=https://web-production-1d453.up.railway.app
+REM TRAS EL CORTE (Task 9) sustituir las dos URLs por:
+REM   set PANEL_URL=https://panelnioval.duckdns.org
 
 REM Abrir el formulario del panel en el navegador.
 echo Abriendo el panel (formulario) en el navegador...

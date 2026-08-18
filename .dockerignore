@@ -1,0 +1,16 @@
+.git
+.gitignore
+*.json
+.env
+.env.*
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+docs/
+.superpowers/
+venv/
+.venv/
+debug_invalid_*
+debug_timeout_*
+adjuntar_fail.png
