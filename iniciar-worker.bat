@@ -18,13 +18,11 @@ if "%WORKER_TOKEN%"=="" (
     echo El token del worker es obligatorio: el heartbeat devuelve 401 sin el.
     goto pedir_worker_token
 )
-set PANEL_URL=https://web-production-1d453.up.railway.app
-REM TRAS EL CORTE (Task 9) sustituir las dos URLs por:
-REM   set PANEL_URL=https://panelnioval.duckdns.org
+set PANEL_URL=https://panelnioval.duckdns.org
 
 REM Abrir el formulario del panel en el navegador.
 echo Abriendo el panel (formulario) en el navegador...
-start "" "https://web-production-1d453.up.railway.app/formulario"
+start "" "https://panelnioval.duckdns.org/formulario"
 
 echo.
 echo Iniciando worker de catalogo en modo CONTINUO...
