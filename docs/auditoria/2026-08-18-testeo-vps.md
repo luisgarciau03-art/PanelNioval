@@ -185,6 +185,53 @@ solo-webhook unos 12 minutos, con dos reinicios cortos.
 
 ---
 
+## Capa 7 — resiliencia: reinicio completo del VPS
+
+Reinicio real del servidor (`reboot`), no de contenedores, ejecutado el 2026-08-18 a las
+20:39 hora de México.
+
+### Preparación
+
+Antes de reiniciar se verificó lo que determina si el reinicio es seguro: los tres
+contenedores tienen `restart: unless-stopped` y el servicio `docker` está `enabled` al
+arranque. Sin eso, un reinicio los habría dejado apagados.
+
+### Resultado
+
+| Comprobación | Antes | Después |
+|---|---|---|
+| Uptime | 3 días, 3 h | 0 minutos |
+| Contenedores arriba | `panel`, `bruce`, `caddy` | los **3**, sin intervención |
+| Contenedores caídos | — | ninguno |
+| Panel sin token | 401 | **401** |
+| Panel con token | 200 | **200**, datos reales de Sheets |
+| Bruce | 200 | **200** |
+| Serie del certificado | `05F6...09D3` | **`05F6...09D3`**, idéntica |
+
+**El certificado sobrevivió sin reemitirse**, que era la duda de fondo: Caddy conserva su
+almacén de certificados en un volumen, así que un reinicio no consume cuota de Let's
+Encrypt ni deja el sitio sin TLS.
+
+### Un 502 transitorio que no es un fallo
+
+A los 26 segundos del arranque, Bruce devolvía **502** desde internet mientras el panel ya
+daba 401. No es una regresión: Bruce hace cálculos de antispam y quality rating al arrancar
+y tarda más que el panel en escuchar. Sus propios logs mostraban `200 OK` sirviendo
+`/api/dashboard` y `/api/leads` a través de Caddy, y tres consultas consecutivas desde
+internet dieron 200.
+
+Conviene anotarlo porque un 502 medido demasiado pronto tras un reinicio parece una caída
+y no lo es. La ventana de arranque de Bruce es de aproximadamente medio minuto.
+
+### Efecto sobre el heartbeat
+
+`worker-estado` volvió a `{"vivo":false,"ultimo_heartbeat":null,"resumen":null}`. El estado
+del heartbeat vive en memoria del proceso (`_worker_heartbeat`), así que un reinicio lo
+borra. Esto tiene una consecuencia operativa: **tras cualquier reinicio, el panel reporta el
+worker como caído hasta que llegue el siguiente latido**, aunque el worker siga corriendo.
+
+---
+
 ## Pendiente
 
 - **Capas 5, 6 y 7**: worker Selenium extremo a extremo, no-regresión de Bruce bajo carga,
