@@ -283,6 +283,48 @@ Idénticos a los previos a la Capa 4, tras dos ciclos de pausa y restauración.
 
 ---
 
+## Incidente: exposicion y rotacion del WORKER_TOKEN
+
+**2026-08-19.** El valor de `WORKER_TOKEN` quedo escrito en una conversacion de Claude Code
+al pegarlo el owner en respuesta a un prompt del `.bat`. Una vez ahi, el valor persiste en la
+transcripcion y en `claude-mem.db`: retirarlo del chat no lo invalida.
+
+### Alcance real
+
+Se identifico por prefijo cual de los dos tokens era, sin manejar el valor completo. El
+expuesto fue **`WORKER_TOKEN`**, no `PANEL_DASHBOARD_TOKEN`.
+
+Eso acota mucho el dano: `WORKER_TOKEN` solo autoriza `POST /api/catalogo/heartbeat`, es
+decir, permite falsificar un latido y hacer que el panel reporte el worker como vivo. **No
+da acceso a ningun dato de clientes.** El token que si abre el panel entero nunca salio del
+disco del owner.
+
+### Rotacion
+
+| Paso | Evidencia |
+|---|---|
+| Respaldo previo del `.env` | `secretos/.env.antes-de-rotar-<fecha>`, chmod 600 |
+| Huella antes | `1fc5fc8b94dea335` |
+| Huella despues | `ac0cd28ec593b55c` |
+| Variables tras rotar | las 5 presentes |
+| Token viejo contra el heartbeat | **401** |
+| Token nuevo contra el heartbeat | **200** |
+
+Comprobado en las dos direcciones: que el viejo deja de servir **y** que el nuevo funciona.
+Solo con la primera mitad no se distingue "rotado" de "roto".
+
+### Causa raiz, y lo que se cambio para que no se repita
+
+El `.bat` pedia `WORKER_TOKEN` pero abria el panel sin token, asi que el navegador mostraba
+`{"ok":false,"error":"no autorizado"}` y el operador asumia que el token pedido era el del
+panel. Ambos son 64 caracteres hex y se parecen. Corregido en el PR #17: el `.bat` pide los
+dos por separado, con etiquetas distintas, y abre el navegador ya autenticado.
+
+Para entregar valores de credencial sin que pasen por la conversacion, se escriben a un
+archivo local por el tunel SSH y se verifica por huella, nunca mostrando el contenido.
+
+---
+
 ## Pendiente
 
 - **Capas 5, 6 y 7**: worker Selenium extremo a extremo, no-regresión de Bruce bajo carga,
