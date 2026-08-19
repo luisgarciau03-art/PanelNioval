@@ -232,6 +232,57 @@ worker como caído hasta que llegue el siguiente latido**, aunque el worker siga
 
 ---
 
+## Capa 6 — no-regresión de Bruce
+
+Cuatro de los cinco pasos ejecutados el 2026-08-18 tras el reinicio del VPS.
+
+### Step 1 — webhook de Meta
+
+Comprobado en **las dos direcciones**, que es lo que le da valor: un webhook que aceptara
+cualquier token pasaría igual una prueba que solo verifique el caso bueno.
+
+| Caso | Código | Respuesta |
+|---|---|---|
+| `hub.verify_token` correcto | **200** | devuelve el challenge `test123` |
+| `hub.verify_token` falso | **403** | rechaza |
+
+### Step 2 — jobs del scheduler · NO VERIFICADO
+
+El plan esperaba ver los 16 jobs registrados en el log. Bruce **no los enumera**: solo
+escribe `[STARTUP] APScheduler iniciado — follow-ups automáticos activos`.
+
+Se confirma que el scheduler arranca, y que `WA_CAMPANA_AUTO=0` sigue puesto. **No** se
+confirma que sean 16 jobs: el método no puede distinguir 16 de cualquier otro número, así
+que queda como no verificado en vez de darse por bueno. Para cerrarlo haría falta un
+endpoint que liste los jobs, o subir el nivel de log de APScheduler.
+
+### Step 3 — envío saliente real · PENDIENTE
+
+Requiere disparar un envío de Bruce al teléfono del owner y confirmar recepción.
+
+### Step 4 — consumo con los dos servicios
+
+| Contenedor | Memoria | Del límite |
+|---|---|---|
+| `panel` | 148.1 MiB | 19.3% de sus 768 MiB |
+| `bruce` | 98.9 MiB | 5.0% del total |
+| `caddy` | 52.9 MiB | 2.7% del total |
+
+Sistema: 638 MB usados de 1,962, **1,323 MB disponibles y swap en 0**. Sin presión de
+memoria con ambos servicios conviviendo.
+
+`bruce` consume 99 MB frente a los ~64 MB medidos antes del despliegue. Es variación por
+uso —estaba sirviendo su dashboard activamente durante la medición—, no efecto del panel:
+son procesos y contenedores independientes, y el panel tiene su propio `mem_limit`.
+
+### Step 5 — flags intactos
+
+`WA_BUSCADOR_AUTO=1` · `WA_CAMPANA_AUTO=0` · `WA_GEO_AUTO=1` · `WA_SCHEDULER=1`
+
+Idénticos a los previos a la Capa 4, tras dos ciclos de pausa y restauración.
+
+---
+
 ## Pendiente
 
 - **Capas 5, 6 y 7**: worker Selenium extremo a extremo, no-regresión de Bruce bajo carga,
