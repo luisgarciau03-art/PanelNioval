@@ -11,3 +11,5 @@ __pycache__/
 debug_invalid_*
 debug_timeout_*
 adjuntar_fail.png
+# Respaldos de hojas: contienen datos de clientes (no versionar)
+docs/auditoria/respaldos/
