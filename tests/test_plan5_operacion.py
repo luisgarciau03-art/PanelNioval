@@ -1,5 +1,8 @@
 """Tests de la operación Railway (Plan 5): auth opcional del panel (M1) + heartbeat."""
 import importlib
+import json
+import os
+import time
 from unittest.mock import patch
 
 import pytest
@@ -191,3 +194,75 @@ class TestRutaCredenciales:
              patch("app.build"):
             app.get_drive_service()
         assert mock_creds.call_args[0][0] == self.DEFECTO
+
+
+# ─────────────── Heartbeat compartido entre procesos de gunicorn ───────────────
+class TestHeartbeatCompartido:
+    """El latido no puede vivir en memoria del proceso.
+
+    El panel corre con `gunicorn --workers 2`: el POST del worker cae en un
+    proceso y la consulta puede caer en el otro. Medido en el VPS, diez
+    consultas seguidas alternaban entre dos timestamps distintos. Al parar el
+    worker, un proceso cruzaria el TTL antes que el otro y el panel diria
+    "muerto"/"vivo" segun quien contestara.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _archivo_aislado(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(app, "WORKER_HEARTBEAT_FILE", str(tmp_path / "hb.json"))
+
+    def test_estado_lee_del_archivo_no_de_memoria(self, client, monkeypatch):
+        """El test que falla si alguien revierte a la variable en memoria.
+
+        Se guarda un latido por la ruta y despues se reescribe el archivo por
+        fuera, simulando a OTRO proceso de gunicorn. La consulta debe reflejar
+        el archivo; si leyera de memoria devolveria el resumen anterior.
+        """
+        client.post("/api/catalogo/heartbeat", json={"resumen": {"origen": "proceso-A"}})
+
+        with open(app.WORKER_HEARTBEAT_FILE, "w", encoding="utf-8") as fh:
+            json.dump({"ts": time.time(), "resumen": {"origen": "proceso-B"}}, fh)
+
+        d = client.get("/api/catalogo/worker-estado").get_json()
+        assert d["vivo"] is True
+        assert d["resumen"] == {"origen": "proceso-B"}
+
+    def test_sin_archivo_reporta_muerto(self, client):
+        """Un proceso recien arrancado no debe inventarse un latido."""
+        assert not os.path.exists(app.WORKER_HEARTBEAT_FILE)
+        d = client.get("/api/catalogo/worker-estado").get_json()
+        assert d["vivo"] is False
+        assert d["ultimo_heartbeat"] is None
+
+    def test_archivo_corrupto_reporta_muerto(self, client):
+        """Un JSON a medias no debe tumbar la ruta ni dar un vivo falso."""
+        with open(app.WORKER_HEARTBEAT_FILE, "w", encoding="utf-8") as fh:
+            fh.write('{"ts": 123')  # truncado a proposito
+
+        d = client.get("/api/catalogo/worker-estado").get_json()
+        assert d["vivo"] is False
+        assert d["ultimo_heartbeat"] is None
+
+    def test_ts_no_numerico_reporta_muerto(self, client):
+        """JSON valido pero con basura en ts: no debe reventar comparando."""
+        with open(app.WORKER_HEARTBEAT_FILE, "w", encoding="utf-8") as fh:
+            json.dump({"ts": "ayer", "resumen": {}}, fh)
+
+        d = client.get("/api/catalogo/worker-estado").get_json()
+        assert d["vivo"] is False
+
+    def test_latido_viejo_reporta_muerto(self, client):
+        """Pasado el TTL el worker se reporta caido aunque haya archivo."""
+        viejo = time.time() - app.WORKER_HEARTBEAT_TTL - 1
+        with open(app.WORKER_HEARTBEAT_FILE, "w", encoding="utf-8") as fh:
+            json.dump({"ts": viejo, "resumen": {"x": 1}}, fh)
+
+        d = client.get("/api/catalogo/worker-estado").get_json()
+        assert d["vivo"] is False
+        assert d["ultimo_heartbeat"] == viejo
+
+    def test_escritura_no_deja_temporales(self, client, tmp_path):
+        """La escritura atomica renombra: no debe quedar ningun .tmp."""
+        client.post("/api/catalogo/heartbeat", json={"resumen": {"n": 1}})
+        assert list(tmp_path.glob("*.tmp")) == []
+        assert os.path.exists(app.WORKER_HEARTBEAT_FILE)

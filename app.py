@@ -17,7 +17,7 @@ from gspread.exceptions import WorksheetNotFound
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-import os, json, time, io, base64, re, hmac, requests as req_lib
+import os, json, time, io, base64, re, hmac, tempfile, requests as req_lib
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
@@ -3509,7 +3509,48 @@ def catalogo_reintentar():
 # El worker local (PC del owner) hace POST cada corrida; el panel consulta el estado.
 # Nota: con 2 gunicorn workers en el VPS el heartbeat en memoria es best-effort;
 # para estado definitivo, el worker también deja timestamp en ENVIOS_CATALOGO.
-_worker_heartbeat = {'ts': None, 'resumen': None}
+# El heartbeat NO puede vivir en memoria del proceso: con varios workers de gunicorn
+# cada uno tendria el suyo, el POST caeria en uno y la consulta en otro. Medido en el
+# VPS con --workers 2, diez consultas seguidas alternaban entre dos timestamps
+# distintos; al parar el worker un proceso cruzaria el TTL antes que el otro, el panel
+# diria "muerto", el operador refrescaria y diria "vivo". Un monitor que miente al azar
+# es peor que no tenerlo. El archivo lo comparten todos los procesos del contenedor.
+WORKER_HEARTBEAT_FILE = os.environ.get(
+    'WORKER_HEARTBEAT_FILE',
+    os.path.join(tempfile.gettempdir(), 'worker_heartbeat.json'))
+
+
+def _guardar_heartbeat(resumen):
+    """Persiste el latido. Escritura atomica: un lector nunca ve un JSON a medias."""
+    datos = {'ts': time.time(), 'resumen': resumen}
+    tmp = '%s.%d.tmp' % (WORKER_HEARTBEAT_FILE, os.getpid())
+    try:
+        with open(tmp, 'w', encoding='utf-8') as fh:
+            json.dump(datos, fh)
+        os.replace(tmp, WORKER_HEARTBEAT_FILE)
+    except OSError as e:
+        # Sin disco escribible el panel sigue sirviendo: solo se degrada el monitor.
+        print("[worker] no se pudo persistir el heartbeat: %s" % e)
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+    return datos
+
+
+def _leer_heartbeat():
+    """Devuelve el ultimo latido, o ts=None si no hay ninguno o esta corrupto."""
+    try:
+        with open(WORKER_HEARTBEAT_FILE, encoding='utf-8') as fh:
+            datos = json.load(fh)
+    except (OSError, ValueError):
+        return {'ts': None, 'resumen': None}
+    ts = datos.get('ts')
+    if not isinstance(ts, (int, float)):
+        return {'ts': None, 'resumen': None}
+    return {'ts': ts, 'resumen': datos.get('resumen')}
+
+
 WORKER_HEARTBEAT_TTL = 15 * 60  # 15 min sin heartbeat → "muerto"
 
 
@@ -3522,20 +3563,20 @@ def catalogo_heartbeat():
         if not esperado or not hmac.compare_digest(str(provisto), str(esperado)):
             return jsonify({'ok': False, 'error': 'no autorizado'}), 401
     body = request.json or {}
-    _worker_heartbeat['ts'] = time.time()
-    _worker_heartbeat['resumen'] = body.get('resumen')
+    _guardar_heartbeat(body.get('resumen'))
     return jsonify({'ok': True})
 
 
 @app.route('/api/catalogo/worker-estado')
 def catalogo_worker_estado():
     """Estado del worker según el último heartbeat (vivo/desconocido)."""
-    ts = _worker_heartbeat['ts']
+    latido = _leer_heartbeat()
+    ts = latido['ts']
     vivo = bool(ts) and (time.time() - ts) < WORKER_HEARTBEAT_TTL
     return jsonify({
         'vivo': vivo,
         'ultimo_heartbeat': ts,
-        'resumen': _worker_heartbeat['resumen'],
+        'resumen': latido['resumen'],
     })
 
 
