@@ -4,6 +4,8 @@ __pycache__/
 *.pyc
 .env
 .env.*
+*.env
+# Cubre nombres sueltos tipo Envirioment.env: .env y .env.* no los atrapan.
 !.env.example
 # Debug de envio_catalogo.py: screenshots/HTML con PII de clientes (no versionar)
 debug_invalid_*
