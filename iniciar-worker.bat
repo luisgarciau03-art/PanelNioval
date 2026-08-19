@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM  NIOVAL - Iniciar worker de catalogo (modo continuo)
-REM  Abrelo ANTES de abrir el panel de Railway. Deja la ventana
+REM  Abrelo ANTES de abrir el panel. Deja la ventana
 REM  abierta: procesa la cola de envios cada 15s. Ctrl+C para salir.
 REM ============================================================
 cd /d "%~dp0"
@@ -21,8 +21,17 @@ if "%WORKER_TOKEN%"=="" (
 set PANEL_URL=https://panelnioval.duckdns.org
 
 REM Abrir el formulario del panel en el navegador.
-echo Abriendo el panel (formulario) en el navegador...
-start "" "https://panelnioval.duckdns.org/formulario"
+REM Sin ?token= el navegador recibe 401 {"ok":false,"error":"no autorizado"}:
+REM el gate del panel no distingue un navegador de cualquier otro cliente.
+REM Basta con entrar una vez con el token; queda en la sesion del navegador.
+if "%PANEL_DASHBOARD_TOKEN%"=="" set /p PANEL_DASHBOARD_TOKEN=Token del panel (Enter para abrir sin autenticar): 
+if "%PANEL_DASHBOARD_TOKEN%"=="" (
+    echo Abriendo el panel SIN token: veras "no autorizado" hasta que entres con el.
+    start "" "%PANEL_URL%/formulario"
+) else (
+    echo Abriendo el panel autenticado en el navegador...
+    start "" "%PANEL_URL%/formulario?token=%PANEL_DASHBOARD_TOKEN%"
+)
 
 echo.
 echo Iniciando worker de catalogo en modo CONTINUO...
