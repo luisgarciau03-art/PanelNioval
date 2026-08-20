@@ -266,3 +266,48 @@ class TestHeartbeatCompartido:
         client.post("/api/catalogo/heartbeat", json={"resumen": {"n": 1}})
         assert list(tmp_path.glob("*.tmp")) == []
         assert os.path.exists(app.WORKER_HEARTBEAT_FILE)
+
+
+# ─────────────── Inyeccion de formula en el importador ───────────────
+class TestEscapeFormula:
+    """Sheets parsea lo que empieza por = + - @ cuando se escribe con
+    USER_ENTERED. La ferreteria "+ Mas Seguro Distribuidora Ferretera" se
+    guardo asi: el texto quedo intacto por debajo, pero la celda muestra
+    #ERROR! y el operador ve un error en vez del nombre al llamarla.
+    """
+
+    @pytest.mark.parametrize("entrada", [
+        "+ Mas Seguro Distribuidora Ferretera",   # el caso real, fila 6807
+        "=SUMA(A1:A9)",
+        "-Ferreteria del Norte",
+        "@arroba SA de CV",
+    ])
+    def test_escapa_lo_que_sheets_tomaria_por_formula(self, entrada):
+        r = app._escapar_formula(entrada)
+        assert r == "'" + entrada
+        assert r[1:] == entrada  # el texto original se conserva entero
+
+    @pytest.mark.parametrize("entrada", [
+        "Ferreteria Chavez",
+        "3M Mexico",
+        "",
+        "Tornillos & Co",
+    ])
+    def test_no_toca_texto_normal(self, entrada):
+        assert app._escapar_formula(entrada) == entrada
+
+    @pytest.mark.parametrize("entrada", [19.4326, -99.1332, 0, 4, 8, 3.5])
+    def test_no_toca_numeros(self, entrada):
+        """Latitud, longitud, calificacion y resenas deben seguir siendo
+        numeros: convertirlos a texto es justo lo que RAW habria roto."""
+        r = app._escapar_formula(entrada)
+        assert r == entrada
+        assert isinstance(r, type(entrada))
+
+    def test_longitud_negativa_sigue_siendo_numero(self):
+        """Una longitud como -99.13 empieza por '-' pero NO es cadena: no se toca."""
+        assert app._escapar_formula(-99.1332) == -99.1332
+
+    def test_fecha_como_texto_no_se_escapa(self):
+        """La fecha entra como texto y debe seguir parseandose como fecha."""
+        assert app._escapar_formula("18/08/2026") == "18/08/2026"

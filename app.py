@@ -4346,6 +4346,25 @@ def _buscar_negocios(gmaps_client, categoria, ciudad):
     return resultados, stats
 
 
+def _escapar_formula(valor):
+    """Evita que Sheets interprete un texto como formula.
+
+    Con value_input_option='USER_ENTERED', Sheets parsea lo que empieza por
+    '=', '+', '-' o '@' igual que si lo tecleara un usuario. La ferreteria
+    "+ Mas Seguro Distribuidora Ferretera" se guardo asi y la celda muestra
+    #ERROR!: el texto sigue intacto por debajo, pero el operador ve un error
+    en vez del nombre de la tienda al llamarla.
+
+    El apostrofo inicial es la marca de "esto es texto" de Sheets y no forma
+    parte del valor almacenado. Solo se toca lo que es cadena: los numeros
+    (calificacion, resenas, latitud, longitud) y las fechas deben seguir
+    entrando como numero y fecha, que es justo lo que RAW habria roto.
+    """
+    if isinstance(valor, str) and valor[:1] in ('=', '+', '-', '@'):
+        return "'" + valor
+    return valor
+
+
 def _exportar_a_sheets(resultados, categoria, ciudad):
     """Exporta a LISTA DE CONTACTOS con columnas idénticas al script original."""
     try:
@@ -4392,6 +4411,7 @@ def _exportar_a_sheets(resultados, categoria, ciudad):
                 ])
 
         if nuevos:
+            nuevos = [[_escapar_formula(v) for v in fila] for fila in nuevos]
             ws.append_rows(nuevos, value_input_option='USER_ENTERED')
             _cache.pop('contactos', None)
         return len(nuevos)
