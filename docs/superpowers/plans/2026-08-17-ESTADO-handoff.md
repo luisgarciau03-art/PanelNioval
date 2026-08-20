@@ -137,3 +137,74 @@ Con la autorización de push, la secuencia es: pushear → clonar en `/srv/panel
 secretos en el servidor → levantar contenedor → **probar por red interna del Docker antes de
 tocar el DNS** → repuntar DuckDNS → Caddy emite el certificado → smoke test → apuntar el
 worker → apagar Railway.
+
+---
+
+## CIERRE — estado al 2026-08-19
+
+**La migracion esta terminada y en produccion.** El panel corre en
+`https://panelnioval.duckdns.org` con TLS de Let's Encrypt (valido hasta el 2026-11-16),
+cerrado con token, y Railway esta apagado (devuelve 404).
+
+### Testeo de 7 capas
+
+| Capa | Estado |
+|---|---|
+| 1 · suite | 187 passed |
+| 2 · gates sin token | 401 en 8/8 + `RuntimeError` capturado en contenedor desechable |
+| 3 · rutas GET con token | 200 en 23/23 |
+| 4 · escrituras sobre produccion | huellas SHA-256 identicas antes y despues: ninguna columna se movio |
+| 5 · worker Selenium | pendiente: requiere arrancar `iniciar-worker.bat` en la PC del owner |
+| 6 · no-regresion de Bruce | 3 pasos verificados, 1 no observable, 1 bloqueado por permisos |
+| 7 · resiliencia | reinicio real del VPS: los 3 contenedores vuelven solos, mismo certificado |
+
+Evidencia completa en `docs/auditoria/2026-08-18-testeo-vps.md`.
+
+### Bugs encontrados y corregidos durante la verificacion
+
+Ninguno lo causo la migracion; los tres son preexistentes que el testeo saco a la luz.
+
+1. **Heartbeat en memoria del proceso** (PR #20). Con `gunicorn --workers 2`, diez consultas
+   seguidas a `worker-estado` alternaban entre dos timestamps. Al parar el worker un proceso
+   cruzaria el TTL antes que el otro y el panel diria "muerto"/"vivo" segun quien contestara.
+   Resuelto persistiendo el latido en archivo compartido con escritura atomica.
+
+2. **Inyeccion de formula en el importador** (PR #22). La ferreteria
+   `+ Mas Seguro Distribuidora Ferretera` empieza por `+`, que Sheets parsea como formula:
+   la celda mostraba `#ERROR!` y el operador no veia a quien llamaba. Se escapan las cadenas
+   que empiezan por `= + - @`. **No** se cambio a RAW en bloque porque la fecha dejaria de
+   parsearse como fecha.
+
+3. **`.gitignore` no cubria `*.env`** (PR #15). Un archivo con credenciales vivas estaba sin
+   ignorar dentro del repo. No llego a commitearse; se aparto con hash verificado.
+
+### Incidente de credencial
+
+`WORKER_TOKEN` quedo expuesto al pegarse en una conversacion. Rotado y verificado en las dos
+direcciones: el viejo devuelve 401, el nuevo 200. Alcance acotado — solo autoriza el
+heartbeat, no da acceso a datos de clientes. Detalle en el documento de auditoria.
+
+### Pendientes del owner
+
+| Pendiente | Por que no lo puede hacer el agente |
+|---|---|
+| Arrancar el worker (Capa 5) | Corre en la PC del owner, con Selenium y WhatsApp Web |
+| Envio saliente de Bruce (Capa 6 Step 3) | Mandar un WhatsApp real requiere aprobacion humana |
+| Cargar `GMAPS_API_KEY` | No venia en el archivo de entorno; sin ella el importador falla |
+| Rotar `TELEGRAM_TOKEN` | Se revoca en el proveedor, no en el servidor |
+| 57 celdas `#ERROR!` en `Respuestas de formulario 1` | Preexistentes, con el nombre original perdido; recuperarlas es decision del owner |
+
+### Notas operativas que parecen fallos y no lo son
+
+- **Bruce devuelve 502 durante su primer medio minuto** tras un reinicio: arranca mas lento
+  que el panel.
+- **`worker-estado` vuelve a `vivo:false` tras cada despliegue**, porque el archivo de latido
+  vive en el contenedor y se recrea con el.
+- **Gunicorn no registra accesos.** Cualquier conteo de codigos HTTP sobre `docker logs panel`
+  da cero por ausencia de logging, no por ausencia de peticiones. Activar el log de accesos
+  sin filtrar escribiria tokens en disco: el panel acepta `?token=` por query string.
+
+### Servicios en el VPS al cierre
+
+`panel`, `bruce`, `caddy` y `agendanioval` (este ultimo desplegado por el owner). Memoria en
+torno a 1.0 GB de 1.9 GB. Al empezar eran dos servicios y 529 MB.
