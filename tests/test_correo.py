@@ -83,9 +83,16 @@ class TestGuardarCorreo:
 
 class TestActualizarTelefono:
     def _ws(self, nfilas=10):
+        """Encabezados REALES de 'LISTA DE CONTACTOS', comprobados en la hoja.
+
+        La version anterior de este test simulaba ["TIENDA", "TELÉFONO", "CIUDAD"],
+        un layout que no existe: la columna del telefono es CONTACTO, la E. El
+        test pasaba contra esa ficcion mientras produccion devolvia 400
+        'columna TELÉFONO no encontrada'.
+        """
         ws = MagicMock()
-        header = ["TIENDA", "TELÉFONO", "CIUDAD"]
-        ws.get_all_values.return_value = [header] + [["x", "111", "y"]] * (nfilas - 1)
+        header = ["  ", "TIENDA", "CIUDAD", "CATEGORIA ", "CONTACTO", "RESPUESTA"]
+        ws.get_all_values.return_value = [header] + [["1", "x", "y", "z", "111", ""]] * (nfilas - 1)
         return ws
 
     def test_valido_actualiza_col_telefono(self, client, monkeypatch):
@@ -94,8 +101,16 @@ class TestActualizarTelefono:
         r = client.post("/api/formulario/telefono", json={"row": 5, "telefono": "5599998888"})
         assert r.status_code == 200 and r.get_json()["ok"] is True
         upd = ws.batch_update.call_args[0][0]
-        assert upd[0]["range"] == "B5"                 # TELÉFONO = col B, fila 5
-        assert upd[0]["values"] == [["+5599998888"]]   # normalizado con '+'
+        assert upd[0]["range"] == "E5"                  # CONTACTO = col E, fila 5
+        assert upd[0]["values"] == [["559 999 8888"]]   # convenio de la hoja
+
+    def test_respuesta_conserva_el_formato_normalizado(self, client, monkeypatch):
+        """La hoja lleva el formato legible; la respuesta de la API sigue
+        devolviendo el normalizado, que es el que consume la cola de catalogo."""
+        ws = self._ws(10)
+        monkeypatch.setattr(app, "get_gs_client", lambda: _fake_client(ws))
+        r = client.post("/api/formulario/telefono", json={"row": 5, "telefono": "5599998888"})
+        assert r.get_json()["telefono"] == "+5599998888"
 
     def test_invalido_400_sin_escritura(self, client, monkeypatch):
         ws = self._ws()

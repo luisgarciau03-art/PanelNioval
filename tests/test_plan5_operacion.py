@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 import app
+import nucleo_catalogo as nc
 
 
 @pytest.fixture
@@ -311,3 +312,59 @@ class TestEscapeFormula:
     def test_fecha_como_texto_no_se_escapa(self):
         """La fecha entra como texto y debe seguir parseandose como fecha."""
         assert app._escapar_formula("18/08/2026") == "18/08/2026"
+
+
+# ─────────────── Columna del telefono en LISTA DE CONTACTOS ───────────────
+class TestColumnaTelefonoContactos:
+    """La columna se llama CONTACTO (la E), no TELEFONO.
+
+    Buscar 'TELÉFONO'/'TELEFONO' devolvia 400 'columna TELÉFONO no encontrada'
+    al corregir un numero, y dejaba el telefono en blanco en el formulario.
+    Encabezados reales de la hoja, comprobados: A='  ', B='TIENDA', C='CIUDAD',
+    D='CATEGORIA ', E='CONTACTO'.
+    """
+
+    ENCABEZADOS_REALES = ['  ', 'TIENDA', 'CIUDAD', 'CATEGORIA ', 'CONTACTO',
+                          'RESPUESTA', 'PORCENTAJES ', 'Domicilio']
+
+    def test_encuentra_contacto_en_la_columna_e(self):
+        assert app._columna_telefono_contactos(self.ENCABEZADOS_REALES) == 5
+
+    def test_acepta_telefono_como_respaldo(self):
+        """Si una hoja hermana si usa 'TELÉFONO', se sigue soportando."""
+        assert app._columna_telefono_contactos(['TIENDA', 'TELÉFONO']) == 2
+        assert app._columna_telefono_contactos(['TIENDA', 'TELEFONO']) == 2
+
+    def test_ignora_mayusculas_y_espacios(self):
+        assert app._columna_telefono_contactos(['x', ' contacto ']) == 2
+
+    def test_devuelve_none_si_no_esta(self):
+        assert app._columna_telefono_contactos(['TIENDA', 'CIUDAD']) is None
+        assert app._columna_telefono_contactos([]) is None
+
+
+class TestFormatoTelefonoContactos:
+    """La hoja guarda el numero nacional con espacios: 6787 de 7054 telefonos
+    tienen 10 digitos y el formato dominante es 'NNN NNN NNNN'. Escribir
+    '+526623534185' seria ajeno al resto de la columna."""
+
+    @pytest.mark.parametrize("entrada", [
+        "526623534185",        # el caso que fallo, con lada de pais
+        "6623534185",          # nacional pelado
+        "+52 662 353 4185",    # ya formateado con prefijo
+        "5216623534185",       # con el '1' de movil que Mexico ya no usa
+        "662-353-4185",        # con guiones
+        "(662) 353 4185",      # con parentesis
+    ])
+    def test_normaliza_al_formato_de_la_hoja(self, entrada):
+        assert nc.formatear_telefono_contactos(entrada) == "662 353 4185"
+
+    def test_no_inventa_agrupacion_si_no_son_10_digitos(self):
+        """Agrupar a ciegas un numero raro escribiria algo falso en produccion."""
+        assert nc.formatear_telefono_contactos("12345") == "12345"
+        assert nc.formatear_telefono_contactos("") == ""
+        assert nc.formatear_telefono_contactos(None) == ""
+
+    def test_no_confunde_un_nacional_que_empieza_por_52(self):
+        """5212345678 son 10 digitos: es nacional, no lada 52 + 8 digitos."""
+        assert nc.formatear_telefono_contactos("5212345678") == "521 234 5678"
