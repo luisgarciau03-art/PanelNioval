@@ -17,6 +17,7 @@ Instalar como Tarea Programada de Windows: ver `instalar-worker.ps1`.
 import json
 import os
 import sys
+import subprocess
 import tempfile
 import time
 import traceback
@@ -61,19 +62,62 @@ def _abrir_ws_envios(client):
     return sp.worksheet(ENVIOS_WS_NAME)
 
 
+def _proceso_vivo(pid):
+    """True si el PID sigue corriendo. Ante la duda, True: mejor no arrancar dos
+    workers que arrancar sobre uno vivo y duplicar envios de WhatsApp."""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        try:
+            salida = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                capture_output=True, text=True, timeout=10,
+            ).stdout
+        except (OSError, subprocess.SubprocessError):
+            return True
+        return str(pid) in salida
+    try:
+        os.kill(pid, 0)          # senal 0: no envia nada, solo comprueba
+    except ProcessLookupError:
+        return False
+    except PermissionError:      # existe, es de otro usuario
+        return True
+    except OSError:
+        return True
+    return True
+
+
+def _pid_del_lock():
+    """PID guardado en el lock, o 0 si no se puede leer."""
+    try:
+        with open(LOCK_PATH, encoding="utf-8") as f:
+            return int(f.read().split()[0])
+    except (OSError, ValueError, IndexError):
+        return 0
+
+
 def _adquirir_lock():
-    """Evita dos corridas solapadas. Usa creación atómica ('x'); si el lock existe
-    pero es más viejo que LOCK_TTL, se considera huérfano y se reemplaza."""
+    """Evita dos corridas solapadas. Usa creación atómica ('x').
+
+    Un lock se considera huérfano si el proceso que lo escribió ya no existe, o
+    si supera LOCK_TTL. Antes solo se miraba la edad: un worker cerrado con
+    Ctrl+C o caido por un apagon dejaba el archivo y bloqueaba los reintentos
+    hasta 30 minutos, sin ninguna corrida real en curso. El PID es la senal
+    directa; el TTL queda como respaldo para PIDs reciclados por el sistema.
+    """
     if os.path.isfile(LOCK_PATH):
         try:
             edad = time.time() - os.path.getmtime(LOCK_PATH)
         except OSError:
             edad = 0
-        if edad < LOCK_TTL:
-            print("[worker] otra corrida en curso (lock activo); saliendo.")
+        pid = _pid_del_lock()
+        if edad < LOCK_TTL and _proceso_vivo(pid):
+            print(f"[worker] otra corrida en curso (PID {pid}); saliendo.")
             return False
+        motivo = "proceso muerto" if edad < LOCK_TTL else f"mas de {LOCK_TTL // 60} min"
+        print(f"[worker] lock huerfano ({motivo}); se reemplaza.")
         try:
-            os.remove(LOCK_PATH)  # lock huérfano
+            os.remove(LOCK_PATH)
         except OSError:
             pass
     try:
