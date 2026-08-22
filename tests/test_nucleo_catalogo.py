@@ -23,15 +23,41 @@ class TestConclusionElegible:
 
 
 class TestNormalizarTelefono:
+    """WhatsApp exige el numero internacional completo.
+
+    Estos casos esperaban antes '+5512345678', sin lada de pais: el test pasaba
+    mientras un envio real habria construido `send?phone=5512345678`, que
+    WhatsApp no resuelve. 'LISTA DE CONTACTOS' guarda el numero nacional de 10
+    digitos, asi que la lada tiene que anadirse aqui.
+    """
+
     @pytest.mark.parametrize("entrada,esperado", [
-        ("5512345678", "+5512345678"),
-        ("+52 55 1234 5678", "+525512345678"),
-        ("(55) 1234-5678", "+5512345678"),
+        ("5512345678", "+525512345678"),          # nacional de 10 -> con lada
+        ("+52 55 1234 5678", "+525512345678"),    # ya la trae
+        ("(55) 1234-5678", "+525512345678"),      # con separadores
+        ("662 353 4185", "+526623534185"),        # como lo guarda la hoja
+        ("5215512345678", "+525512345678"),       # el '1' de movil que MX retiro
         ("", ""),
         ("sin numero", ""),
     ])
     def test_normaliza(self, entrada, esperado):
         assert nc.normalizar_telefono(entrada) == esperado
+
+    def test_no_duplica_la_lada(self):
+        """Normalizar dos veces debe ser estable: la cola puede reprocesar."""
+        una = nc.normalizar_telefono("6623534185")
+        assert nc.normalizar_telefono(una) == una == "+526623534185"
+
+    def test_no_inventa_lada_en_longitudes_raras(self):
+        """Solo se asume nacional en 10 digitos: adivinar en otras longitudes
+        mandaria el catalogo a un numero equivocado."""
+        assert nc.normalizar_telefono("12345") == "+12345"
+        assert nc.normalizar_telefono("448012345678") == "+448012345678"  # UK, no MX
+
+    def test_la_fila_de_la_cola_lleva_lada(self):
+        """Lo que de verdad importa: el valor que el worker usa para enviar."""
+        fila = nc.nueva_fila_envio("Ferreteria X", "662 353 4185", 42, "Pedido")
+        assert fila[2] == "+526623534185"
 
 
 class TestValidarNumero:
@@ -69,7 +95,7 @@ class TestNuevaFilaEnvio:
         assert len(fila) == len(nc.COLUMNAS_ENVIOS)
         d = dict(zip(nc.COLUMNAS_ENVIOS, fila))
         assert d["tienda"] == "Ferretería A"
-        assert d["telefono"] == "+5512345678"
+        assert d["telefono"] == "+525512345678"  # con lada: es lo que usa WhatsApp
         assert d["fila_respuesta"] == "7"
         assert d["conclusion"] == "Revisara el Catalogo"
         assert d["estado"] == nc.PENDIENTE
