@@ -3851,8 +3851,8 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0047CC
           <b id="val-cat-tienda"></b> — conclusión: <b id="val-cat-conclusion"></b>.<br>
           Verifica que el <b>número de WhatsApp</b> sea correcto antes de enviar. Si lo corriges, se actualiza en LISTA DE CONTACTOS.
         </p>
-        <label style="font-size:.82em;color:#555;font-weight:600">Número de WhatsApp (con lada, ej. 52...)</label>
-        <input id="val-cat-tel" type="tel" inputmode="numeric" placeholder="526623534185"
+        <label style="font-size:.82em;color:#555;font-weight:600">Número de WhatsApp (10 dígitos; la lada 52 se añade sola)</label>
+        <input id="val-cat-tel" type="tel" inputmode="numeric" placeholder="662 353 4185"
                style="width:100%;padding:11px;border:1px solid #ccd;border-radius:8px;font-size:1em;margin-top:4px"
                oninput="validarValCat()">
         <p id="val-cat-error" style="color:var(--red);font-size:.82em;min-height:16px;margin:4px 0"></p>
@@ -4038,8 +4038,18 @@ function validarValCat() {
   const dig = (v.match(/\d/g) || []).length;
   const ok = dig >= 10 && dig <= 13;
   document.getElementById('val-cat-btn').disabled = !ok;
-  document.getElementById('val-cat-error').textContent =
-    (v && !ok) ? 'El número debe tener 10 a 13 dígitos (con lada, ej. 52...).' : '';
+  // Distinguir "el numero guardado esta incompleto" de "lo tecleaste mal": el
+  // campo se precarga desde LISTA DE CONTACTOS y hay 131 contactos con menos de
+  // 10 digitos (40 con nueve, 26 con siete, y algunos con uno solo). Sin esta
+  // distincion el operador cree que se equivoco al teclear.
+  const sinTocar = v === (telContacto(O.contacto) || '');
+  let msg = '';
+  if (v && !ok) {
+    msg = (sinTocar && dig > 0 && dig < 10)
+      ? 'El número guardado está incompleto (' + dig + ' dígitos). Escribe el número completo de 10 dígitos.'
+      : 'Faltan dígitos: se necesitan 10 (o 12 si incluyes la lada 52).';
+  }
+  document.getElementById('val-cat-error').textContent = msg;
   return ok;
 }
 async function confirmarEnviarCatalogo() {
