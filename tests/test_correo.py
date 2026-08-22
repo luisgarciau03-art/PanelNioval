@@ -110,7 +110,7 @@ class TestActualizarTelefono:
         ws = self._ws(10)
         monkeypatch.setattr(app, "get_gs_client", lambda: _fake_client(ws))
         r = client.post("/api/formulario/telefono", json={"row": 5, "telefono": "5599998888"})
-        assert r.get_json()["telefono"] == "+5599998888"
+        assert r.get_json()["telefono"] == "+525599998888"  # con lada de pais
 
     def test_invalido_400_sin_escritura(self, client, monkeypatch):
         ws = self._ws()

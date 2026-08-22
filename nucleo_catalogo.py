@@ -65,10 +65,32 @@ def conclusion_elegible(col_j: str) -> bool:
     return (col_j or "").strip().lower() in CONCLUSIONES_ELEGIBLES
 
 
+LADA_MX = "52"
+
+
 def normalizar_telefono(tel: str) -> str:
-    """Deja solo dígitos y antepone '+'. '' si no hay dígitos."""
+    """Deja solo digitos, antepone la lada de pais y el '+'. '' si no hay digitos.
+
+    WhatsApp exige el numero internacional completo: envio_catalogo.py construye
+    la URL como `send?phone={telefono sin '+'}`, asi que un '+6623534185' llega
+    como phone=6623534185 y WhatsApp no puede resolverlo.
+
+    'LISTA DE CONTACTOS' guarda el numero nacional de 10 digitos ('662 353 4185'),
+    asi que sin este paso todo lo que salga de la hoja pierde la lada. Antes no se
+    notaba porque el frontend leia una columna inexistente y mandaba vacio: la cola
+    lo marcaba NUMERO_INVALIDO y el operador tecleaba el numero completo a mano.
+
+    El '1' de 521 es el prefijo de movil que Mexico dejo de usar en 2019; se retira
+    para no acabar con 13 digitos que WhatsApp rechaza.
+    """
     digitos = re.sub(r"\D", "", tel or "")
-    return f"+{digitos}" if digitos else ""
+    if not digitos:
+        return ""
+    if len(digitos) == 10:
+        digitos = LADA_MX + digitos
+    elif len(digitos) == 13 and digitos.startswith(LADA_MX + "1"):
+        digitos = LADA_MX + digitos[3:]
+    return f"+{digitos}"
 
 
 # Nombres posibles de la columna del telefono en 'LISTA DE CONTACTOS'.
