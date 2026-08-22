@@ -71,6 +71,36 @@ def normalizar_telefono(tel: str) -> str:
     return f"+{digitos}" if digitos else ""
 
 
+# Nombres posibles de la columna del telefono en 'LISTA DE CONTACTOS'.
+# La real es CONTACTO (columna E). El codigo buscaba 'TELEFONO'/'TELÉFONO', que
+# nunca existieron en esa hoja: el importador escribe el telefono en la quinta
+# posicion, y esa columna se titula CONTACTO. Las otras dos quedan como respaldo
+# por si alguna hoja hermana si las usa.
+COLUMNAS_TELEFONO_CONTACTOS = ("CONTACTO", "TELÉFONO", "TELEFONO")
+
+
+def formatear_telefono_contactos(tel: str) -> str:
+    """Formatea al convenio de 'LISTA DE CONTACTOS': 10 digitos en grupos 3-3-4.
+
+    Medido sobre la hoja: 6787 de 7054 telefonos tienen 10 digitos y el formato
+    dominante es 'NNN NNN NNNN'. Escribir '+526623534185' ahi seria legible por
+    maquina pero ajeno al resto de la columna, y el operador compara a ojo.
+
+    Los prefijos de pais se retiran porque la hoja guarda el numero nacional:
+    52 + 10 digitos, o 521 + 10 digitos (el '1' de movil que Mexico ya no usa).
+    Lo que no encaje en 10 digitos se devuelve solo con digitos, sin inventar
+    una agrupacion que podria estar mal.
+    """
+    digitos = re.sub(r"\D", "", tel or "")
+    if len(digitos) == 13 and digitos.startswith("521"):
+        digitos = digitos[3:]
+    elif len(digitos) == 12 and digitos.startswith("52"):
+        digitos = digitos[2:]
+    if len(digitos) == 10:
+        return f"{digitos[:3]} {digitos[3:6]} {digitos[6:]}"
+    return digitos
+
+
 def validar_numero(tel: str) -> bool:
     """Valida un teléfono E.164-aproximado: 10 a 13 dígitos (con o sin '+')."""
     digitos = re.sub(r"\D", "", tel or "")

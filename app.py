@@ -3211,6 +3211,20 @@ def _correo_valido(correo):
     return bool(correo) and len(correo) <= 254 and _EMAIL_RE.match(correo) is not None
 
 
+def _columna_telefono_contactos(headers):
+    """Indice 1-based de la columna del telefono en 'LISTA DE CONTACTOS'.
+
+    Se buscaba 'TELEFONO'/'TELÉFONO', que nunca existieron en esa hoja: la
+    columna real es CONTACTO (la E), que es justo donde el importador escribe
+    r['Telefono']. El resultado era un 400 'columna TELÉFONO no encontrada' al
+    corregir un numero, y el telefono en blanco en el formulario.
+    """
+    for i, h in enumerate(headers):
+        if str(h).strip().upper() in nc.COLUMNAS_TELEFONO_CONTACTOS:
+            return i + 1
+    return None
+
+
 @app.route('/api/formulario/telefono', methods=['POST'])
 def formulario_telefono():
     """Actualiza el TELÉFONO del contacto en LISTA DE CONTACTOS (validador pre-envío)."""
@@ -3234,13 +3248,16 @@ def formulario_telefono():
         if row > len(filas):
             return jsonify({'ok': False, 'error': 'row fuera de rango'}), 400
         headers = filas[0] if filas else []
-        tel_col = next((i + 1 for i, h in enumerate(headers)
-                        if str(h).strip().upper() in ('TELÉFONO', 'TELEFONO')), None)
+        tel_col = _columna_telefono_contactos(headers)
         if not tel_col:
-            return jsonify({'ok': False, 'error': 'columna TELÉFONO no encontrada'}), 400
+            return jsonify({'ok': False,
+                            'error': 'columna de telefono no encontrada en LISTA DE CONTACTOS'}), 400
         tel_norm = nc.normalizar_telefono(telefono)
+        # La hoja guarda el numero nacional con espacios ('662 353 4185'); el
+        # operador la lee a ojo. tel_norm queda para la respuesta y la cola.
+        tel_hoja = nc.formatear_telefono_contactos(telefono)
         wsc.batch_update(
-            [{'range': gsu.rowcol_to_a1(row, tel_col), 'values': [[tel_norm]]}],
+            [{'range': gsu.rowcol_to_a1(row, tel_col), 'values': [[tel_hoja]]}],
             value_input_option='RAW',
         )
         _cache.pop('contactos', None)
@@ -3447,11 +3464,11 @@ def catalogo_corregir_numero():
                 spc = get_gs_client().open_by_key(SHEET_IDS['contactos'])
                 wsc = spc.worksheet('LISTA DE CONTACTOS')
                 headers = wsc.row_values(1)
-                tel_col = next((i + 1 for i, h in enumerate(headers)
-                                if str(h).strip().upper() in ('TELÉFONO', 'TELEFONO')), None)
+                tel_col = _columna_telefono_contactos(headers)
                 if tel_col:
                     wsc.batch_update(
-                        [{'range': gsu.rowcol_to_a1(contacto_row_real, tel_col), 'values': [[tel_norm]]}],
+                        [{'range': gsu.rowcol_to_a1(contacto_row_real, tel_col),
+                          'values': [[nc.formatear_telefono_contactos(nuevo_tel)]]}],
                         value_input_option='RAW',
                     )
                     contacto_actualizado = True
@@ -3915,7 +3932,7 @@ async function cargarContacto() {
 function renderContacto(c) {
   const tienda = c.TIENDA || c.Tienda || c.Nombre || '(Sin nombre)';
   const ciudad = c.CIUDAD || c.Ciudad || '';
-  const tel    = c.TELÉFONO || c['Teléfono'] || c.TELEFONO || c.Telefono || '';
+  const tel    = c.CONTACTO || c.TELÉFONO || c['Teléfono'] || c.TELEFONO || c.Telefono || '';
   const maps   = c.Maps || c.MAPS || '';
   const link   = c.Link || c.LINK || '';
   const cat    = c['CATEGORIA '] || c.CATEGORIA || c.Categoria || '';
@@ -4146,7 +4163,7 @@ async function guardar() {
 const CONCLUSIONES_CATALOGO = ['pedido', 'revisara el catalogo'];
 
 function telContacto(c) {
-  return c ? (c['TELÉFONO'] || c['Teléfono'] || c.TELEFONO || c.Telefono || '') : '';
+  return c ? (c.CONTACTO || c['TELÉFONO'] || c['Teléfono'] || c.TELEFONO || c.Telefono || '') : '';
 }
 
 async function encolarCatalogo(tienda) {
