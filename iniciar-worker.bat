@@ -11,6 +11,20 @@ REM Armar el envio para esta ventana y apuntar el panel (heartbeat).
 set WA_ENVIO_ARMADO=1
 REM Contrasena de envio: si no esta en el entorno, se pide una vez.
 if "%WA_ENVIO_PASSWORD%"=="" set /p WA_ENVIO_PASSWORD=Contrasena de envio:
+REM Los dos tokens se leen del archivo si existe. Copiarlos a mano fallo tres
+REM veces seguidas: son dos cadenas de 64 hex casi identicas a la vista, y
+REM confundirlas da el mismo "no autorizado" en el panel que en el heartbeat.
+set "ARCHIVO_TOKENS=%USERPROFILE%\tokens-panelnioval.txt"
+if exist "%ARCHIVO_TOKENS%" (
+    for /f "usebackq tokens=1,* delims==" %%A in ("%ARCHIVO_TOKENS%") do (
+        if /i "%%A"=="WORKER_TOKEN" set "WORKER_TOKEN=%%B"
+        if /i "%%A"=="PANEL_DASHBOARD_TOKEN" set "PANEL_DASHBOARD_TOKEN=%%B"
+    )
+    echo Tokens leidos de %ARCHIVO_TOKENS%
+) else (
+    echo No se encontro %ARCHIVO_TOKENS%; se pediran a mano.
+)
+
 REM WORKER_TOKEN es obligatorio: el heartbeat devuelve 401 sin el.
 :pedir_worker_token
 if "%WORKER_TOKEN%"=="" set /p WORKER_TOKEN=Token del worker:
