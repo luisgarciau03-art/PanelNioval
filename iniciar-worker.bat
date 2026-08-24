@@ -28,6 +28,13 @@ if exist "%ARCHIVO_TOKENS%" (
 )
 
 REM WORKER_TOKEN es obligatorio: el heartbeat devuelve 401 sin el.
+REM Desatendido y sin token: fallar rapido. Un set /p sin consola se cuelga
+REM esperando una respuesta que nadie va a teclear.
+if "%WORKER_SIN_NAVEGADOR%"=="1" if "%WORKER_TOKEN%"=="" (
+    echo ERROR: falta WORKER_TOKEN y no hay consola para pedirlo.
+    echo Revisa que exista %ARCHIVO_TOKENS%
+    exit /b 1
+)
 :pedir_worker_token
 if "%WORKER_TOKEN%"=="" set /p WORKER_TOKEN=Token del worker:
 if "%WORKER_TOKEN%"=="" (
@@ -40,6 +47,9 @@ REM Abrir el formulario del panel en el navegador.
 REM Sin ?token= el navegador recibe 401 {"ok":false,"error":"no autorizado"}:
 REM el gate del panel no distingue un navegador de cualquier otro cliente.
 REM Basta con entrar una vez con el token; queda en la sesion del navegador.
+REM En modo desatendido (Tarea Programada) no hay nadie para responder un
+REM prompt ni para mirar un navegador: se salta ambos.
+if "%WORKER_SIN_NAVEGADOR%"=="1" goto sin_navegador
 if "%PANEL_DASHBOARD_TOKEN%"=="" set /p PANEL_DASHBOARD_TOKEN=Token del panel (Enter para abrir sin autenticar): 
 if "%PANEL_DASHBOARD_TOKEN%"=="" (
     echo Abriendo el panel SIN token: veras "no autorizado" hasta que entres con el.
@@ -48,6 +58,10 @@ if "%PANEL_DASHBOARD_TOKEN%"=="" (
     echo Abriendo el panel autenticado en el navegador...
     start "" "%PANEL_URL%/formulario?token=%PANEL_DASHBOARD_TOKEN%"
 )
+goto tras_navegador
+:sin_navegador
+echo Modo desatendido: no se abre el navegador.
+:tras_navegador
 
 echo.
 echo Iniciando worker de catalogo en modo CONTINUO...
