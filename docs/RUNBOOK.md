@@ -37,10 +37,12 @@ setx TELEGRAM_CHAT_ID "5838212022"
 "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="C:\Users\PC 1\ChromeSeleniumProfile" --profile-directory=Default https://web.whatsapp.com
 #   → escanea el QR, espera a que carguen TODOS tus chats, y CIERRA esa ventana.
 
-# 4. Instalar como Tarea Programada (cada 15 min):
-.\instalar-worker.ps1 -IntervaloMinutos 15
+# 4. OPERACION NORMAL: doble clic en iniciar-worker.bat y dejar la ventana abierta.
+#    Lee los tokens de tokens-panelnioval.txt, fija PANEL_URL, limpia locks y
+#    Chrome huerfanos, abre el panel autenticado y procesa la cola cada 15s.
+#    Cerrar con Ctrl+C, NO con la X: con la X Chrome queda huerfano.
 
-# 5. Probar a mano (una corrida):
+# 5. Probar a mano (una corrida suelta, sin el .bat):
 python worker_catalogo_run.py
 
 # 5b. MODO CONTINUO (recomendado para envío casi inmediato): abre WhatsApp una vez
@@ -49,9 +51,31 @@ python worker_catalogo_run.py --loop
 #     (intervalo configurable con  setx WORKER_LOOP_SECS 15  ; salir con Ctrl+C)
 ```
 
-Quitar la tarea: `Unregister-ScheduledTask -TaskName NIOVAL_WorkerCatalogo -Confirm:$false`.
+## Tarea Programada: instalada pero DESACTIVADA
 
-- **Modo continuo vs Tarea Programada:** en modo continuo (`--loop`) el envío ocurre a los segundos de cerrar la llamada (ideal con el validador pre-envío). La Tarea Programada (cada 15 min) sirve como respaldo si prefieres no dejar una ventana abierta. No uses ambos a la vez con la misma sesión (el perfil de Chrome no admite 2 instancias).
+**Decisión del owner (2026-08-24): la operación es manual, con `iniciar-worker.bat`.**
+La tarea `NIOVAL_WorkerCatalogo` sigue registrada pero desactivada; su definición está
+respaldada en `respaldos/2026-08-22-tarea-worker/`.
+
+```powershell
+Enable-ScheduledTask  -TaskName NIOVAL_WorkerCatalogo    # reactivar
+Disable-ScheduledTask -TaskName NIOVAL_WorkerCatalogo    # desactivar
+Unregister-ScheduledTask -TaskName NIOVAL_WorkerCatalogo -Confirm:$false   # quitar
+```
+
+Por qué se desactivó: corría cada 15 minutos lanzando `worker_catalogo_run.py`
+**directamente**, sin pasar por el `.bat`, así que solo heredaba las variables
+persistidas con `setx`. Sin `WORKER_TOKEN` ni `PANEL_URL` el heartbeat fallaba en
+silencio y el panel mostraba el worker como muerto — pero el gate de envío sí se
+cumplía, o sea que **enviaba catálogos sin que nadie se enterara**. Además dejaba locks
+y procesos de Chrome huérfanos que bloqueaban las corridas manuales.
+
+`instalar-worker.ps1` ya está corregido: la tarea ejecutaría el `.bat` (mismo camino que
+en manual) y se niega a instalarse si falta algo. No la reactives sin decidir antes que
+quieres envíos automáticos.
+
+**Nunca las dos a la vez:** el perfil de Chrome no admite dos instancias.
+
 - **Detener el envío:** la autorización (`WA_ENVIO_ARMADO`) se evalúa al ARRANCAR el worker; para frenar un worker ya corriendo, **ciérralo (Ctrl+C / matar el proceso)** — cambiar la env var a media corrida no lo detiene.
 
 ### Notas de operación (aprendidas en la prueba real 2026-08-15)
