@@ -80,3 +80,62 @@ class TestAdquirirLock:
         assert lock_aislado.is_file()
         w._liberar_lock()
         assert not lock_aislado.is_file()
+
+
+class TestCerrarChromesHuerfanos:
+    """El bloque finally hace driver.quit(), pero no corre si el proceso muere de
+    golpe (cerrar la consola con la X, apagon, kill). Chrome sobrevive sujetando
+    el perfil y la siguiente corrida falla con SessionNotCreatedException
+    "Chrome instance exited", que no dice nada de la causa. En la maquina del
+    owner quedaron 12 huerfanos de dos dias atras.
+    """
+
+    PERFIL = "C:/Users/PC 1/ChromeSeleniumProfile"
+
+    # Salida tipica de wmic: cabecera, un chrome del perfil, y uno del operador.
+    CSV = (
+        "Node,CommandLine,ProcessId\n"
+        'EQUIPO,"chrome.exe --user-data-dir=C:/Users/PC 1/ChromeSeleniumProfile",2132\n'
+        "EQUIPO,chrome.exe --profile-directory=Default,9999\n"
+    )
+
+    def test_no_hace_nada_fuera_de_windows(self, monkeypatch):
+        monkeypatch.setattr(os, "name", "posix")
+        llamadas = []
+        monkeypatch.setattr(w.subprocess, "run", lambda *a, **k: llamadas.append(a))
+        assert w._cerrar_chromes_huerfanos(self.PERFIL) == 0
+        assert llamadas == []
+
+    def test_cierra_solo_los_del_perfil(self, monkeypatch):
+        """El Chrome del operador (PID 9999) no debe tocarse."""
+        monkeypatch.setattr(os, "name", "nt")
+        matados = []
+
+        def falso_run(cmd, **kwargs):
+            if cmd[0] == "wmic":
+                return type("R", (), {"stdout": self.CSV})()
+            if cmd[0] == "taskkill":
+                matados.append(cmd[2])
+            return type("R", (), {"stdout": ""})()
+
+        monkeypatch.setattr(w.subprocess, "run", falso_run)
+        assert w._cerrar_chromes_huerfanos(self.PERFIL) == 1
+        assert matados == ["2132"]          # solo el del perfil
+        assert "9999" not in matados        # el del operador, intacto
+
+    def test_devuelve_cero_si_no_hay_huerfanos(self, monkeypatch):
+        monkeypatch.setattr(os, "name", "nt")
+        monkeypatch.setattr(
+            w.subprocess, "run",
+            lambda cmd, **k: type("R", (), {"stdout": "Node,CommandLine,ProcessId\n"})())
+        assert w._cerrar_chromes_huerfanos(self.PERFIL) == 0
+
+    def test_wmic_ausente_no_revienta(self, monkeypatch):
+        """Sin wmic el worker debe seguir arrancando, no caerse."""
+        monkeypatch.setattr(os, "name", "nt")
+
+        def explota(*a, **k):
+            raise OSError("wmic no encontrado")
+
+        monkeypatch.setattr(w.subprocess, "run", explota)
+        assert w._cerrar_chromes_huerfanos(self.PERFIL) == 0

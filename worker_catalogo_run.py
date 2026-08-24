@@ -96,6 +96,51 @@ def _pid_del_lock():
         return 0
 
 
+def _cerrar_chromes_huerfanos(perfil):
+    """Cierra los Chrome que quedaron agarrados al perfil de Selenium.
+
+    El bloque finally hace driver.quit(), pero no corre si el proceso muere de
+    golpe: cerrar la consola con la X, un apagon o un kill. Entonces Chrome
+    sobrevive sujetando el perfil, y la siguiente corrida falla con
+    SessionNotCreatedException "Chrome instance exited", que no dice nada sobre
+    la causa real. Medido en la maquina del owner: 12 procesos huerfanos de dos
+    dias atras.
+
+    Solo se tocan los que citan ESTE perfil en su linea de comandos; el Chrome
+    normal del operador no se toca. Windows unicamente: el worker corre ahi.
+    """
+    if os.name != "nt":
+        return 0
+    marca = os.path.basename(os.path.normpath(perfil))
+    try:
+        salida = subprocess.run(
+            ["wmic", "process", "where", "name='chrome.exe'", "get", "ProcessId,CommandLine", "/format:csv"],
+            capture_output=True, text=True, timeout=30,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return 0
+
+    pids = []
+    for linea in salida.splitlines():
+        if marca in linea:
+            partes = linea.rsplit(",", 1)
+            if len(partes) == 2 and partes[1].strip().isdigit():
+                pids.append(partes[1].strip())
+    if not pids:
+        return 0
+
+    print(f"[worker] {len(pids)} Chrome huerfanos del perfil; cerrandolos.")
+    cerrados = 0
+    for pid in pids:
+        try:
+            subprocess.run(["taskkill", "/PID", pid, "/F", "/T"],
+                           capture_output=True, timeout=15)
+            cerrados += 1
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return cerrados
+
+
 def _adquirir_lock():
     """Evita dos corridas solapadas. Usa creación atómica ('x').
 
@@ -215,6 +260,7 @@ def main():
         archivos = ec.IMAGENES
 
         ws = _abrir_ws_envios(client)
+        _cerrar_chromes_huerfanos(ec.FALLBACK_PROFILE_DIR)
         driver = ec.iniciar_driver(ec.FALLBACK_PROFILE_DIR, "Default")
         driver.get("https://web.whatsapp.com/")
         print("[worker] Abre WhatsApp Web y escanea el QR si corresponde.")
