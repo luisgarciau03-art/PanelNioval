@@ -3352,8 +3352,26 @@ def encolar_envio_catalogo(tienda, telefono, referencia, conclusion):
     numero_valido = nc.validar_numero(telefono)
     ws = _abrir_ws_envios()
     filas = ws.get_all_values()
-    if nc.indice_por_fila_respuesta(filas, referencia) is not None:
-        return {'ok': True, 'estado': 'ya_encolado', 'numero_valido': numero_valido}
+    idx = nc.indice_por_fila_respuesta(filas, referencia)
+    if idx is not None:
+        # La idempotencia mira solo `fila_respuesta`, no el estado, asi que un
+        # contacto ya ENVIADO tambien cae aqui. Devolver un 'ya_encolado' pelado
+        # hacia que el panel dijera "Catalogo encolado para envio" cuando en
+        # realidad no iba a pasar nada: el operador se quedaba esperando un envio
+        # que ya se habia hecho horas antes. Se devuelve el estado real para que
+        # el mensaje pueda decir que ocurrio y cuando.
+        existente = filas[idx - 1] if idx - 1 < len(filas) else []
+        def _col(nombre):
+            i = nc.COLUMNAS_ENVIOS.index(nombre)
+            return existente[i] if i < len(existente) else ''
+        return {
+            'ok': True,
+            'estado': 'ya_encolado',
+            'estado_actual': _col('estado'),
+            'desde': _col('timestamp_estado'),
+            'envio_row': idx,
+            'numero_valido': numero_valido,
+        }
     ws.append_row(
         nc.nueva_fila_envio(tienda, telefono, referencia, conclusion),
         value_input_option='RAW',
@@ -4190,7 +4208,16 @@ async function encolarCatalogo(tienda) {
       })
     });
     const d = await r.json();
-    if (d && d.ok) nota.textContent = '📖 Catálogo encolado para envío (' + (d.estado || 'PENDIENTE') + ').';
+    if (d && d.ok && d.estado === 'ya_encolado') {
+      const est = (d.estado_actual || '').toUpperCase();
+      const cuando = d.desde ? (' el ' + d.desde) : '';
+      if (est === 'ENVIADO')          nota.textContent = '✅ Ya se envió' + cuando + '. No se encola de nuevo.';
+      else if (est === 'FALLO')       nota.textContent = '⚠️ Hubo un fallo' + cuando + '. Usa Reintentar para volver a encolarlo.';
+      else if (est === 'NUMERO_INVALIDO') nota.textContent = '⚠️ Número inválido' + cuando + '. Corrige el número y reintenta.';
+      else                            nota.textContent = '📖 Ya está en la cola (' + (est || 'PENDIENTE') + cuando + ').';
+    } else if (d && d.ok) {
+      nota.textContent = '📖 Catálogo encolado para envío (' + (d.estado || 'PENDIENTE') + ').';
+    }
     else nota.textContent = '⚠️ No se pudo encolar el catálogo.';
   } catch(e) { nota.textContent = '⚠️ No se pudo encolar el catálogo (sin conexión).'; }
 }

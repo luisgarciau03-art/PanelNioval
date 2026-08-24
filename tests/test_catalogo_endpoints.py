@@ -75,6 +75,40 @@ class TestEncolar:
         assert d["ok"] is True and d["estado"] == "ya_encolado"
         ws.append_row.assert_not_called()
 
+    def test_ya_encolado_informa_el_estado_real(self, client, monkeypatch):
+        """El operador tiene que saber que paso, no un 'ya_encolado' pelado.
+
+        La idempotencia mira solo `fila_respuesta`, no el estado, asi que un
+        contacto ya ENVIADO tambien cae aqui. El panel decia "Catalogo encolado
+        para envio" cuando en realidad no iba a pasar nada, y el operador se
+        quedaba esperando un envio hecho horas antes.
+        """
+        ws = MagicMock()
+        fila = ["ts", "A", "+525512345678", "7", "Pedido", "ENVIADO", "0",
+                "24/08/2026 16:17:40", "mensajes y archivos enviados"]
+        ws.get_all_values.return_value = [nc.COLUMNAS_ENVIOS, fila]
+        monkeypatch.setattr(app, "get_gs_client", lambda: _fake_client(ws))
+        r = client.post("/api/catalogo/encolar", json={
+            "tienda": "A", "telefono": "5512345678", "referencia": 7, "conclusion": "Pedido",
+        })
+        d = r.get_json()
+        assert d["estado"] == "ya_encolado"
+        assert d["estado_actual"] == "ENVIADO"
+        assert d["desde"] == "24/08/2026 16:17:40"
+        assert d["envio_row"] == 2
+        ws.append_row.assert_not_called()
+
+    def test_ya_encolado_distingue_fallo_de_enviado(self, client, monkeypatch):
+        """Un FALLO se reintenta; un ENVIADO no. El mensaje debe diferenciarlos."""
+        ws = MagicMock()
+        fila = ["ts", "A", "+525512345678", "7", "Pedido", "FALLO", "1", "ts", "sesion invalida"]
+        ws.get_all_values.return_value = [nc.COLUMNAS_ENVIOS, fila]
+        monkeypatch.setattr(app, "get_gs_client", lambda: _fake_client(ws))
+        r = client.post("/api/catalogo/encolar", json={
+            "tienda": "A", "telefono": "5512345678", "referencia": 7, "conclusion": "Pedido",
+        })
+        assert r.get_json()["estado_actual"] == "FALLO"
+
     def test_falta_tienda_o_referencia_400(self, client, monkeypatch):
         monkeypatch.setattr(app, "get_gs_client", lambda: _fake_client(MagicMock()))
         r = client.post("/api/catalogo/encolar", json={"telefono": "5512345678", "conclusion": "Pedido"})
