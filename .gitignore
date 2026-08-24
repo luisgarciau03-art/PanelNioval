@@ -5,6 +5,10 @@ __pycache__/
 .env
 .env.*
 *.env
+tokens-*.txt
+*.url
+# Tokens del worker y accesos directos con ?token= en la URL: viven en la
+# raiz del proyecto para tenerlo todo junto, asi que se ignoran si o si.
 # Cubre nombres sueltos tipo Envirioment.env: .env y .env.* no los atrapan.
 !.env.example
 # Debug de envio_catalogo.py: screenshots/HTML con PII de clientes (no versionar)

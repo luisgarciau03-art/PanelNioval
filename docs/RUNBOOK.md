@@ -19,10 +19,19 @@ Guía operativa para el owner. Arquitectura: **panel en Railway** + **worker loc
 # 2. Variables de entorno persistentes (una vez):
 setx WA_ENVIO_PASSWORD "<tu-contraseña>"   # gate de envío
 setx WA_ENVIO_ARMADO 1                      # 1 = autoriza envío automático; 0 = pausa
-setx WORKER_TOKEN "<token del worker>"      # obligatorio: el heartbeat devuelve 401 sin el
 setx TELEGRAM_TOKEN "<token rotado>"        # opcional (reportes)
 setx TELEGRAM_CHAT_ID "5838212022"
-setx PANEL_URL "https://<tu-app>.up.railway.app"   # opcional (heartbeat)
+
+# WORKER_TOKEN y PANEL_DASHBOARD_TOKEN NO se ponen con setx: iniciar-worker.bat
+# los lee de tokens-panelnioval.txt en la raiz del proyecto, con el formato
+# NOMBRE=valor. Copiarlos a mano fallo tres veces seguidas: son dos cadenas de
+# 64 hex casi identicas y confundirlas da el mismo "no autorizado" en el panel
+# que en el heartbeat. El archivo esta en .gitignore (tokens-*.txt).
+#
+# Para regenerarlo desde el servidor:
+#   ssh root@155.138.200.66 'grep -E "^(PANEL_DASHBOARD_TOKEN|WORKER_TOKEN)=" /srv/panel/secretos/.env' > tokens-panelnioval.txt
+#
+# PANEL_URL ya no hace falta: el .bat lo fija a https://panelnioval.duckdns.org.
 
 # 3. Iniciar sesión de WhatsApp Web en el perfil del worker (SOLO la primera vez o si expira):
 "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="C:\Users\PC 1\ChromeSeleniumProfile" --profile-directory=Default https://web.whatsapp.com
@@ -94,7 +103,7 @@ python tools/inspeccionar_contactos.py   # confirma que la columna T está libre
 ## Gates del owner pendientes (seguridad)
 
 - **Rotar** `TELEGRAM_TOKEN` (bot `8404009072`, expuesto en ~14 copias del historial) y la **Google Places key**; cargarlas en `/srv/panel/secretos/.env` y `/srv/bruce/secretos/.env` en el VPS (ya no en Railway).
-- **Eliminar el servicio de Railway** (`https://web-production-1d453.up.railway.app/`): corre sin `PANEL_DASHBOARD_TOKEN` definida ahí, así que sirve el panel abierto ahora mismo. `PANEL_DASHBOARD_TOKEN` dejó de ser opcional — la app no arranca sin él (ver § Operación en el VPS) — pero mientras Railway siga vivo, esa instancia vieja queda expuesta independientemente del VPS.
+- ~~Eliminar el servicio de Railway~~ — **HECHO** (2026-08-19). `https://web-production-1d453.up.railway.app/` devuelve 404 en la raíz y en `/api/prospectos/stats`. Antes servía el panel abierto sin token: esa exposición está cerrada.
 - **Corrida real de WhatsApp** (T5.5): 1 llamada de prueba end-to-end con un número propio.
 
 ## Operación en el VPS (desde 2026-08-17)

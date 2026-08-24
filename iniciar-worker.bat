@@ -14,7 +14,9 @@ if "%WA_ENVIO_PASSWORD%"=="" set /p WA_ENVIO_PASSWORD=Contrasena de envio:
 REM Los dos tokens se leen del archivo si existe. Copiarlos a mano fallo tres
 REM veces seguidas: son dos cadenas de 64 hex casi identicas a la vista, y
 REM confundirlas da el mismo "no autorizado" en el panel que en el heartbeat.
-set "ARCHIVO_TOKENS=%USERPROFILE%\tokens-panelnioval.txt"
+set "ARCHIVO_TOKENS=%~dp0tokens-panelnioval.txt"
+REM Respaldo: ubicacion anterior, por si el archivo aun no se ha movido.
+if not exist "%ARCHIVO_TOKENS%" set "ARCHIVO_TOKENS=%USERPROFILE%\tokens-panelnioval.txt"
 if exist "%ARCHIVO_TOKENS%" (
     for /f "usebackq tokens=1,* delims==" %%A in ("%ARCHIVO_TOKENS%") do (
         if /i "%%A"=="WORKER_TOKEN" set "WORKER_TOKEN=%%B"
