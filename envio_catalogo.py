@@ -36,11 +36,37 @@ SPREADSHEET_ID_TELEFONOS = '1oEtAiYaYVdOnEum3tbp_BminBUdj06JzXqJhaOVQFlk'
 SHEET_NAME_TELEFONOS = 'BD CONTACTOS'
 SHEET_NAME_MENSAJE = 'Mensajes'
 
-PDF_LOCAL_PATH = 'C:/Users/PC 1/Files mensajes'
+# Rutas por usuario, no de una maquina concreta. Estaban fijadas a
+# 'C:/Users/PC 1/...', asi que en cualquier otra PC Chrome no podia crear el
+# perfil y el worker moria con "cannot create default profile directory".
+# En la PC original ~ es C:/Users/PC 1, o sea que resuelven a lo mismo.
+_INICIO = os.path.expanduser("~")
+
+PDF_LOCAL_PATH = os.environ.get(
+    "NIOVAL_ARCHIVOS_DIR", os.path.join(_INICIO, "Files mensajes"))
 IMAGENES = ['IMG1.jpg', 'Video1.mp4', 'CATÁLOGO NIOVAL.pdf', 'LPNIOVAL.pdf']
 
-FALLBACK_PROFILE_DIR = 'C:/Users/PC 1/ChromeSeleniumProfile'
-CHROME_BINARY = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
+FALLBACK_PROFILE_DIR = os.environ.get(
+    "NIOVAL_CHROME_PROFILE", os.path.join(_INICIO, "ChromeSeleniumProfile"))
+
+def _ubicar_chrome():
+    """Primer chrome.exe que exista entre las rutas habituales de Windows.
+
+    Si no aparece ninguno se devuelve '' y Selenium lo busca por su cuenta:
+    crear_opciones solo fija binary_location cuando el archivo existe.
+    """
+    partes = ("Google", "Chrome", "Application", "chrome.exe")
+    candidatos = [os.environ.get("NIOVAL_CHROME_BINARY", "")]
+    for base in (os.environ.get("ProgramFiles", ""), os.environ.get("ProgramFiles(x86)", ""), os.environ.get("LOCALAPPDATA", "")):
+        if base:
+            candidatos.append(os.path.join(base, *partes))
+    for ruta in candidatos:
+        if ruta and os.path.isfile(ruta):
+            return ruta
+    return ""
+
+
+CHROME_BINARY = _ubicar_chrome()
 
 T_CHAT_LOAD = 10
 WAIT_TIMEOUT = 30
