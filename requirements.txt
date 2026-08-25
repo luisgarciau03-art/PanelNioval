@@ -1,10 +1,25 @@
+# Dependencias del panel Flask. Verificado con un barrido de imports sobre el
+# codigo y comprobando que se cargan de verdad al importar app.py.
 flask>=3.0.0
-flask-cors>=4.0.0
 gspread>=5.12.0
 google-auth>=2.23.0
 google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.1.1
 google-api-python-client>=2.100.0
 googlemaps>=4.10.0
-pandas>=2.0.0
 gunicorn>=21.0.0
+
+# requests se usa DIRECTAMENTE en app.py, envio_catalogo.py, worker_catalogo_run.py
+# y tools/smoke_panel.py. Estaba sin declarar y funcionaba solo porque gspread y
+# google-auth lo arrastran: el dia que alguna cambie de cliente HTTP, el panel
+# deja de arrancar sin que nadie haya tocado nada.
+requests>=2.31.0
+
+# RETIRADOS (no los importa nadie, comprobado con ast sobre todos los .py y con
+# sys.modules tras importar app.py):
+#   pandas      - el mas pesado de la lista; ni pandas ni numpy se cargan.
+#                 CLAUDE.md le atribuia los ~2 min del import en frio; son de
+#                 googleapiclient + Defender.
+#   flask-cors  - nunca se importa, asi que no estaba aplicando CORS a nada.
+# google-auth-oauthlib y google-auth-httplib2 SI se quedan: no se importan
+# directamente pero googleapiclient los carga en runtime.
