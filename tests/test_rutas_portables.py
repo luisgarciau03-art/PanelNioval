@@ -1,8 +1,12 @@
-"""Las rutas del worker deben seguir al usuario, no a una maquina concreta.
+"""Las rutas del worker no deben depender de una maquina concreta.
 
 PDF_LOCAL_PATH y FALLBACK_PROFILE_DIR estaban fijadas a 'C:/Users/PC 1/...'.
 Al instalar el proyecto en otra PC, Chrome no podia crear el perfil y el worker
 moria con SessionNotCreatedException: "cannot create default profile directory".
+
+Se usan barras normales en las rutas de prueba a proposito: Windows las acepta,
+y ambos lados de cada assert se construyen con el mismo os.path.join, asi que la
+comparacion no depende del separador.
 """
 import importlib
 import os
@@ -10,6 +14,10 @@ import os
 import pytest
 
 import envio_catalogo as ec
+
+HOME_DELL = "C:/Users/DELL"
+HOME_OWNER = "C:/Users/PC 1"
+HOME_OTRO = "C:/Users/OTRO"
 
 
 def _recargar(monkeypatch, inicio=None, **entorno):
@@ -30,28 +38,47 @@ def _restaurar():
     importlib.reload(ec)
 
 
-class TestRutasSiguenAlUsuario:
+class TestPerfilDeChrome:
+    """El perfil sigue al usuario: cada PC usa el suyo."""
+
     def test_otra_pc_otra_carpeta(self, monkeypatch):
         """El caso reportado: instalado en una PC cuyo usuario es DELL."""
-        m = _recargar(monkeypatch, inicio=r"C:\Users\DELL")
-        assert m.FALLBACK_PROFILE_DIR == os.path.join(r"C:\Users\DELL", "ChromeSeleniumProfile")
-        assert m.PDF_LOCAL_PATH == os.path.join(r"C:\Users\DELL", "Files mensajes")
+        m = _recargar(monkeypatch, inicio=HOME_DELL)
+        assert m.FALLBACK_PROFILE_DIR == os.path.join(HOME_DELL, "ChromeSeleniumProfile")
         assert "PC 1" not in m.FALLBACK_PROFILE_DIR
-        assert "PC 1" not in m.PDF_LOCAL_PATH
 
     def test_la_pc_original_resuelve_igual_que_antes(self, monkeypatch):
         """Sin regresion en la maquina del owner: ~ es C:/Users/PC 1."""
-        m = _recargar(monkeypatch, inicio=r"C:\Users\PC 1")
-        assert m.FALLBACK_PROFILE_DIR == os.path.join(r"C:\Users\PC 1", "ChromeSeleniumProfile")
-        assert m.PDF_LOCAL_PATH == os.path.join(r"C:\Users\PC 1", "Files mensajes")
+        m = _recargar(monkeypatch, inicio=HOME_OWNER)
+        assert m.FALLBACK_PROFILE_DIR == os.path.join(HOME_OWNER, "ChromeSeleniumProfile")
 
-    def test_las_env_vars_mandan(self, monkeypatch):
-        """Un disco compartido o una ruta a medida deben poder imponerse."""
-        m = _recargar(monkeypatch, inicio=r"C:\Users\DELL",
-                      NIOVAL_CHROME_PROFILE=r"D:\perfiles\wa",
-                      NIOVAL_ARCHIVOS_DIR=r"D:\catalogo")
-        assert m.FALLBACK_PROFILE_DIR == r"D:\perfiles\wa"
-        assert m.PDF_LOCAL_PATH == r"D:\catalogo"
+    def test_la_env_var_manda(self, monkeypatch):
+        m = _recargar(monkeypatch, inicio=HOME_DELL, NIOVAL_CHROME_PROFILE="D:/perfiles/wa")
+        assert m.FALLBACK_PROFILE_DIR == "D:/perfiles/wa"
+
+
+class TestArchivosDelCatalogo:
+    """Los archivos viven en Files/ dentro del proyecto (decision del owner).
+
+    Al ser relativa al propio modulo, la ruta es la misma en cualquier PC donde
+    se clone, sin depender del nombre de usuario.
+    """
+
+    def test_apunta_a_Files_dentro_del_proyecto(self, monkeypatch):
+        m = _recargar(monkeypatch, inicio=HOME_DELL)
+        proyecto = os.path.dirname(os.path.abspath(m.__file__))
+        assert m.PDF_LOCAL_PATH == os.path.join(proyecto, "Files")
+
+    def test_no_depende_del_usuario(self, monkeypatch):
+        """El bug original: la ruta cambiaba de PC y no se encontraba nada."""
+        a = _recargar(monkeypatch, inicio=HOME_DELL).PDF_LOCAL_PATH
+        b = _recargar(monkeypatch, inicio=HOME_OTRO).PDF_LOCAL_PATH
+        assert a == b
+        assert "DELL" not in a and "OTRO" not in a
+
+    def test_la_env_var_sigue_mandando(self, monkeypatch):
+        m = _recargar(monkeypatch, inicio=HOME_DELL, NIOVAL_ARCHIVOS_DIR="D:/catalogo")
+        assert m.PDF_LOCAL_PATH == "D:/catalogo"
 
 
 class TestUbicarChrome:
@@ -62,15 +89,15 @@ class TestUbicarChrome:
         assert ec._ubicar_chrome() == ""
 
     def test_la_env_var_tiene_prioridad(self, monkeypatch):
-        monkeypatch.setenv("NIOVAL_CHROME_BINARY", r"D:\chrome\chrome.exe")
+        monkeypatch.setenv("NIOVAL_CHROME_BINARY", "D:/chrome/chrome.exe")
         monkeypatch.setattr(os.path, "isfile", lambda p: True)
-        assert ec._ubicar_chrome() == r"D:\chrome\chrome.exe"
+        assert ec._ubicar_chrome() == "D:/chrome/chrome.exe"
 
     def test_encuentra_el_que_existe(self, monkeypatch):
         """Con Chrome solo en LOCALAPPDATA (instalacion por usuario)."""
         monkeypatch.delenv("NIOVAL_CHROME_BINARY", raising=False)
-        monkeypatch.setenv("LOCALAPPDATA", r"C:\Users\DELL\AppData\Local")
-        esperado = os.path.join(r"C:\Users\DELL\AppData\Local",
+        monkeypatch.setenv("LOCALAPPDATA", "C:/Users/DELL/AppData/Local")
+        esperado = os.path.join("C:/Users/DELL/AppData/Local",
                                 "Google", "Chrome", "Application", "chrome.exe")
         monkeypatch.setattr(os.path, "isfile", lambda p: p == esperado)
         assert ec._ubicar_chrome() == esperado
