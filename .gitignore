@@ -7,6 +7,9 @@ __pycache__/
 *.env
 tokens-*.txt
 *.url
+# Archivos del catalogo (~124 MB de PDF y video): viven en Files/ dentro del
+# proyecto para tenerlo todo junto, pero NO se versionan.
+Files/
 # Tokens del worker y accesos directos con ?token= en la URL: viven en la
 # raiz del proyecto para tenerlo todo junto, asi que se ignoran si o si.
 # Cubre nombres sueltos tipo Envirioment.env: .env y .env.* no los atrapan.

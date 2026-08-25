@@ -14,3 +14,6 @@ venv/
 debug_invalid_*
 debug_timeout_*
 adjuntar_fail.png
+# Archivos del catalogo: 124 MB que solo usa el worker en la PC del owner.
+# En la imagen del panel no pintan nada y la engordarian un 30%.
+Files/

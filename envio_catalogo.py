@@ -42,8 +42,13 @@ SHEET_NAME_MENSAJE = 'Mensajes'
 # En la PC original ~ es C:/Users/PC 1, o sea que resuelven a lo mismo.
 _INICIO = os.path.expanduser("~")
 
+# Los archivos viven en Files/ dentro del proyecto (decision del owner): la
+# ruta es la misma en cualquier PC donde se clone, sin depender del nombre de
+# usuario. No se versionan: son ~124 MB de PDF y video, y estan en .gitignore
+# y .dockerignore.
+_PROYECTO = os.path.dirname(os.path.abspath(__file__))
 PDF_LOCAL_PATH = os.environ.get(
-    "NIOVAL_ARCHIVOS_DIR", os.path.join(_INICIO, "Files mensajes"))
+    "NIOVAL_ARCHIVOS_DIR", os.path.join(_PROYECTO, "Files"))
 IMAGENES = ['IMG1.jpg', 'Video1.mp4', 'CATÁLOGO NIOVAL.pdf', 'LPNIOVAL.pdf']
 
 FALLBACK_PROFILE_DIR = os.environ.get(
