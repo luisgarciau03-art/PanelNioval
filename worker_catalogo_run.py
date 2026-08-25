@@ -260,6 +260,11 @@ def main():
         archivos = ec.IMAGENES
 
         ws = _abrir_ws_envios(client)
+        # El perfil tiene que existir antes de arrancar Chrome. envio_catalogo.py
+        # lo creaba en su propio flujo, pero el worker iba directo a iniciar_driver
+        # y en una PC recien instalada eso da "cannot create default profile
+        # directory". Aqui no se noto porque la carpeta ya estaba de antes.
+        os.makedirs(ec.FALLBACK_PROFILE_DIR, exist_ok=True)
         _cerrar_chromes_huerfanos(ec.FALLBACK_PROFILE_DIR)
         driver = ec.iniciar_driver(ec.FALLBACK_PROFILE_DIR, "Default")
         driver.get("https://web.whatsapp.com/")
