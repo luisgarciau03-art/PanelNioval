@@ -547,7 +547,7 @@ Se revisaron las ~60 herramientas de `claude-ads` contra el contenido de este pl
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
 | T3.0 | Tarea Cero: rama, respaldo y reproducción | **HECHA** | `docs/investigacion/2026-08-27-reproduccion-bugs-importador.md` · repro 20 vs 10 · B4 `done` con 0 filas · 10/20 sondeos `idle` · baseline **230 passed** · respaldo `docs/auditoria/respaldos/2026-08-27/` (6 archivos) | 2026-08-27 |
-| T3.1 | Confirmar los 9 defectos con experimento | PENDIENTE | | |
+| T3.1 | Confirmar los 9 defectos con experimento | **HECHA** | `docs/investigacion/...-reproduccion-bugs-importador.md` §7 · 9/9 CONFIRMADOS · **4 defectos nuevos** (B10 guard por proceso, B11 filtro renumera, B12 insignias rancias, B13 estado muerto) · **2 hipotesis DESCARTADAS** (doble init, `if lugares: break`) · B9 sube a severidad ALTA (XSS almacenado autoservicio) | 2026-08-27 |
 | T3.2 | Separar los cuatro contadores (B1, B2) | PENDIENTE | | |
 | T3.3 | Deduplicar entre categorías (B3) | PENDIENTE | | |
 | T3.4 | Fallo de escritura visible (B4) | PENDIENTE | | |
@@ -557,4 +557,4 @@ Se revisaron las ~60 herramientas de `claude-ads` contra el contenido de este pl
 | T3.8 | Verificación de extremo a extremo | PENDIENTE | | |
 | T3.9 | Cierre: docs, PR, handoff | PENDIENTE | | |
 
-**Avance del plan: 1 / 10 tareas (10 %)**
+**Avance del plan: 2 / 10 tareas (20 %)**

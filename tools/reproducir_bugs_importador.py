@@ -256,7 +256,9 @@ def modo_workers():
         print("=" * 72)
         print("REPRO C - B5: el estado vive en memoria de proceso")
         print("=" * 72)
-        print("  Dos procesos Flask independientes en %d y %d." % (puertos[0], puertos[1]))
+        print("  Dos procesos Flask independientes:")
+        for puerto, pr in zip(puertos, procesos):
+            print("    puerto %d -> PID %d" % (puerto, pr.pid))
         print("  Es el mismo modelo que 'gunicorn --workers 2' (pre-fork, sin")
         print("  memoria compartida). gunicorn no corre en Windows: necesita fcntl.")
         print("")
@@ -277,6 +279,7 @@ def modo_workers():
             if d["status"] == "idle":
                 idle += 1
             filas.append((i + 1, puerto, d["status"], d["progreso"], d["encontrados"]))
+            del d
             time.sleep(0.2)
 
         print("  20 sondeos alternando entre los dos workers:")
