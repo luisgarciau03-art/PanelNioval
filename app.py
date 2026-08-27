@@ -4308,18 +4308,34 @@ cargarContacto();
 
 CATEGORIAS_IMPORTADOR = ['Ferreterías', 'Distribuidoras Ferreterías']
 
-_import_job = {
-    'status':    'idle',   # idle | running | done | error
-    'ciudad':    '',
-    'categoria': '',
-    'progreso':  0,        # categorías completadas
-    'total':     len(CATEGORIAS_IMPORTADOR),
-    'encontrados': 0,
-    'descartados': 0,
-    'resultados': [],
-    'log':        [],
-    'error':      '',
-}
+def _nuevo_import_job(ciudad='', status='idle'):
+    """Forma canonica del estado del importador.
+
+    Estaba escrita dos veces (al importar el modulo y en importador_iniciar). Con
+    dos copias, un contador nuevo se olvida en una de ellas y el trabajo revienta
+    con KeyError a media corrida. Una sola definicion, dos llamadas.
+
+    Los cuatro contadores son independientes a proposito: `encontrados` es lo que
+    aprobo Places y `nuevos_en_sheet` son las filas que de verdad se escribieron.
+    Presentar el primero como si fuera el segundo es el bug que reporto el owner.
+    """
+    return {
+        'status':    status,   # idle | running | done | error
+        'ciudad':    ciudad,
+        'categoria': '',
+        'progreso':  0,        # categorías completadas
+        'total':     len(CATEGORIAS_IMPORTADOR),
+        'encontrados':     0,  # pasaron los filtros de Places
+        'nuevos_en_sheet': 0,  # filas REALMENTE escritas en la hoja
+        'duplicados':      0,  # ya estaban en LISTA DE CONTACTOS
+        'descartados':     0,  # rechazados por resenas, calificacion o sin telefono
+        'resultados': [],
+        'log':        [],
+        'error':      '',
+    }
+
+
+_import_job = _nuevo_import_job()
 _import_lock = threading.Lock()
 
 
@@ -4475,15 +4491,23 @@ def _exportar_a_sheets(resultados, categoria, ciudad):
         return 0
 
 
-def _enviar_telegram_importador(ciudad, total, desglose, tiempo_min):
+def _enviar_telegram_importador(ciudad, resumen, desglose, tiempo_min):
     try:
         token   = os.environ.get('TELEGRAM_TOKEN')
         chat_id = os.environ.get('TELEGRAM_CHAT_ID')
         if not token or not chat_id:
             return
-        msg = f"<b>📥 Importador Completado</b>\n\n<b>Ciudad:</b> {ciudad}\n<b>Total:</b> {total} contactos\n<b>Tiempo:</b> {tiempo_min:.1f} min\n\n"
+        msg = (
+            f"<b>📥 Importador Completado</b>\n\n"
+            f"<b>Ciudad:</b> {ciudad}\n"
+            f"<b>Nuevos en la hoja:</b> {resumen['nuevos']}\n"
+            f"<b>Aprobados por filtros:</b> {resumen['encontrados']}\n"
+            f"<b>Ya estaban:</b> {resumen['duplicados']}\n"
+            f"<b>Descartados:</b> {resumen['descartados']}\n"
+            f"<b>Tiempo:</b> {tiempo_min:.1f} min\n\n"
+        )
         for cat, n in desglose.items():
-            msg += f"  {cat}: {n}\n"
+            msg += f"  {cat}: {n} aprobados\n"
         req_lib.post(f'https://api.telegram.org/bot{token}/sendMessage',
                      data={'chat_id': chat_id, 'text': msg, 'parse_mode': 'HTML'}, timeout=10)
     except Exception:
@@ -4521,21 +4545,37 @@ def _worker_importador(ciudad, gmaps_api_key):
             desglose[cat] = len(resultados)
 
             desc = sum(stats.values())
+            # `nuevos` es el valor de retorno de _exportar_a_sheets: las filas que
+            # de verdad se escribieron. Antes solo iba al log, y la UI mostraba
+            # `encontrados` rotulado como si fueran guardados. Son cosas distintas
+            # y el operador necesita las dos.
             with _import_lock:
-                _import_job['encontrados'] += len(resultados)
-                _import_job['descartados'] += desc
+                _import_job['encontrados']     += len(resultados)
+                _import_job['nuevos_en_sheet'] += nuevos
+                _import_job['duplicados']      += len(resultados) - nuevos
+                _import_job['descartados']     += desc
                 _import_job['resultados']   = todos[:]
                 _import_job['log'].append(
                     f'✓ {cat}: {len(resultados)} aprobados, {desc} descartados, {nuevos} nuevos en Sheet'
                 )
 
         tiempo = (time.time() - inicio) / 60
-        _enviar_telegram_importador(ciudad, len(todos), desglose, tiempo)
+        with _import_lock:
+            resumen = {
+                'nuevos':      _import_job['nuevos_en_sheet'],
+                'encontrados': _import_job['encontrados'],
+                'duplicados':  _import_job['duplicados'],
+                'descartados': _import_job['descartados'],
+            }
+        _enviar_telegram_importador(ciudad, resumen, desglose, tiempo)
 
         with _import_lock:
             _import_job['status']   = 'done'
             _import_job['progreso'] = len(CATEGORIAS_IMPORTADOR)
-            _import_job['log'].append(f'✅ Completado en {tiempo:.1f} min — {len(todos)} contactos encontrados')
+            _import_job['log'].append(
+                f"✅ Completado en {tiempo:.1f} min — "
+                f"{resumen['nuevos']} nuevos en la hoja de {resumen['encontrados']} encontrados"
+            )
 
     except Exception as e:
         with _import_lock:
@@ -4563,13 +4603,7 @@ def importador_iniciar():
     with _import_lock:
         if _import_job['status'] == 'running':
             return jsonify({'ok': False, 'error': 'Ya hay una búsqueda en curso'})
-        _import_job = {
-            'status': 'running', 'ciudad': ciudad,
-            'categoria': '', 'progreso': 0,
-            'total': len(CATEGORIAS_IMPORTADOR),
-            'encontrados': 0, 'descartados': 0,
-            'resultados': [], 'log': [], 'error': '',
-        }
+        _import_job = _nuevo_import_job(ciudad, status='running')
 
     t = threading.Thread(target=_worker_importador, args=(ciudad, gmaps_api_key), daemon=True)
     t.start()
@@ -4585,8 +4619,10 @@ def importador_estado():
             'categoria':  _import_job['categoria'],
             'progreso':   _import_job['progreso'],
             'total':      _import_job['total'],
-            'encontrados': _import_job['encontrados'],
-            'descartados': _import_job['descartados'],
+            'encontrados':     _import_job['encontrados'],
+            'nuevos_en_sheet': _import_job['nuevos_en_sheet'],
+            'duplicados':      _import_job['duplicados'],
+            'descartados':     _import_job['descartados'],
             'log':        _import_job['log'][-10:],
             'error':      _import_job['error'],
         })
@@ -4624,7 +4660,11 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399
 .cat-badge{padding:5px 12px;border-radius:20px;font-size:.78em;font-weight:600;background:#e6f0ff;color:#888;transition:all .3s}
 .cat-badge.active{background:var(--blue);color:#fff}
 .cat-badge.done{background:var(--green);color:#fff}
-.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px}
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.stats-row .stat-box.principal{background:#eefaf1;border-top-width:4px}
+.stat-box.principal .n{font-size:2.4em}
+@media(max-width:620px){.stats-row{grid-template-columns:1fr 1fr}}
+.progreso-row{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:16px}
 .stat-box{background:#f8f9fa;border-radius:10px;padding:12px;text-align:center;border-top:3px solid #dde}
 .stat-box.green{border-color:var(--green)}.stat-box.red{border-color:#e74c3c}.stat-box.blue{border-color:var(--blue)}
 .stat-box .n{font-size:1.8em;font-weight:800;color:var(--blue)}.stat-box.green .n{color:var(--green)}.stat-box.red .n{color:#e74c3c}
@@ -4693,9 +4733,13 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399
 
     <!-- STATS -->
     <div class="stats-row" id="stats-row" style="display:none">
-      <div class="stat-box green"><div class="n" id="s-encontrados">0</div><div class="l">Encontrados</div></div>
+      <div class="stat-box green principal"><div class="n" id="s-nuevos">0</div><div class="l">Nuevos en la hoja</div></div>
+      <div class="stat-box blue"><div class="n" id="s-encontrados">0</div><div class="l">Aprobados por filtros</div></div>
+      <div class="stat-box"><div class="n" id="s-duplicados">0</div><div class="l">Ya estaban</div></div>
       <div class="stat-box red"><div class="n" id="s-descartados">0</div><div class="l">Descartados</div></div>
-      <div class="stat-box blue"><div class="n" id="s-progreso">0/0</div><div class="l">Progreso</div></div>
+    </div>
+    <div class="progreso-row" id="progreso-row" style="display:none">
+      <div class="stat-box blue"><div class="n" id="s-progreso">0/0</div><div class="l">Categorias procesadas</div></div>
     </div>
 
     <!-- LOG -->
@@ -4864,6 +4908,7 @@ async function iniciar() {
 
   document.getElementById('progress-box').style.display = 'block';
   document.getElementById('stats-row').style.display = 'grid';
+  document.getElementById('progreso-row').style.display = 'grid';
   document.getElementById('log-box').style.display = 'block';
   document.getElementById('result-box').style.display = 'none';
 
@@ -4890,7 +4935,9 @@ async function actualizarEstado() {
   document.getElementById('prog-label').textContent = d.categoria ? `Buscando: ${d.categoria}...` : 'Procesando...';
 
   // Stats
+  document.getElementById('s-nuevos').textContent      = d.nuevos_en_sheet;
   document.getElementById('s-encontrados').textContent = d.encontrados;
+  document.getElementById('s-duplicados').textContent  = d.duplicados;
   document.getElementById('s-descartados').textContent = d.descartados;
   document.getElementById('s-progreso').textContent    = `${d.progreso}/${d.total}`;
 
@@ -4913,9 +4960,12 @@ async function actualizarEstado() {
     document.getElementById('prog-label').textContent = '¡Completado!';
     CATS.forEach((_,i) => document.getElementById('cat-'+i).className = 'cat-badge done');
     document.getElementById('result-box').style.display = 'block';
-    document.getElementById('result-titulo').textContent = `✅ Búsqueda completada — ${d.ciudad}`;
+    document.getElementById('result-titulo').textContent =
+      `✅ ${d.nuevos_en_sheet} contactos nuevos en la hoja — ${d.ciudad}`;
     document.getElementById('result-desc').textContent =
-      `${d.encontrados} contactos encontrados · ${d.descartados} descartados · Guardados en Google Sheets`;
+      `De ${d.encontrados + d.descartados} candidatos de Google, ${d.encontrados} pasaron los ` +
+      `filtros de calidad: ${d.nuevos_en_sheet} se guardaron y ${d.duplicados} ya estaban en la lista. ` +
+      `Los otros ${d.descartados} se descartaron por reseñas, calificación o falta de teléfono.`;
     document.getElementById('btn-iniciar').textContent = '🔍 Nueva Búsqueda';
     document.getElementById('btn-iniciar').disabled = false;
   }
