@@ -122,9 +122,10 @@ def _catalogo(ferreterias, distribuidoras):
 
 
 def _job_limpio(ciudad="CiudadDemo"):
-    return {"status": "running", "ciudad": ciudad, "categoria": "",
-            "progreso": 0, "total": 2, "encontrados": 0, "descartados": 0,
-            "resultados": [], "log": [], "error": ""}
+    """Usa la factory de produccion: una copia a mano se queda vieja en cuanto el
+    estado gana un campo, y el worker revienta con KeyError a media corrida."""
+    import app
+    return app._nuevo_import_job(ciudad, status="running")
 
 
 def modo_conteo():
@@ -164,17 +165,30 @@ def modo_conteo():
     print("  status final                     : %s" % est["status"])
     print("")
     print("  Mensaje final que lee el operador:")
-    print("    \"%d contactos encontrados - %d descartados - Guardados en Google Sheets\""
-          % (est["encontrados"], est["descartados"]))
+    print("    \"De %d candidatos de Google, %d pasaron los filtros de calidad:"
+          % (est["encontrados"] + est["descartados"], est["encontrados"]))
+    print("     %d se guardaron y %d ya estaban en la lista. Los otros %d se"
+          % (est.get("nuevos_en_sheet", 0), est.get("duplicados", 0), est["descartados"]))
+    print("     descartaron por resenas, calificacion o falta de telefono.\"")
     print("")
     print("  Desglose de la diferencia:")
     print("    B2 (ya estaban en la hoja)            : 4")
     print("    B3 (contados 2 veces entre categorias): 6")
     print("    B1 (el contador nunca usa 'nuevos')   : por eso ninguna resta se ve")
     print("")
-    print("  Log interno (que si tiene el numero correcto, pero nadie mira):")
+    print("  Log interno:")
     for linea in est["log"]:
         print("    > %s" % linea)
+    print("")
+    if est.get("nuevos_en_sheet") == filas_reales:
+        print("  VEREDICTO: B1/B2/B3 CORREGIDOS (T3.2) - los dos numeros siguen")
+        print("  siendo distintos, que es lo correcto, pero ahora AMBOS estan a la")
+        print("  vista y rotulados: nuevos_en_sheet=%d es el numero grande."
+              % est["nuevos_en_sheet"])
+    else:
+        print("  VEREDICTO: B1 VIVO - solo se publica 'encontrados', rotulado de")
+        print("  forma que se lee como 'guardados'. El operador ve %d y recibe %d."
+              % (est["encontrados"], filas_reales))
     print("")
 
     # B4: la escritura explota y la corrida termina en exito.
@@ -187,7 +201,7 @@ def modo_conteo():
     est4 = app._import_job
 
     print("=" * 72)
-    print("REPRO B - B4: la escritura falla y la corrida se declara exitosa")
+    print("REPRO B - B4: que pasa cuando la escritura a Sheets falla")
     print("=" * 72)
     print("  get_worksheet lanza              : RuntimeError('cuota de Sheets agotada')")
     print("  Filas escritas                   : 0")
@@ -197,7 +211,13 @@ def modo_conteo():
     print("  Ultima linea del log             : %s"
           % (est4["log"][-1] if est4["log"] else "(vacio)"))
     print("")
-    print("  VEREDICTO: cero filas escritas, status 'done', palomita verde.")
+    if est4["status"] == "done" and not est4["error"]:
+        print("  VEREDICTO: B4 VIVO - cero filas escritas, status 'done', palomita")
+        print("  verde y campo error vacio. El fallo es invisible para el operador.")
+    else:
+        print("  VEREDICTO: B4 CORREGIDO (T3.4) - la corrida termina en '%s' con la"
+              % est4["status"])
+        print("  causa a la vista, en vez de declararse exitosa con la hoja intacta.")
     print("")
 
     return {"encontrados": est["encontrados"], "filas_reales": filas_reales,
@@ -215,7 +235,9 @@ def modo_servidor(puerto):
             time.sleep(1)
         return ([_negocio("Demo", "pid-X", "Calle X")],
                 {"pocas_resenas": 0, "baja_calificacion": 0,
-                 "cerrado": 0, "sin_telefono": 0})
+                 "cerrado": 0, "sin_telefono": 0},
+                {"detalles_fallidos": 0, "paginas_fallidas": 0,
+                 "consultas_fallidas": 0})
 
     app.GMAPS_OK = True
     app.googlemaps.Client = lambda key=None, **kw: object()

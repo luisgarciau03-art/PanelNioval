@@ -4344,6 +4344,14 @@ def _buscar_negocios(gmaps_client, categoria, ciudad):
     resultados = []
     vistos = set()
     stats  = {'pocas_resenas': 0, 'baja_calificacion': 0, 'cerrado': 0, 'sin_telefono': 0}
+    # Distinguir "Places dijo que no hay nada" de "no se pudo preguntar". Sin esto,
+    # una clave invalida o la cuota agotada devuelven lista vacia y la corrida
+    # termina en 'done' informando "0 aprobados": un fallo de autenticacion
+    # presentado como una ciudad sin ferreterias.
+    consultas_ok      = 0
+    detalles_fallidos = 0
+    paginas_fallidas  = 0
+    ultimo_error      = None
 
     variaciones = [
         f"{categoria} en {ciudad}",
@@ -4352,9 +4360,11 @@ def _buscar_negocios(gmaps_client, categoria, ciudad):
     ]
 
     for query in variaciones:
+        consulta_ok = False
         for intento in range(3):
             try:
                 resp   = gmaps_client.places(query=query, language='es', type='establishment')
+                consulta_ok = True
                 lugares = resp.get('results', [])
                 paginas = 1
                 while 'next_page_token' in resp and paginas < 3:
@@ -4364,6 +4374,7 @@ def _buscar_negocios(gmaps_client, categoria, ciudad):
                         lugares.extend(resp.get('results', []))
                         paginas += 1
                     except Exception:
+                        paginas_fallidas += 1
                         break
 
                 for lugar in lugares:
@@ -4403,17 +4414,34 @@ def _buscar_negocios(gmaps_client, categoria, ciudad):
                         })
                         time.sleep(0.3)
                     except Exception:
+                        # Un negocio que se cae aqui no aparece ni en `resultados`
+                        # ni en `stats`: se evaporaba sin dejar numero.
+                        detalles_fallidos += 1
                         continue
 
                 if lugares: break
 
             except Exception as e:
+                ultimo_error = e
                 print(f'[importador] error query intento {intento+1}: {e}')
                 if intento < 2: time.sleep(2 ** intento)
 
+        if consulta_ok:
+            consultas_ok += 1
         if query != variaciones[-1]: time.sleep(1)
 
-    return resultados, stats
+    # Ninguna de las variaciones logro hablar con Places: eso no es "no hay
+    # resultados", es que no se pudo preguntar. Se propaga, igual que hace
+    # _exportar_a_sheets con los fallos de escritura.
+    if consultas_ok == 0:
+        raise RuntimeError(
+            f'no se pudo consultar Google Places para {categoria} en {ciudad}: {ultimo_error}'
+        )
+
+    incidencias = {'detalles_fallidos': detalles_fallidos,
+                   'paginas_fallidas': paginas_fallidas,
+                   'consultas_fallidas': len(variaciones) - consultas_ok}
+    return resultados, stats, incidencias
 
 
 def _escapar_formula(valor):
@@ -4436,97 +4464,99 @@ def _escapar_formula(valor):
 
 
 def _exportar_a_sheets(resultados, categoria, ciudad):
-    """Exporta a LISTA DE CONTACTOS con columnas idénticas al script original."""
-    try:
-        ws = get_worksheet('contactos')
-        datos_actuales = ws.get_all_values()
+    """Exporta a LISTA DE CONTACTOS con columnas idénticas al script original.
 
-        # Detección de duplicados: Nombre|Dirección (igual que el original)
-        nombres_existentes = set()
-        for fila in datos_actuales[1:]:
-            if len(fila) > 7:
-                nombres_existentes.add(f"{fila[1]}|{fila[7]}")
+    PROPAGA cualquier fallo de Sheets. Antes lo atrapaba y devolvia 0, con lo que
+    "no habia nada nuevo que escribir" y "la escritura reventó" eran el mismo
+    numero: la corrida seguia, terminaba en 'done' con palomita verde y el unico
+    rastro era un print al stdout del contenedor. Quien llama decide que hacer.
+    """
+    ws = get_worksheet('contactos')
+    datos_actuales = ws.get_all_values()
 
-        fecha  = datetime.now().strftime('%d/%m/%Y')
-        semana = datetime.now().isocalendar()[1]
-        nuevos = []
+    # Detección de duplicados: Nombre|Dirección (igual que el original)
+    nombres_existentes = set()
+    for fila in datos_actuales[1:]:
+        if len(fila) > 7:
+            nombres_existentes.add(f"{fila[1]}|{fila[7]}")
 
-        for r in resultados:
-            key = f"{r['Nombre']}|{r['Dirección']}"
-            if key not in nombres_existentes:
-                # Orden de columnas EXACTO al script original:
-                # NUM SEMANA | Nombre | Ciudad | Categoría | Teléfono | "" | "" |
-                # Dirección | Calificación | Núm. de Reseñas | Google Maps Link |
-                # Sitio Web | Horarios | Estado | Latitud | Longitud | Tamaño | Tipo Cliente | Fecha
-                nuevos.append([
-                    semana,
-                    r['Nombre'],
-                    ciudad,
-                    categoria,
-                    r['Teléfono'],
-                    '',
-                    '',
-                    r['Dirección'],
-                    r['Calificación'],
-                    r['Núm. de Reseñas'],
-                    r['Google Maps Link'],
-                    r['Sitio Web'],
-                    r['Horarios'],
-                    r['Estado'],
-                    r['Latitud'],
-                    r['Longitud'],
-                    r['Tamaño'],
-                    r['Tipo Cliente'],
-                    fecha,
-                ])
+    fecha  = datetime.now().strftime('%d/%m/%Y')
+    semana = datetime.now().isocalendar()[1]
+    nuevos = []
 
-        if nuevos:
-            nuevos = [[_escapar_formula(v) for v in fila] for fila in nuevos]
-            ws.append_rows(nuevos, value_input_option='USER_ENTERED')
-            _cache.pop('contactos', None)
-        return len(nuevos)
-    except Exception as e:
-        print(f'[importador] sheets error: {e}')
-        traceback.print_exc()
-        return 0
+    for r in resultados:
+        key = f"{r['Nombre']}|{r['Dirección']}"
+        if key not in nombres_existentes:
+            # Orden de columnas EXACTO al script original:
+            # NUM SEMANA | Nombre | Ciudad | Categoría | Teléfono | "" | "" |
+            # Dirección | Calificación | Núm. de Reseñas | Google Maps Link |
+            # Sitio Web | Horarios | Estado | Latitud | Longitud | Tamaño | Tipo Cliente | Fecha
+            nuevos.append([
+                semana,
+                r['Nombre'],
+                ciudad,
+                categoria,
+                r['Teléfono'],
+                '',
+                '',
+                r['Dirección'],
+                r['Calificación'],
+                r['Núm. de Reseñas'],
+                r['Google Maps Link'],
+                r['Sitio Web'],
+                r['Horarios'],
+                r['Estado'],
+                r['Latitud'],
+                r['Longitud'],
+                r['Tamaño'],
+                r['Tipo Cliente'],
+                fecha,
+            ])
+
+    if nuevos:
+        nuevos = [[_escapar_formula(v) for v in fila] for fila in nuevos]
+        ws.append_rows(nuevos, value_input_option='USER_ENTERED')
+        _cache.pop('contactos', None)
+    return len(nuevos)
 
 
-def _enviar_telegram_importador(ciudad, resumen, desglose, tiempo_min):
+def _enviar_telegram_importador(ciudad, resumen, desglose, tiempo_min, error=None):
     try:
         token   = os.environ.get('TELEGRAM_TOKEN')
         chat_id = os.environ.get('TELEGRAM_CHAT_ID')
         if not token or not chat_id:
             return
         msg = (
-            f"<b>📥 Importador Completado</b>\n\n"
+            f"<b>{'❌ Importador FALLÓ' if error else '📥 Importador Completado'}</b>\n\n"
             f"<b>Ciudad:</b> {ciudad}\n"
-            f"<b>Nuevos en la hoja:</b> {resumen['nuevos']}\n"
-            f"<b>Aprobados por filtros:</b> {resumen['encontrados']}\n"
-            f"<b>Ya estaban:</b> {resumen['duplicados']}\n"
-            f"<b>Descartados:</b> {resumen['descartados']}\n"
-            f"<b>Tiempo:</b> {tiempo_min:.1f} min\n\n"
+            + (f"<b>Causa:</b> {error}\n" if error else "")
+            + f"<b>Nuevos en la hoja:</b> {resumen['nuevos']}\n"
+            + f"<b>Aprobados por filtros:</b> {resumen['encontrados']}\n"
+            + f"<b>Ya estaban:</b> {resumen['duplicados']}\n"
+            + f"<b>Descartados:</b> {resumen['descartados']}\n"
+            + f"<b>Tiempo:</b> {tiempo_min:.1f} min\n\n"
         )
         for cat, n in desglose.items():
             msg += f"  {cat}: {n} aprobados\n"
         req_lib.post(f'https://api.telegram.org/bot{token}/sendMessage',
                      data={'chat_id': chat_id, 'text': msg, 'parse_mode': 'HTML'}, timeout=10)
-    except Exception:
-        pass
+    except Exception as e:
+        # Este aviso ES la via por la que el owner se entera de que algo fallo.
+        # Tragarselo lo deja sin enterarse de nada, que es justo lo que esta
+        # tarea vino a arreglar.
+        print(f'[importador] no se pudo avisar por telegram: {e}')
+        traceback.print_exc()
 
 
 def _worker_importador(ciudad, gmaps_api_key):
-    global _import_job
     inicio = time.time()
+    desglose = {}
     try:
         if not GMAPS_OK:
-            with _import_lock:
-                _import_job['status'] = 'error'
-                _import_job['error']  = 'googlemaps no instalado'
-            return
+            raise RuntimeError('googlemaps no instalado')
 
         gmaps = googlemaps.Client(key=gmaps_api_key)
         todos = []
-        desglose = {}
 
         for i, cat in enumerate(CATEGORIAS_IMPORTADOR):
             with _import_lock:
@@ -4534,17 +4564,30 @@ def _worker_importador(ciudad, gmaps_api_key):
                 _import_job['progreso']  = i
                 _import_job['log'].append(f'Buscando {cat} en {ciudad}...')
 
-            resultados, stats = _buscar_negocios(gmaps, cat, ciudad)
+            resultados, stats, incidencias = _buscar_negocios(gmaps, cat, ciudad)
 
             # Agregar ciudad a cada resultado
             for r in resultados:
                 r['CIUDAD'] = ciudad
 
-            nuevos = _exportar_a_sheets(resultados, cat, ciudad)
+            desc = sum(stats.values())
+            try:
+                nuevos = _exportar_a_sheets(resultados, cat, ciudad)
+            except Exception as e:
+                # Lo que se sabe se apunta; lo que no, no se inventa.
+                # `encontrados` y `descartados` son hechos de la BUSQUEDA y siguen
+                # siendo ciertos. `nuevos_en_sheet` y `duplicados` dependen de una
+                # escritura que reventó: contarlos como duplicados afirmaria que
+                # esos negocios "ya estaban", que es falso y peor que no decir nada.
+                with _import_lock:
+                    _import_job['encontrados'] += len(resultados)
+                    _import_job['descartados'] += desc
+                raise RuntimeError(
+                    f'{cat}: fallo al escribir en Google Sheets — {e}'
+                ) from e
+
             todos.extend(resultados)
             desglose[cat] = len(resultados)
-
-            desc = sum(stats.values())
             # `nuevos` es el valor de retorno de _exportar_a_sheets: las filas que
             # de verdad se escribieron. Antes solo iba al log, y la UI mostraba
             # `encontrados` rotulado como si fueran guardados. Son cosas distintas
@@ -4555,8 +4598,11 @@ def _worker_importador(ciudad, gmaps_api_key):
                 _import_job['duplicados']      += len(resultados) - nuevos
                 _import_job['descartados']     += desc
                 _import_job['resultados']   = todos[:]
+                perdidos = incidencias['detalles_fallidos'] + incidencias['paginas_fallidas']
+                aviso = f' ⚠ {perdidos} se perdieron por errores de Places' if perdidos else ''
                 _import_job['log'].append(
-                    f'✓ {cat}: {len(resultados)} aprobados, {desc} descartados, {nuevos} nuevos en Sheet'
+                    f'✓ {cat}: {len(resultados)} aprobados, {desc} descartados, '
+                    f'{nuevos} nuevos en Sheet{aviso}'
                 )
 
         tiempo = (time.time() - inicio) / 60
@@ -4578,9 +4624,25 @@ def _worker_importador(ciudad, gmaps_api_key):
             )
 
     except Exception as e:
+        # Telegram solo avisaba en el camino feliz: si la corrida se caia, el
+        # owner no se enteraba por ningun canal.
+        tiempo = (time.time() - inicio) / 60
         with _import_lock:
             _import_job['status'] = 'error'
             _import_job['error']  = str(e)
+            _import_job['log'].append(f'❌ Falló: {e}')
+            sin_intentar = [c for c in CATEGORIAS_IMPORTADOR if c not in desglose
+                            and c != _import_job.get('categoria')]
+            if sin_intentar:
+                _import_job['log'].append(
+                    'Sin intentar por el fallo: ' + ', '.join(sin_intentar))
+            resumen = {
+                'nuevos':      _import_job['nuevos_en_sheet'],
+                'encontrados': _import_job['encontrados'],
+                'duplicados':  _import_job['duplicados'],
+                'descartados': _import_job['descartados'],
+            }
+        _enviar_telegram_importador(ciudad, resumen, desglose, tiempo, error=str(e))
         traceback.print_exc()
 
 
