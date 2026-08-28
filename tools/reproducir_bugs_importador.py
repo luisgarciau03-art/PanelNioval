@@ -248,10 +248,10 @@ def modo_servidor(puerto):
     app.app.run(host="127.0.0.1", port=int(puerto), threaded=True, debug=False)
 
 
-def modo_workers():
+def modo_workers(n_procesos=2):
     import urllib.request
 
-    puertos = [5061, 5062]
+    puertos = [5061, 5062][:n_procesos]
     entorno = dict(os.environ, PANEL_AUTH_DESACTIVADA="1",
                    GMAPS_API_KEY="clave-falsa-local")
     procesos = []
@@ -279,7 +279,7 @@ def modo_workers():
         print("=" * 72)
         print("REPRO C - B5: el estado vive en memoria de proceso")
         print("=" * 72)
-        print("  Dos procesos Flask independientes:")
+        print("  %d proceso(s) Flask:" % len(puertos))
         for puerto, pr in zip(puertos, procesos):
             print("    puerto %d -> PID %d" % (puerto, pr.pid))
         print("  Es el mismo modelo que 'gunicorn --workers 2' (pre-fork, sin")
@@ -297,7 +297,7 @@ def modo_workers():
         filas = []
         idle = 0
         for i in range(20):
-            puerto = puertos[i % 2]
+            puerto = puertos[i % len(puertos)]
             d = _get(puerto, "/api/importador/estado")
             if d["status"] == "idle":
                 idle += 1
@@ -313,11 +313,17 @@ def modo_workers():
         print("")
         print("  Respuestas con status 'idle' mientras el trabajo corre: %d de 20" % idle)
         print("")
-        print("  VEREDICTO: el worker que no lanzo el trabajo responde 'idle',")
-        print("  'progreso 0' y 'encontrados 0'. Ese es el parpadeo que ve el owner.")
-        print("  La proporcion 50% aqui es POR CONSTRUCCION (se alterna a proposito);")
-        print("  lo que el experimento PRUEBA es que el proceso B no sabe nada del")
-        print("  trabajo, no cual es el reparto real del balanceador de gunicorn.")
+        if len(puertos) == 1:
+            print("  VEREDICTO (configuracion ACTUAL, --workers 1): %d de 20 sondeos"
+                  % idle)
+            print("  respondieron 'idle'. Con un solo proceso no hay una segunda")
+            print("  memoria que consultar, asi que B5 no puede darse.")
+        else:
+            print("  VEREDICTO (configuracion ANTERIOR, --workers 2): el worker que no")
+            print("  lanzo el trabajo responde 'idle', 'progreso 0' y 'encontrados 0'.")
+            print("  Ese es el parpadeo que veia el owner. La proporcion 50% aqui es")
+            print("  POR CONSTRUCCION (se alterna a proposito); lo que el experimento")
+            print("  PRUEBA es que el proceso B no sabe nada del trabajo.")
         return {"idle": idle, "total": 20}
     finally:
         for pr in procesos:
@@ -334,7 +340,9 @@ if __name__ == "__main__":
     elif len(sys.argv) >= 2 and sys.argv[1] == "conteo":
         modo_conteo()
     elif len(sys.argv) >= 2 and sys.argv[1] == "workers":
-        modo_workers()
+        modo_workers(2)          # reproduce el defecto con la config ANTERIOR
+    elif len(sys.argv) >= 2 and sys.argv[1] == "un-worker":
+        modo_workers(1)          # comprueba la config ACTUAL
     else:
         print(__doc__)
         sys.exit(2)

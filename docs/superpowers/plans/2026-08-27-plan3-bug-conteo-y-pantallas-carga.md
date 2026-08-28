@@ -548,13 +548,13 @@ Se revisaron las ~60 herramientas de `claude-ads` contra el contenido de este pl
 |---|---|---|---|---|
 | T3.0 | Tarea Cero: rama, respaldo y reproducción | **HECHA** | `docs/investigacion/2026-08-27-reproduccion-bugs-importador.md` · repro 20 vs 10 · B4 `done` con 0 filas · 10/20 sondeos `idle` · baseline **230 passed** · respaldo `docs/auditoria/respaldos/2026-08-27/` (6 archivos) | 2026-08-27 |
 | T3.1 | Confirmar los 9 defectos con experimento | **HECHA** | `docs/investigacion/...-reproduccion-bugs-importador.md` §7 · 9/9 CONFIRMADOS · **4 defectos nuevos** (B10 guard por proceso, B11 filtro renumera, B12 insignias rancias, B13 estado muerto) · **2 hipotesis DESCARTADAS** (doble init, `if lugares: break`) · B9 sube a severidad ALTA (XSS almacenado autoservicio) | 2026-08-27 |
-| T3.2 | Separar los cuatro contadores (B1, B2) | PENDIENTE | | |
-| T3.3 | Deduplicar entre categorías (B3) | PENDIENTE | | |
-| T3.4 | Fallo de escritura visible (B4) | PENDIENTE | | |
-| T3.5 | Estado compartido entre workers (B5) | PENDIENTE | | |
-| T3.6 | Progreso real y continuo (B6) | PENDIENTE | | |
-| T3.7 | Frontend robusto (B7, B8, B9) | PENDIENTE | | |
+| T3.2 | Separar los cuatro contadores (B1, B2) | **HECHA** | `3c8c6a0` · 237 passed (7 tests nuevos) · gates python-reviewer + code-reviewer: 0 CRITICAL, 1 HIGH que cierra T3.4, MEDIUM y LOW aplicados | 2026-08-27 |
+| T3.3 | Deduplicar entre categorías (B3) | **HECHA** | `fd38673` · 252 passed (5 tests nuevos) · gates python-reviewer + code-reviewer: 0 CRITICAL/HIGH, MEDIUM aplicado · **B15 nuevo**: `descartados` venia inflado hasta 6x · dedup ANTES del `place()`, listo para Plan 2 T2.3 | 2026-08-27 |
+| T3.4 | Fallo de escritura visible (B4) | **HECHA** (adelantada antes de T3.3) | `a5b413f` · 247 passed (10 tests nuevos) · gates python-reviewer + code-reviewer + **silent-failure-hunter**: 0 CRITICAL; los 2 HIGH y los 2 MEDIUM encontrados se corrigieron en el mismo commit · **B14 nuevo**: el mismo fallo silencioso existia en la LECTURA de Places | 2026-08-27 |
+| T3.5 | Estado compartido entre workers (B5) | **HECHA** | `cd3bfcb` · 275 passed (23 tests nuevos) · ADR `docs/adr/2026-08-27-estado-compartido-importador.md` · **council eligio A, no la B del plan** (premisa de B falsa: daemon=True muere igual) · gates python-reviewer + code-reviewer + **security-reviewer**: 1 CRITICAL (CMD del Dockerfile roto) y 2 HIGH corregidos en el mismo commit · **falta verificacion con gunicorn real en el VPS (gate del owner)** | 2026-08-27 |
+| T3.6 | Progreso real y continuo (B6) | **HECHA** | `0062da8` · 288 passed (13 tests nuevos) · barra de 3 valores a 12, tramos parejos de 9 puntos · denominador ajustable listo para Plan 2 T2.4 · gates python-reviewer + code-reviewer: 0 CRITICAL/HIGH, 3 MEDIUM corregidos | 2026-08-27 |
+| T3.7 | Frontend robusto (B7, B8, B9 + B10 cliente, B12, B13) | **HECHA** | `9bd8f6c` · 314 passed (26 tests nuevos) · gates code-reviewer + **security-reviewer PASS** + **silent-failure-hunter**: 1 CRITICAL (Telegram decia 'Completado' de una corrida detenida) y 2 HIGH corregidos · `node --check` sobre el JS embebido | 2026-08-27 |
 | T3.8 | Verificación de extremo a extremo | PENDIENTE | | |
 | T3.9 | Cierre: docs, PR, handoff | PENDIENTE | | |
 
-**Avance del plan: 2 / 10 tareas (20 %)**
+**Avance del plan: 8 / 10 tareas (80 %)**
