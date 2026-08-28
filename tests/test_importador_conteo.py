@@ -109,7 +109,13 @@ def correr(monkeypatch, gmaps, ws, ciudad="CiudadDemo"):
 def escenario_veinte_contra_diez():
     """12 ferreterias + 8 distribuidoras (6 repetidas), hoja con 4 ya dentro.
 
-    encontrados = 20, filas escritas = 10. Son los numeros del reporte.
+    Es el escenario del reporte del owner. Antes de arreglarlo: la UI decia 20 y
+    a la hoja llegaban 10.
+
+    Despues: 14 negocios DISTINTOS aprobados (T3.3 deja de contar dos veces los 6
+    que salen en las dos categorias), de los cuales 10 son filas nuevas y 4 ya
+    estaban en la hoja. Las 10 filas escritas no cambian en ningun momento: lo
+    que cambia es que ahora el numero grande es ese.
     """
     ferreterias = [negocio("Ferreteria %d" % i, "pid-F%d" % i, "Calle %d" % i)
                    for i in range(1, 13)]
@@ -136,7 +142,9 @@ class TestCuatroContadores:
         gmaps, ws = escenario_veinte_contra_diez()
         est = correr(entorno, gmaps, ws)
         # Los dos numeros existen y son DISTINTOS: ese es justo el bug del owner.
-        assert est["encontrados"] == 20
+        # `encontrados` es 14 y no 20 desde T3.3: los 6 negocios que salen en las
+        # dos categorias son 6 negocios, no 12. Contarlos dos veces era B3.
+        assert est["encontrados"] == 14
         assert est["nuevos_en_sheet"] == 10
         assert est["encontrados"] != est["nuevos_en_sheet"]
 
@@ -180,7 +188,7 @@ class TestEstadoExponeLosContadores:
         for clave in ("encontrados", "nuevos_en_sheet", "duplicados", "descartados"):
             assert clave in d, "/api/importador/estado no expone %r" % clave
         assert d["nuevos_en_sheet"] == 10
-        assert d["encontrados"] == 20
+        assert d["encontrados"] == 14  # negocios distintos, ver T3.3
 
     def test_estado_inicial_trae_los_contadores_en_cero(self, client, monkeypatch):
         monkeypatch.setattr(app, "_import_job", dict(app._import_job, status="idle"))
@@ -404,3 +412,87 @@ class TestAvisoYRastro:
         assert "Distribuidoras Ferreterías" in texto, (
             "no se dice que la segunda categoria nunca se intento: %r" % est["log"]
         )
+
+
+# ═══════ T3.3 — un negocio en dos categorias es UN negocio (B3) ═══════
+
+class TestDedupEntreCategorias:
+    def test_mismo_place_id_en_dos_categorias_cuenta_una_vez(self, entorno):
+        """`vistos` era local a _buscar_negocios, o sea por categoria.
+
+        Una ferreteria que sale en 'Ferreterías' y en 'Distribuidoras
+        Ferreterías' se contaba dos veces en `encontrados`, mientras que la hoja
+        la escribia una sola vez. En el respaldo de produccion hay 12 place_id
+        reales bajo las dos categorias: no es un caso de laboratorio.
+        """
+        gmaps, ws = escenario_veinte_contra_diez()
+        est = correr(entorno, gmaps, ws)
+        # 12 ferreterias + 8 distribuidoras, de las que 6 se repiten
+        # => 14 negocios DISTINTOS, no 20.
+        assert est["encontrados"] == 14, (
+            "los 6 repetidos entre categorias se siguen contando dos veces: %d"
+            % est["encontrados"]
+        )
+        assert est["nuevos_en_sheet"] == 10, "las filas escritas no cambian"
+        assert est["duplicados"] == 4, "solo los 4 que ya estaban en la hoja"
+        assert est["nuevos_en_sheet"] + est["duplicados"] == est["encontrados"]
+
+    def test_el_log_reporta_los_saltados_por_solapamiento(self, entorno):
+        """Cuanto se solapan las dos busquedas es informacion util, no ruido."""
+        gmaps, ws = escenario_veinte_contra_diez()
+        est = correr(entorno, gmaps, ws)
+        texto = " ".join(est["log"])
+        assert "6" in texto and "ya vistos en otra categoría" in texto, (
+            "el log no dice cuantos se saltaron por aparecer en las dos categorias: %r"
+            % est["log"]
+        )
+
+    def test_el_solape_distingue_ya_visto_de_ya_pagado(self, entorno):
+        """Un rechazado por resenas se salta, pero saltarlo no ahorra dinero.
+
+        El detalle de Places solo se pide DESPUES de pasar los filtros, asi que un
+        negocio rechazado nunca costo nada. Contar su salto como ahorro
+        sobrestimaria el beneficio, y el Plan 2 se apoya en este numero.
+        """
+        # Uno bueno (paga detalle) y uno malo (rechazado antes de pagar), los dos
+        # en las dos categorias.
+        ambos = [negocio("Buena", "pid-B", "Calle B"),
+                 negocio("Chica", "pid-C", "Calle C", resenas=2)]
+        est = correr(entorno, GmapsFalso(catalogo(ambos, ambos)), WorksheetFalsa())
+        texto = " ".join(est["log"])
+        # 2 se saltaron en la segunda categoria, pero solo 1 habia costado un place().
+        assert "2 ya vistos en otra categoría" in texto, texto
+        assert "1 consultas de detalle ahorradas" in texto, texto
+
+    def test_no_se_pide_el_detalle_dos_veces_del_mismo_negocio(self, entorno):
+        """El ahorro que hereda el Plan 2 (T2.3).
+
+        Cada gmaps.place() se paga. Un negocio ya visto en esta corrida no debe
+        volver a pedir su detalle aunque salga en la segunda categoria.
+        """
+        gmaps, ws = escenario_veinte_contra_diez()
+        correr(entorno, gmaps, ws)
+        pedidos = gmaps.detalles_pedidos
+        assert len(pedidos) == len(set(pedidos)), (
+            "se pidio el detalle repetido de %d negocios"
+            % (len(pedidos) - len(set(pedidos)))
+        )
+        assert len(pedidos) == 14, (
+            "se pagaron %d detalles para 14 negocios distintos" % len(pedidos)
+        )
+
+    def test_un_negocio_rechazado_se_cuenta_una_sola_vez(self, entorno):
+        """B15: `descartados` venia inflado hasta 6x.
+
+        `stats['pocas_resenas']` y `stats['baja_calificacion']` se incrementaban
+        ANTES de `vistos.add(pid)`, asi que el mismo negocio rechazado volvia a
+        contarse en cada una de las 3 variaciones y en cada una de las 2
+        categorias. Un negocio con 2 resenas se reportaba como 6 descartados.
+        """
+        malo = [negocio("Chica", "pid-X", "Calle X", resenas=2)]
+        est = correr(entorno, GmapsFalso(catalogo(malo, malo)), WorksheetFalsa())
+        assert est["descartados"] == 1, (
+            "un solo negocio rechazado se reporta como %d descartados"
+            % est["descartados"]
+        )
+        assert est["encontrados"] == 0

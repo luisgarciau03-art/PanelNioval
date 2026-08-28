@@ -4339,17 +4339,41 @@ _import_job = _nuevo_import_job()
 _import_lock = threading.Lock()
 
 
-def _buscar_negocios(gmaps_client, categoria, ciudad):
-    """Busca negocios con filtros de calidad. Campos y lógica idénticos al script original."""
+def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None, con_detalle=None):
+    """Busca negocios con filtros de calidad. Campos y lógica idénticos al script original.
+
+    `vistos` es el conjunto de place_id ya procesados. Si quien llama pasa el
+    suyo, la deduplicacion pasa a ser de CORRIDA en vez de por categoria: una
+    ferreteria que sale en 'Ferreterías' y en 'Distribuidoras Ferreterías' es un
+    solo negocio, se cuenta una vez y se paga un solo Place Details.
+
+    (El Plan 2 reutiliza este mismo conjunto para no pagar detalles repetidos;
+    no se crea una segunda estructura.)
+    """
     resultados = []
-    vistos = set()
+    if vistos is None:
+        vistos = set()
+    # Solo cuenta como SOLAPAMIENTO lo que ya estaba visto al entrar, es decir lo
+    # que aporto otra categoria. Las tres variaciones de esta misma categoria
+    # devuelven en gran parte los mismos negocios; contar eso como solape daria
+    # numeros inflados (24 de 12) y no dice nada sobre cuanto se pisan las dos
+    # busquedas, que es la pregunta.
+    ya_de_otra_categoria = set(vistos)
+    # `con_detalle` separa "ya lo vi" de "ya lo PAGUE": un negocio rechazado por
+    # resenas se descarta antes de pedir el detalle, asi que saltarselo despues no
+    # ahorra dinero. Sin esta distincion, el contador de solapamiento se lee como
+    # ahorro de Places y lo sobrestima. El Plan 2 necesita el numero exacto.
+    if con_detalle is None:
+        con_detalle = set()
     stats  = {'pocas_resenas': 0, 'baja_calificacion': 0, 'cerrado': 0, 'sin_telefono': 0}
     # Distinguir "Places dijo que no hay nada" de "no se pudo preguntar". Sin esto,
     # una clave invalida o la cuota agotada devuelven lista vacia y la corrida
     # termina en 'done' informando "0 aprobados": un fallo de autenticacion
     # presentado como una ciudad sin ferreterias.
-    consultas_ok      = 0
-    detalles_fallidos = 0
+    consultas_ok        = 0
+    ya_vistos_otra_cat  = 0   # negocios que ya habia procesado OTRA categoria
+    detalles_evitados   = 0   # de esos, los que ya habian costado un place()
+    detalles_fallidos   = 0
     paginas_fallidas  = 0
     ultimo_error      = None
 
@@ -4379,18 +4403,29 @@ def _buscar_negocios(gmaps_client, categoria, ciudad):
 
                 for lugar in lugares:
                     pid     = lugar.get('place_id')
-                    if pid in vistos: continue
+                    if pid in vistos:
+                        if pid in ya_de_otra_categoria:
+                            ya_de_otra_categoria.discard(pid)  # se cuenta una vez
+                            ya_vistos_otra_cat += 1
+                            if pid in con_detalle:
+                                detalles_evitados += 1
+                        continue
                     cal     = lugar.get('rating')
                     resenas = lugar.get('user_ratings_total')
+
+                    # El place_id se apunta ANTES de filtrar. Estaba despues, con
+                    # lo que un negocio rechazado no quedaba registrado y volvia a
+                    # contarse en cada variacion y en cada categoria: un solo
+                    # negocio con 2 resenas se reportaba como 6 descartados.
+                    vistos.add(pid)
 
                     if not resenas or resenas < 5:
                         stats['pocas_resenas'] += 1; continue
                     if not cal or cal < 3.5:
                         stats['baja_calificacion'] += 1; continue
-
-                    vistos.add(pid)
                     try:
                         det = gmaps_client.place(pid, language='es')['result']
+                        con_detalle.add(pid)
                         # Filtro "Cerrado" eliminado — se capturan negocios sin importar horario
                         tel = det.get('formatted_phone_number', '')
                         if not tel:
@@ -4440,7 +4475,9 @@ def _buscar_negocios(gmaps_client, categoria, ciudad):
 
     incidencias = {'detalles_fallidos': detalles_fallidos,
                    'paginas_fallidas': paginas_fallidas,
-                   'consultas_fallidas': len(variaciones) - consultas_ok}
+                   'consultas_fallidas': len(variaciones) - consultas_ok,
+                   'ya_vistos_otra_cat': ya_vistos_otra_cat,
+                   'detalles_evitados': detalles_evitados}
     return resultados, stats, incidencias
 
 
@@ -4557,6 +4594,11 @@ def _worker_importador(ciudad, gmaps_api_key):
 
         gmaps = googlemaps.Client(key=gmaps_api_key)
         todos = []
+        # Un solo conjunto para toda la corrida. Antes vivia dentro de
+        # _buscar_negocios, o sea que se reiniciaba en cada categoria y el mismo
+        # negocio se contaba (y se pagaba) dos veces.
+        vistos_corrida = set()
+        con_detalle_corrida = set()
 
         for i, cat in enumerate(CATEGORIAS_IMPORTADOR):
             with _import_lock:
@@ -4564,7 +4606,9 @@ def _worker_importador(ciudad, gmaps_api_key):
                 _import_job['progreso']  = i
                 _import_job['log'].append(f'Buscando {cat} en {ciudad}...')
 
-            resultados, stats, incidencias = _buscar_negocios(gmaps, cat, ciudad)
+            resultados, stats, incidencias = _buscar_negocios(
+                gmaps, cat, ciudad, vistos=vistos_corrida,
+                con_detalle=con_detalle_corrida)
 
             # Agregar ciudad a cada resultado
             for r in resultados:
@@ -4599,7 +4643,12 @@ def _worker_importador(ciudad, gmaps_api_key):
                 _import_job['descartados']     += desc
                 _import_job['resultados']   = todos[:]
                 perdidos = incidencias['detalles_fallidos'] + incidencias['paginas_fallidas']
-                aviso = f' ⚠ {perdidos} se perdieron por errores de Places' if perdidos else ''
+                aviso = f' · ⚠ {perdidos} se perdieron por errores de Places' if perdidos else ''
+                solape = incidencias['ya_vistos_otra_cat']
+                if solape:
+                    evitados = incidencias['detalles_evitados']
+                    aviso += (f' · {solape} ya vistos en otra categoría'
+                              f' ({evitados} consultas de detalle ahorradas)')
                 _import_job['log'].append(
                     f'✓ {cat}: {len(resultados)} aprobados, {desc} descartados, '
                     f'{nuevos} nuevos en Sheet{aviso}'

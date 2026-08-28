@@ -230,14 +230,15 @@ def modo_servidor(puerto):
     """Un worker: proceso Flask independiente con su propio _import_job."""
     import app
 
-    def _buscar_lento(_cliente, _categoria, _ciudad):
+    def _buscar_lento(_cliente, _categoria, _ciudad, vistos=None, con_detalle=None):
         for _ in range(30):
             time.sleep(1)
         return ([_negocio("Demo", "pid-X", "Calle X")],
                 {"pocas_resenas": 0, "baja_calificacion": 0,
                  "cerrado": 0, "sin_telefono": 0},
                 {"detalles_fallidos": 0, "paginas_fallidas": 0,
-                 "consultas_fallidas": 0})
+                 "consultas_fallidas": 0, "ya_vistos_otra_cat": 0,
+                 "detalles_evitados": 0})
 
     app.GMAPS_OK = True
     app.googlemaps.Client = lambda key=None, **kw: object()
