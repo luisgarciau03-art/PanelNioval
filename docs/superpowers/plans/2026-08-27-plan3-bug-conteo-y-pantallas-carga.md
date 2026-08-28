@@ -554,7 +554,7 @@ Se revisaron las ~60 herramientas de `claude-ads` contra el contenido de este pl
 | T3.5 | Estado compartido entre workers (B5) | **HECHA** | `cd3bfcb` · 275 passed (23 tests nuevos) · ADR `docs/adr/2026-08-27-estado-compartido-importador.md` · **council eligio A, no la B del plan** (premisa de B falsa: daemon=True muere igual) · gates python-reviewer + code-reviewer + **security-reviewer**: 1 CRITICAL (CMD del Dockerfile roto) y 2 HIGH corregidos en el mismo commit · **falta verificacion con gunicorn real en el VPS (gate del owner)** | 2026-08-27 |
 | T3.6 | Progreso real y continuo (B6) | **HECHA** | `0062da8` · 288 passed (13 tests nuevos) · barra de 3 valores a 12, tramos parejos de 9 puntos · denominador ajustable listo para Plan 2 T2.4 · gates python-reviewer + code-reviewer: 0 CRITICAL/HIGH, 3 MEDIUM corregidos | 2026-08-27 |
 | T3.7 | Frontend robusto (B7, B8, B9 + B10 cliente, B12, B13) | **HECHA** | `9bd8f6c` · 314 passed (26 tests nuevos) · gates code-reviewer + **security-reviewer PASS** + **silent-failure-hunter**: 1 CRITICAL (Telegram decia 'Completado' de una corrida detenida) y 2 HIGH corregidos · `node --check` sobre el JS embebido | 2026-08-27 |
-| T3.8 | Verificación de extremo a extremo | PENDIENTE | | |
-| T3.9 | Cierre: docs, PR, handoff | PENDIENTE | | |
+| T3.8 | Verificación de extremo a extremo | **HECHA** | `2410011` · `docs/investigacion/2026-08-27-verificacion-plan3.md` · **314 passed** · medicion antes/despues: **10/20 sondeos `idle` → 0/20** · 8 de 11 criterios cerrados · **3 son gates del owner** (corrida real, gunicorn en VPS, navegador) | 2026-08-27 |
+| T3.9 | Cierre: docs, PR, handoff | **HECHA** | `2410011` · CLAUDE.md baseline 230→314 + aviso del `-qq` · RUNBOOK con seccion del importador · ADR del estado compartido | 2026-08-27 |
 
-**Avance del plan: 8 / 10 tareas (80 %)**
+**Avance del plan: 10 / 10 tareas (100 %)**
