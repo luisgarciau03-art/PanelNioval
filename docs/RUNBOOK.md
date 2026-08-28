@@ -179,6 +179,54 @@ existe, se marca como interrumpido y se sigue adelante.
 
 Antes, los dos primeros terminaban en ✅ con la hoja intacta.
 
+### Caché de detalles de Places (desde 2026-08-28)
+
+El importador guarda los detalles que pide a Google (teléfono, sitio web, horario)
+para no volver a pagarlos. **A quien más ahorra es al negocio rechazado**: uno que
+pasa reseñas y calificación pero no tiene teléfono se descarta y nunca llega a la
+hoja, así que sin caché se re-pagaba en cada corrida de esa ciudad, para siempre.
+
+Medido: segunda corrida de la misma ciudad, **80 → 0** llamadas de Place Details.
+
+| Dato | Valor |
+|---|---|
+| Archivo | `PLACES_CACHE_FILE`, por defecto el temp del sistema |
+| Vigencia | 30 días |
+| Contenido | `place_id` → teléfono, sitio web, horario, y marca de tiempo |
+
+**Lleva teléfonos de negocios, o sea datos personales.** Está en `.gitignore` y
+`.dockerignore`. No copiarlo fuera del servidor ni adjuntarlo a un reporte.
+
+**Por defecto NO sobrevive a un redespliegue** (vive en el temp del contenedor).
+Funciona igual — se pierde el ahorro, no el servicio. Para que persista, montarle
+un volumen en `/srv/panel/docker-compose.yml`:
+
+```yaml
+    environment:
+      - PLACES_CACHE_FILE=/datos/places_detalles.json
+    volumes:
+      - ./secretos/credentials.json:/app/credentials.json:ro
+      - panel-datos:/datos          # <-- añadir
+
+volumes:
+  panel-datos:                      # <-- añadir al final del archivo
+```
+
+Es opcional y es decisión del owner: sin el volumen el panel funciona igual.
+
+**Si hace falta borrarla** (por ejemplo, si se sospecha que tiene teléfonos
+viejos), basta con eliminar el archivo: se reconstruye sola en la siguiente
+corrida, pagando los detalles una vez.
+
+### ¿Por qué 30 días y no 90?
+
+Lo que se cachea incluye el teléfono que el operador va a marcar. Un negocio que
+añade teléfono a su ficha de Google es un prospecto nuevo, y no conviene tardar un
+trimestre en verlo. Con 30 días, quien recorre una ciudad cada semana o cada mes
+ya no paga nada por los rechazados.
+
+---
+
 ### Por qué un solo worker
 
 `--workers 1 --threads 4`. El estado del importador y la caché son globales de

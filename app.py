@@ -4395,6 +4395,82 @@ MAX_PAGINAS_POR_CONSULTA = 3
 MAX_VARIACIONES_SIN_APORTE = 2   # variaciones seguidas con 0 nuevos antes de parar
 CORTAR_PAGINAS_SIN_APORTE = True # False deja de cortar por pagina sin tocar codigo
 
+# ─── Cache de Place Details (Plan 2 - T2.5) ──────────────────────────────────
+# A quien mas ahorra no es al negocio repetido, sino al RECHAZADO. Un negocio que
+# pasa resenas y calificacion pero no tiene telefono paga su Place Details, se
+# descarta por `sin_telefono` y nunca llega a la hoja. Como el prefiltro de T2.3
+# solo salta lo que esta EN la hoja, ese negocio se vuelve a pagar en cada corrida
+# de esa ciudad, indefinidamente.
+#
+# TTL de 30 dias, no 90: lo que se cachea incluye el telefono que el operador va a
+# marcar. Un negocio que anade telefono a su ficha es un prospecto nuevo y no
+# conviene tardar un trimestre en verlo. Con 30 dias, quien recorre una ciudad
+# cada semana o cada mes ya no paga nada por los rechazados.
+#
+# Por defecto vive en el temp del sistema, que NO sobrevive a un redespliegue.
+# Para que sobreviva hay que montarle un volumen (ver docs/RUNBOOK.md). Sin
+# volumen sigue funcionando: se pierde el ahorro, no el servicio.
+PLACES_CACHE_FILE = os.environ.get(
+    'PLACES_CACHE_FILE',
+    os.path.join(tempfile.gettempdir(), 'places_detalles.json'))
+PLACES_CACHE_TTL = 30 * 24 * 3600
+
+
+def _leer_cache_places():
+    """Cache de detalles, o vacia si no hay o esta ilegible.
+
+    Una cache rota degrada el COSTO, nunca el servicio: si no se puede leer, se
+    sigue pegando a la API igual que antes de que existiera.
+    """
+    try:
+        with open(PLACES_CACHE_FILE, encoding='utf-8') as fh:
+            datos = json.load(fh)
+    except (OSError, ValueError) as e:
+        if not isinstance(e, FileNotFoundError):
+            print(f'[importador] cache de Places ilegible, se ignora: {e}')
+        return {}
+    if not isinstance(datos, dict):
+        print('[importador] cache de Places con formato inesperado, se ignora')
+        return {}
+    ahora = time.time()
+    return {pid: v for pid, v in datos.items()
+            if isinstance(v, dict) and ahora - (v.get('ts') or 0) < PLACES_CACHE_TTL}
+
+
+def _guardar_cache_places(cache):
+    """Escritura atomica. Que falle no puede tumbar una corrida."""
+    tmp = '%s.%d.tmp' % (PLACES_CACHE_FILE, os.getpid())
+    try:
+        # 0600 y O_EXCL: es el unico archivo del despliegue con telefonos de
+        # clientes en reposo. O_EXCL ademas impide que un enlace simbolico
+        # plantado en la ruta redirija la escritura.
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w', encoding='utf-8') as fh:
+            json.dump(cache, fh)
+        os.replace(tmp, PLACES_CACHE_FILE)
+    except OSError as e:
+        print(f'[importador] no se pudo guardar la cache de Places: {e}')
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+
+def _detalle_de_place(gmaps_client, pid, cache):
+    """El detalle de un negocio, de la cache o de la API.
+
+    Solo se guardan los tres campos de CAMPOS_PLACE_DETAILS. Nombre y direccion
+    vienen del Text Search y no hacen falta aqui: cuanto menos dato personal
+    acabe en disco, mejor.
+    """
+    entrada = cache.get(pid)
+    if entrada is not None:
+        return entrada.get('det', {}), True
+    det = gmaps_client.place(pid, language='es', fields=CAMPOS_PLACE_DETAILS)['result']
+    guardado = {c: det.get(c) for c in CAMPOS_PLACE_DETAILS if det.get(c) is not None}
+    cache[pid] = {'det': guardado, 'ts': time.time()}
+    return det, False
+
 def _avanzar_progreso(job, hechos=None, total=None, fase=None):
     """Mueve la barra. Nunca hacia atras.
 
@@ -4576,7 +4652,8 @@ def _leer_estado_importador():
 
 
 def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
-                     con_detalle=None, avisar=None, claves_en_hoja=None):
+                     con_detalle=None, avisar=None, claves_en_hoja=None,
+                     cache_places=None):
     """Busca negocios con filtros de calidad. Campos y lógica idénticos al script original.
 
     `claves_en_hoja`, si se pasa, es el conjunto de claves `Nombre|Dirección` que
@@ -4613,7 +4690,10 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
     # termina en 'done' informando "0 aprobados": un fallo de autenticacion
     # presentado como una ciudad sin ferreterias.
     consultas_ok        = 0
+    detalles_desde_cache = 0
     cortes              = []  # lo que se dejo de pedir, y por que
+    if cache_places is None:
+        cache_places = {}
     ya_en_hoja          = 0   # saltados ANTES de pagar su detalle
     ya_vistos_otra_cat  = 0   # negocios que ya habia procesado OTRA categoria
     detalles_evitados   = 0   # de esos, los que ya habian costado un place()
@@ -4726,10 +4806,11 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                     if not cal or cal < 3.5:
                         stats['baja_calificacion'] += 1; continue
                     try:
-                        det = gmaps_client.place(
-                            pid, language='es',
-                            fields=CAMPOS_PLACE_DETAILS)['result']
-                        con_detalle.add(pid)
+                        det, de_cache = _detalle_de_place(gmaps_client, pid, cache_places)
+                        if de_cache:
+                            detalles_desde_cache += 1
+                        else:
+                            con_detalle.add(pid)
                         # Filtro "Cerrado" eliminado — se capturan negocios sin importar horario
                         tel = det.get('formatted_phone_number', '')
                         if not tel:
@@ -4784,6 +4865,7 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
 
     incidencias = {'ya_en_hoja': ya_en_hoja,
                    'cortes': cortes,
+                   'detalles_desde_cache': detalles_desde_cache,
                    'detalles_fallidos': detalles_fallidos,
                    'paginas_fallidas': paginas_fallidas,
                    'consultas_fallidas': len(variaciones) - consultas_ok,
@@ -4957,6 +5039,7 @@ def _enviar_telegram_importador(ciudad, resumen, desglose, tiempo_min,
 def _worker_importador(ciudad, gmaps_api_key):
     inicio = time.time()
     desglose = {}
+    cache_places = {}
     try:
         if not GMAPS_OK:
             raise RuntimeError('googlemaps no instalado')
@@ -4972,6 +5055,8 @@ def _worker_importador(ciudad, gmaps_api_key):
         # Place Details de lo que ya esta (que es donde esta el ahorro) y evitar
         # releer ~7,000 filas una vez por categoria.
         claves_en_hoja = _claves_de_la_hoja(get_worksheet('contactos'))
+        # Una sola lectura por corrida; se guarda en el `finally`, pase lo que pase.
+        cache_places.update(_leer_cache_places())
 
         # Presupuesto de pasos GARANTIZADOS por categoria: 1 al preparar, 3 (una
         # por variacion, que siempre corren) y 1 al guardar. Nada mas.
@@ -5026,7 +5111,7 @@ def _worker_importador(ciudad, gmaps_api_key):
             resultados, stats, incidencias = _buscar_negocios(
                 gmaps, cat, ciudad, vistos=vistos_corrida,
                 con_detalle=con_detalle_corrida, avisar=avanzar,
-                claves_en_hoja=claves_en_hoja)
+                claves_en_hoja=claves_en_hoja, cache_places=cache_places)
 
             avanzar(f'Guardando {cat} en Google Sheets…')
 
@@ -5077,6 +5162,9 @@ def _worker_importador(ciudad, gmaps_api_key):
                 # como "cubri todo" cuando justamente no lo hizo.
                 for corte in incidencias.get('cortes', []):
                     _import_job['log'].append(f'✂ {corte}')
+                de_cache = incidencias.get('detalles_desde_cache', 0)
+                if de_cache:
+                    aviso += f' · {de_cache} detalles servidos de caché'
                 solape = incidencias['ya_vistos_otra_cat']
                 if solape:
                     evitados = incidencias['detalles_evitados']
@@ -5154,6 +5242,12 @@ def _worker_importador(ciudad, gmaps_api_key):
         _enviar_telegram_importador(ciudad, resumen, desglose, tiempo,
                                     error=_sanear_error(e))
         traceback.print_exc()
+
+    finally:
+        # Se guarda pase lo que pase. Si la corrida revienta tras 200 llamadas ya
+        # pagadas, tirar la cache seria pagarlas otra vez en el reintento.
+        if cache_places:
+            _guardar_cache_places(cache_places)
 
 
 @app.route('/importador')

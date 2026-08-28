@@ -527,3 +527,178 @@ class TestCortarPaginasYVariaciones:
         assert not cortes, (
             "se corto con una sola variacion saturada, antes del umbral: %r" % cortes
         )
+
+
+# ─────────── T2.5 · cache persistente place_id -> detalle ───────────
+
+class TestCachePersistente:
+    """Quien mas se beneficia no es el negocio repetido: es el RECHAZADO.
+
+    Un negocio que pasa resenas y calificacion pero no tiene telefono paga su
+    Place Details, se descarta por `sin_telefono` y NUNCA llega a la hoja. Como
+    el prefiltro de T2.3 solo salta lo que esta en la hoja, ese negocio vuelve a
+    pagarse en cada corrida de esa ciudad, indefinidamente.
+    """
+
+    @pytest.fixture
+    def cache_temporal(self, entorno, tmp_path):
+        entorno.setattr(app, "PLACES_CACHE_FILE", str(tmp_path / "places.json"))
+        return tmp_path / "places.json"
+
+    def test_segunda_corrida_no_vuelve_a_pedir_el_mismo_detalle(
+            self, entorno, cache_temporal):
+        gmaps = GmapsEspia(catalogo(negocios(3), []))
+        correr(entorno, gmaps, WorksheetFalsa())
+        assert len(gmaps.llamadas_place) == 3
+
+        # Segunda corrida, hoja vacia otra vez (como si los hubieran borrado):
+        # el prefiltro no ayuda, pero la cache si.
+        gmaps2 = GmapsEspia(catalogo(negocios(3), []))
+        app._import_job = app._nuevo_import_job("CiudadDemo", status="running")
+        correr(entorno, gmaps2, WorksheetFalsa())
+        assert len(gmaps2.llamadas_place) == 0, (
+            "se volvieron a pagar %d detalles ya cacheados"
+            % len(gmaps2.llamadas_place)
+        )
+
+    def test_el_rechazado_sin_telefono_tampoco_se_repaga(self, entorno, cache_temporal):
+        """El caso que mas veces se repite en la vida real."""
+        class GmapsSinTelefono(GmapsEspia):
+            def place(self, pid, **kw):
+                self.llamadas_place.append((pid, kw))
+                return {"result": {}}          # sin telefono: se descarta
+
+        g1 = GmapsSinTelefono(catalogo(negocios(4), []))
+        est = correr(entorno, g1, WorksheetFalsa())
+        assert est["descartados"] == 4 and est["nuevos_en_sheet"] == 0
+        assert len(g1.llamadas_place) == 4
+
+        g2 = GmapsSinTelefono(catalogo(negocios(4), []))
+        app._import_job = app._nuevo_import_job("CiudadDemo", status="running")
+        est2 = correr(entorno, g2, WorksheetFalsa())
+        assert len(g2.llamadas_place) == 0, (
+            "se repagaron los detalles de negocios que ya sabiamos que no tienen "
+            "telefono: %d" % len(g2.llamadas_place)
+        )
+        assert est2["descartados"] == 4, "el descarte tiene que seguir contandose"
+
+    def test_una_entrada_vencida_se_vuelve_a_pedir(self, entorno, cache_temporal):
+        import json
+        import time as _t
+        gmaps = GmapsEspia(catalogo(negocios(1), []))
+        correr(entorno, gmaps, WorksheetFalsa())
+        assert len(gmaps.llamadas_place) == 1
+
+        # Se envejece la entrada mas alla del TTL.
+        datos = json.loads(cache_temporal.read_text(encoding="utf-8"))
+        for pid in datos:
+            datos[pid]["ts"] = _t.time() - (app.PLACES_CACHE_TTL + 60)
+        cache_temporal.write_text(json.dumps(datos), encoding="utf-8")
+
+        gmaps2 = GmapsEspia(catalogo(negocios(1), []))
+        app._import_job = app._nuevo_import_job("CiudadDemo", status="running")
+        correr(entorno, gmaps2, WorksheetFalsa())
+        assert len(gmaps2.llamadas_place) == 1, (
+            "una entrada vencida deberia volver a pedirse a la API"
+        )
+
+    def test_una_cache_ilegible_no_rompe_la_corrida(self, entorno, cache_temporal):
+        """Una cache rota degrada el COSTO, nunca el servicio."""
+        cache_temporal.write_text("{esto no es json", encoding="utf-8")
+        gmaps = GmapsEspia(catalogo(negocios(2), []))
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        assert est["status"] == "done", "una cache corrupta tumbo la corrida"
+        assert est["nuevos_en_sheet"] == 2
+        assert len(gmaps.llamadas_place) == 2, "deberia haber pegado a la API"
+
+    def test_no_poder_escribir_la_cache_no_rompe_la_corrida(self, entorno, tmp_path):
+        # Un directorio donde el archivo no se puede crear.
+        entorno.setattr(app, "PLACES_CACHE_FILE",
+                        str(tmp_path / "no-existe" / "sub" / "places.json"))
+        gmaps = GmapsEspia(catalogo(negocios(2), []))
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        assert est["status"] == "done"
+        assert est["nuevos_en_sheet"] == 2
+
+    def test_el_archivo_de_cache_esta_ignorado(self):
+        """Lleva telefonos de negocios, que son datos personales."""
+        import os as _o
+        import subprocess as _sp
+        raiz = _o.path.dirname(_o.path.dirname(_o.path.abspath(__file__)))
+        nombre = _o.path.basename(app.PLACES_CACHE_FILE)
+        for archivo in (".gitignore", ".dockerignore"):
+            with open(_o.path.join(raiz, archivo), encoding="utf-8") as fh:
+                assert nombre in fh.read(), "%s no ignora %s" % (archivo, nombre)
+        r = _sp.run(["git", "check-ignore", nombre], cwd=raiz,
+                    capture_output=True, text=True)
+        assert r.returncode == 0, "git no ignoraria %s" % nombre
+
+    def test_la_cache_no_guarda_nombres_ni_direcciones(self, entorno, cache_temporal):
+        """Solo los tres campos de Place Details, indexados por place_id.
+
+        Nombre y direccion vienen del Text Search y no hacen falta aqui: cuanto
+        menos dato personal en disco, mejor.
+        """
+        gmaps = GmapsEspia(catalogo(negocios(2), []))
+        correr(entorno, gmaps, WorksheetFalsa())
+        crudo = cache_temporal.read_text(encoding="utf-8")
+        assert "Neg 1" not in crudo, "la cache guardo el nombre del negocio"
+        assert "Calle 1" not in crudo, "la cache guardo la direccion"
+
+    def test_la_cache_sobrevive_a_una_corrida_que_revienta(self, entorno, cache_temporal):
+        """Si la corrida falla tras pagar 200 detalles, tirarlos seria pagarlos
+        otra vez en el reintento. Se guarda en el `finally`."""
+        import sys as _s, os as _o
+        _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
+        from test_importador_conteo import WorksheetQueExplota
+
+        gmaps = GmapsEspia(catalogo(negocios(3), []))
+        est = correr(entorno, gmaps, WorksheetQueExplota(fallar_en_escritura_n=1))
+        assert est["status"] == "error"
+        assert len(gmaps.llamadas_place) == 3, "el escenario debia pagar 3 detalles"
+        assert cache_temporal.exists(), (
+            "la corrida fallo y se tiraron los 3 detalles ya pagados"
+        )
+
+        # El reintento no vuelve a pagarlos.
+        gmaps2 = GmapsEspia(catalogo(negocios(3), []))
+        app._import_job = app._nuevo_import_job("CiudadDemo", status="running")
+        correr(entorno, gmaps2, WorksheetFalsa())
+        assert len(gmaps2.llamadas_place) == 0, (
+            "el reintento repago %d detalles" % len(gmaps2.llamadas_place)
+        )
+
+    def test_las_entradas_vencidas_se_podan_del_disco(self, entorno, cache_temporal):
+        """El MEDIO de la review de seguridad.
+
+        El filtro por TTL ocurre al LEER. Si el archivo nunca se reescribiera,
+        los telefonos seguirian en disco pasada su vigencia. Se reescribe en cada
+        corrida, asi que la poda es real y no solo en memoria.
+        """
+        import json
+        import time as _t
+        gmaps = GmapsEspia(catalogo(negocios(1), []))
+        correr(entorno, gmaps, WorksheetFalsa())
+
+        datos = json.loads(cache_temporal.read_text(encoding="utf-8"))
+        datos["pid-viejo"] = {"det": {"formatted_phone_number": "+52 33 9999 0000"},
+                              "ts": _t.time() - (app.PLACES_CACHE_TTL + 60)}
+        cache_temporal.write_text(json.dumps(datos), encoding="utf-8")
+
+        app._import_job = app._nuevo_import_job("CiudadDemo", status="running")
+        correr(entorno, GmapsEspia(catalogo(negocios(1), [])), WorksheetFalsa())
+
+        crudo = cache_temporal.read_text(encoding="utf-8")
+        assert "9999 0000" not in crudo, (
+            "un telefono vencido sigue en disco tras una corrida nueva"
+        )
+
+    def test_el_archivo_de_cache_no_es_legible_por_todos(self, entorno, cache_temporal):
+        """Es el unico archivo del despliegue con telefonos de clientes en reposo."""
+        import os as _o
+        import stat as _st
+        correr(entorno, GmapsEspia(catalogo(negocios(1), [])), WorksheetFalsa())
+        if _o.name == "nt":
+            pytest.skip("los permisos POSIX no aplican en Windows")
+        modo = _st.S_IMODE(_o.stat(cache_temporal).st_mode)
+        assert not modo & 0o077, "la cache es legible por otros: %o" % modo

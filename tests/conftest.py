@@ -50,3 +50,19 @@ _STUBBED_MODULES = [
 for _mod_name in _STUBBED_MODULES:
     if _mod_name not in sys.modules:
         sys.modules[_mod_name] = _StubModule(_mod_name)
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _cache_de_places_aislada(tmp_path, monkeypatch):
+    """Cada test estrena cache de Place Details.
+
+    Por defecto la cache vive en el temp del sistema, asi que sin esto un test
+    heredaria los detalles que cacheo otro y mediria 0 llamadas a la API creyendo
+    que su codigo las evito. Se aisla en el tmp_path del propio test.
+    """
+    import app
+    monkeypatch.setattr(app, "PLACES_CACHE_FILE",
+                        str(tmp_path / "places_detalles.json"), raising=False)

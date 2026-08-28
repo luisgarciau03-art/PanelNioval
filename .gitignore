@@ -24,3 +24,8 @@ docs/auditoria/respaldos/
 # fuera del repo; se ignora por si alguien apunta IMPORT_ESTADO_FILE aqui dentro.
 importador_estado.json
 importador_estado.json.*.tmp
+# Cache de detalles de Google Places. Lleva TELEFONOS de negocios, que son
+# datos personales. Por defecto vive en el temp del sistema; se ignora por si
+# alguien apunta PLACES_CACHE_FILE aqui dentro.
+places_detalles.json
+places_detalles.json.*.tmp
