@@ -4416,6 +4416,72 @@ PLACES_CACHE_FILE = os.environ.get(
 PLACES_CACHE_TTL = 30 * 24 * 3600
 
 
+# ─── Medidor de gasto y tope (Plan 2 - T2.6) ─────────────────────────────────
+# Las tarifas van por variable de entorno y NO tienen valor por defecto. Google
+# las cambia, y un numero hardcodeado empieza siendo correcto y acaba mintiendo
+# sin que nadie lo toque.
+#
+# Sin tarifa configurada NO se publica importe. Un 0.00 se leeria como "esta
+# corrida salio gratis", que es una afirmacion falsa, no una ausencia de dato.
+def _float_de_entorno(nombre):
+    valor = os.environ.get(nombre, '').strip()
+    if not valor:
+        return None
+    try:
+        return float(valor)
+    except ValueError:
+        print(f'[importador] {nombre} no es un numero ({valor!r}); se ignora')
+        return None
+
+
+PLACES_COSTO_TEXT_SEARCH = _float_de_entorno('PLACES_COSTO_TEXT_SEARCH')
+PLACES_COSTO_DETAILS     = _float_de_entorno('PLACES_COSTO_DETAILS')
+
+# Dos topes. El de dinero necesita tarifas; el de llamadas funciona siempre, y es
+# el unico utilizable mientras T2.0 siga bloqueada.
+PLACES_PRESUPUESTO_CORRIDA   = _float_de_entorno('PLACES_PRESUPUESTO_CORRIDA')
+PLACES_MAX_LLAMADAS_CORRIDA  = _float_de_entorno('PLACES_MAX_LLAMADAS_CORRIDA')
+
+
+class PresupuestoAgotado(Exception):
+    """La corrida toco su tope. No es un error: es un limite que se respeto."""
+
+
+def _nuevo_medidor():
+    return {'text_search': 0, 'place_details': 0, 'cache_hits': 0,
+            'duplicados_evitados': 0, 'costo': None}
+
+
+def _costo_estimado(medidor):
+    """Importe estimado, o None si no hay tarifas configuradas."""
+    if PLACES_COSTO_TEXT_SEARCH is None or PLACES_COSTO_DETAILS is None:
+        return None
+    return (medidor['text_search'] * PLACES_COSTO_TEXT_SEARCH
+            + medidor['place_details'] * PLACES_COSTO_DETAILS)
+
+
+def _cobrar(medidor, sku):
+    """Apunta una llamada facturable y corta si se paso del tope.
+
+    Se comprueba DESPUES de sumar: la llamada ya se hizo y ya se paga. Cortar
+    antes de apuntarla dejaria el medidor mintiendo por defecto.
+    """
+    medidor[sku] += 1
+    medidor['costo'] = _costo_estimado(medidor)
+
+    llamadas = medidor['text_search'] + medidor['place_details']
+    if PLACES_MAX_LLAMADAS_CORRIDA is not None and llamadas >= PLACES_MAX_LLAMADAS_CORRIDA:
+        raise PresupuestoAgotado(
+            f'tope de {PLACES_MAX_LLAMADAS_CORRIDA:.0f} llamadas alcanzado '
+            f'({medidor["text_search"]} Text Search + '
+            f'{medidor["place_details"]} Place Details)')
+    if (PLACES_PRESUPUESTO_CORRIDA is not None and medidor['costo'] is not None
+            and medidor['costo'] >= PLACES_PRESUPUESTO_CORRIDA):
+        raise PresupuestoAgotado(
+            f'presupuesto de {PLACES_PRESUPUESTO_CORRIDA} alcanzado '
+            f'(estimado {medidor["costo"]:.4f})')
+
+
 def _leer_cache_places():
     """Cache de detalles, o vacia si no hay o esta ilegible.
 
@@ -4470,7 +4536,7 @@ def _guardar_cache_places(cache):
             pass
 
 
-def _detalle_de_place(gmaps_client, pid, cache):
+def _detalle_de_place(gmaps_client, pid, cache, medidor=None):
     """El detalle de un negocio, de la cache o de la API.
 
     Solo se guardan los tres campos de CAMPOS_PLACE_DETAILS. Nombre y direccion
@@ -4479,7 +4545,11 @@ def _detalle_de_place(gmaps_client, pid, cache):
     """
     entrada = cache.get(pid)
     if entrada is not None:
+        if medidor is not None:
+            medidor['cache_hits'] += 1
         return entrada.get('det', {}), True
+    if medidor is not None:
+        _cobrar(medidor, 'place_details')
     det = gmaps_client.place(pid, language='es', fields=CAMPOS_PLACE_DETAILS)['result']
     # Se guarda y se DEVUELVE lo mismo, para que una fila fresca y una servida de
     # cache sean identicas. Si se devolviera el crudo, un campo explicitamente
@@ -4544,6 +4614,7 @@ def _nuevo_import_job(ciudad='', status='idle'):
         'log':        [],
         'error':      '',
         'cancelado':  False,
+        'medidor':    _nuevo_medidor(),
     }
 
 
@@ -4670,7 +4741,7 @@ def _leer_estado_importador():
 
 def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                      con_detalle=None, avisar=None, claves_en_hoja=None,
-                     cache_places=None):
+                     cache_places=None, medidor=None):
     """Busca negocios con filtros de calidad. Campos y lógica idénticos al script original.
 
     `claves_en_hoja`, si se pasa, es el conjunto de claves `Nombre|Dirección` que
@@ -4711,6 +4782,8 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
     cortes              = []  # lo que se dejo de pedir, y por que
     if cache_places is None:
         cache_places = {}
+    if medidor is None:
+        medidor = _nuevo_medidor()
     ya_en_hoja          = 0   # saltados ANTES de pagar su detalle
     ya_vistos_otra_cat  = 0   # negocios que ya habia procesado OTRA categoria
     detalles_evitados   = 0   # de esos, los que ya habian costado un place()
@@ -4742,6 +4815,7 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
             # empuja hacia un corte que nadie se gano.
             ids_de_esta_consulta = set()
             try:
+                _cobrar(medidor, 'text_search')
                 resp   = gmaps_client.places(query=query, language='es', type='establishment')
                 consulta_ok = True
                 lugares = resp.get('results', [])
@@ -4750,6 +4824,7 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                 while 'next_page_token' in resp and paginas < MAX_PAGINAS_POR_CONSULTA:
                     time.sleep(2)
                     try:
+                        _cobrar(medidor, 'text_search')
                         resp = gmaps_client.places(page_token=resp['next_page_token'])
                         pagina = resp.get('results', [])
                         aporte_pagina = _aporte_nuevo(pagina, vistos, ids_de_esta_consulta)
@@ -4767,6 +4842,8 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                                 f'{categoria} v{idx_q}: no se pidieron mas paginas '
                                 f'tras la {paginas}, que no trajo ninguno nuevo')
                             break
+                    except PresupuestoAgotado:
+                        raise            # el tope no es un tropiezo de la API
                     except Exception:
                         paginas_fallidas += 1
                         break
@@ -4816,6 +4893,7 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                             lugar.get('name', ''),
                             lugar.get('formatted_address', '')) in claves_en_hoja:
                         ya_en_hoja += 1
+                        medidor['duplicados_evitados'] += 1
                         continue
 
                     if not resenas or resenas < 5:
@@ -4823,7 +4901,8 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                     if not cal or cal < 3.5:
                         stats['baja_calificacion'] += 1; continue
                     try:
-                        det, de_cache = _detalle_de_place(gmaps_client, pid, cache_places)
+                        det, de_cache = _detalle_de_place(
+                            gmaps_client, pid, cache_places, medidor)
                         if de_cache:
                             detalles_desde_cache += 1
                         else:
@@ -4850,6 +4929,8 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                             'Tipo Cliente':     'Mayorista/Corporativo' if resenas > 300 else 'Minorista',
                         })
                         time.sleep(0.3)
+                    except PresupuestoAgotado:
+                        raise            # el tope no es un tropiezo de la API
                     except Exception:
                         # Un negocio que se cae aqui no aparece ni en `resultados`
                         # ni en `stats`: se evaporaba sin dejar numero.
@@ -4863,6 +4944,8 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                 # se lanzaba tres veces identicas.
                 break
 
+            except PresupuestoAgotado:
+                raise            # el tope no es un tropiezo de la API
             except Exception as e:
                 ultimo_error = e
                 print(f'[importador] error query intento {intento+1}: {e}')
@@ -5041,6 +5124,16 @@ def _enviar_telegram_importador(ciudad, resumen, desglose, tiempo_min,
             + f"<b>Descartados:</b> {resumen['descartados']}\n"
             + f"<b>Tiempo:</b> {tiempo_min:.1f} min\n\n"
         )
+        med = (resumen or {}).get('medidor') or {}
+        if med:
+            msg += (f"<b>Llamadas a Places:</b> {med.get('text_search', 0)} búsquedas"
+                    f" + {med.get('place_details', 0)} detalles\n")
+            evitadas = med.get('cache_hits', 0) + med.get('duplicados_evitados', 0)
+            if evitadas:
+                msg += f"<b>Llamadas evitadas:</b> {evitadas}\n"
+            if med.get('costo') is not None:
+                msg += f"<b>Costo estimado:</b> {med['costo']:.2f}\n"
+            msg += "\n"
         for cat, n in desglose.items():
             msg += f"  {cat}: {n} aprobados\n"
         req_lib.post(f'https://api.telegram.org/bot{token}/sendMessage',
@@ -5074,6 +5167,8 @@ def _worker_importador(ciudad, gmaps_api_key):
         claves_en_hoja = _claves_de_la_hoja(get_worksheet('contactos'))
         # Una sola lectura por corrida; se guarda en el `finally`, pase lo que pase.
         cache_places.update(_leer_cache_places())
+        with _import_lock:
+            medidor = _import_job['medidor']
 
         # Presupuesto de pasos GARANTIZADOS por categoria: 1 al preparar, 3 (una
         # por variacion, que siempre corren) y 1 al guardar. Nada mas.
@@ -5128,7 +5223,8 @@ def _worker_importador(ciudad, gmaps_api_key):
             resultados, stats, incidencias = _buscar_negocios(
                 gmaps, cat, ciudad, vistos=vistos_corrida,
                 con_detalle=con_detalle_corrida, avisar=avanzar,
-                claves_en_hoja=claves_en_hoja, cache_places=cache_places)
+                claves_en_hoja=claves_en_hoja, cache_places=cache_places,
+                medidor=medidor)
 
             avanzar(f'Guardando {cat} en Google Sheets…')
 
@@ -5205,6 +5301,7 @@ def _worker_importador(ciudad, gmaps_api_key):
                 'encontrados': _import_job['encontrados'],
                 'duplicados':  _import_job['duplicados'],
                 'descartados': _import_job['descartados'],
+                'medidor':     dict(_import_job.get('medidor') or {}),
             }
         _enviar_telegram_importador(ciudad, resumen, desglose, tiempo,
                                     cancelado=fue_cancelada)
@@ -5235,6 +5332,30 @@ def _worker_importador(ciudad, gmaps_api_key):
             )
         _guardar_estado_importador(copia_estado)
 
+    except PresupuestoAgotado as e:
+        # No es un error: la corrida hizo lo que se le pidio y paro donde se le
+        # dijo. Lo escrito hasta aqui es valido. Lo unico inaceptable seria
+        # pararse sin decirlo.
+        tiempo = (time.time() - inicio) / 60
+        with _import_lock:
+            _import_job['status'] = 'presupuesto_agotado'
+            _import_job['error'] = (
+                f'Se alcanzó el tope de gasto de Places: {e}. Lo que ya se '
+                f'guardó en la hoja sigue ahí; volver a correr la ciudad '
+                f'continúa desde donde quedó, sin repetir lo pagado.')
+            _import_job['log'].append(f'⛔ {_import_job["error"]}')
+            copia_estado = dict(_import_job)
+            resumen = {
+                'nuevos':      _import_job['nuevos_en_sheet'],
+                'encontrados': _import_job['encontrados'],
+                'duplicados':  _import_job['duplicados'],
+                'descartados': _import_job['descartados'],
+                'medidor':     dict(_import_job.get('medidor') or {}),
+            }
+        _guardar_estado_importador(copia_estado)
+        _enviar_telegram_importador(ciudad, resumen, desglose, tiempo,
+                                    error=_import_job['error'])
+
     except Exception as e:
         # Telegram solo avisaba en el camino feliz: si la corrida se caia, el
         # owner no se enteraba por ningun canal.
@@ -5254,6 +5375,7 @@ def _worker_importador(ciudad, gmaps_api_key):
                 'encontrados': _import_job['encontrados'],
                 'duplicados':  _import_job['duplicados'],
                 'descartados': _import_job['descartados'],
+                'medidor':     dict(_import_job.get('medidor') or {}),
             }
         _guardar_estado_importador(copia_estado)
         _enviar_telegram_importador(ciudad, resumen, desglose, tiempo,
@@ -5326,6 +5448,7 @@ def importador_estado():
             'total':      _import_job['total'],
             'fraccion':   _import_job.get('fraccion', 0),
             'fase':       _import_job.get('fase', ''),
+            'medidor':    dict(_import_job.get('medidor') or _nuevo_medidor()),
             'encontrados':     _import_job['encontrados'],
             'nuevos_en_sheet': _import_job['nuevos_en_sheet'],
             'duplicados':      _import_job['duplicados'],

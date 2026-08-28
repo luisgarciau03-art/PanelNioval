@@ -766,3 +766,119 @@ class TestCachePersistente:
             "la fila servida de cache difiere de la fresca:\n  %r\n  %r"
             % (fresca[1:18], cacheada[1:18])
         )
+
+
+# ─────────── T2.6 · medidor de gasto y tope de presupuesto ───────────
+
+class TestMedidorDeGasto:
+    @pytest.fixture(autouse=True)
+    def _sin_tope(self, entorno, tmp_path):
+        entorno.setattr(app, "PLACES_CACHE_FILE", str(tmp_path / "c.json"))
+        entorno.setattr(app, "PLACES_MAX_LLAMADAS_CORRIDA", None)
+        entorno.setattr(app, "PLACES_PRESUPUESTO_CORRIDA", None)
+        entorno.setattr(app, "PLACES_COSTO_TEXT_SEARCH", None)
+        entorno.setattr(app, "PLACES_COSTO_DETAILS", None)
+
+    def test_cuenta_una_por_cada_text_search(self, entorno):
+        gmaps = GmapsEspia(catalogo(negocios(2), []))
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        assert est["medidor"]["text_search"] == gmaps.llamadas_places, (
+            "el medidor dice %d Text Search y se hicieron %d"
+            % (est["medidor"]["text_search"], gmaps.llamadas_places)
+        )
+
+    def test_cuenta_una_por_cada_place_details(self, entorno):
+        gmaps = GmapsEspia(catalogo(negocios(3), []))
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        assert est["medidor"]["place_details"] == len(gmaps.llamadas_place) == 3
+
+    def test_un_acierto_de_cache_no_suma_al_contador_de_details(self, entorno, tmp_path):
+        """La comprobacion en las dos direcciones que pide el plan."""
+        gmaps = GmapsEspia(catalogo(negocios(3), []))
+        est1 = correr(entorno, gmaps, WorksheetFalsa())
+        assert est1["medidor"]["place_details"] == 3
+        assert est1["medidor"]["cache_hits"] == 0
+
+        gmaps2 = GmapsEspia(catalogo(negocios(3), []))
+        app._import_job = app._nuevo_import_job("CiudadDemo", status="running")
+        est2 = correr(entorno, gmaps2, WorksheetFalsa())
+        assert est2["medidor"]["place_details"] == 0, (
+            "un acierto de cache sumo al contador de llamadas pagadas"
+        )
+        assert est2["medidor"]["cache_hits"] == 3
+
+    def test_cuenta_los_duplicados_evitados(self, entorno):
+        gmaps = GmapsEspia(catalogo(negocios(5), []))
+        ws = WorksheetFalsa([("Neg %d" % i, "Calle %d" % i) for i in (1, 2, 3)])
+        est = correr(entorno, gmaps, ws)
+        assert est["medidor"]["duplicados_evitados"] == 3
+
+    def test_sin_tarifas_no_se_inventa_un_costo(self, entorno):
+        """T2.0 esta bloqueada: no hay tarifas reales.
+
+        Publicar un 0.00 se leeria como "esta corrida salio gratis", que es una
+        afirmacion falsa. Sin tarifa configurada, no hay importe.
+        """
+        gmaps = GmapsEspia(catalogo(negocios(2), []))
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        assert est["medidor"]["costo"] is None, (
+            "se publico un costo sin tarifas configuradas: %r" % est["medidor"]["costo"]
+        )
+
+    def test_con_tarifas_el_costo_es_la_suma(self, entorno):
+        entorno.setattr(app, "PLACES_COSTO_TEXT_SEARCH", 0.032)
+        entorno.setattr(app, "PLACES_COSTO_DETAILS", 0.017)
+        gmaps = GmapsEspia(catalogo(negocios(2), []))
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        m = est["medidor"]
+        esperado = m["text_search"] * 0.032 + m["place_details"] * 0.017
+        assert abs(m["costo"] - esperado) < 1e-9
+
+
+class TestTopeDePresupuesto:
+    @pytest.fixture(autouse=True)
+    def _cache(self, entorno, tmp_path):
+        entorno.setattr(app, "PLACES_CACHE_FILE", str(tmp_path / "c.json"))
+        entorno.setattr(app, "PLACES_PRESUPUESTO_CORRIDA", None)
+        entorno.setattr(app, "PLACES_COSTO_TEXT_SEARCH", None)
+        entorno.setattr(app, "PLACES_COSTO_DETAILS", None)
+
+    def test_la_corrida_se_detiene_al_superar_el_tope_de_llamadas(self, entorno):
+        entorno.setattr(app, "PLACES_MAX_LLAMADAS_CORRIDA", 5)
+        gmaps = GmapsEspia(catalogo(negocios(20), []))
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        total = gmaps.llamadas_places + len(gmaps.llamadas_place)
+        assert total <= 7, "se pasó del tope: %d llamadas" % total
+        assert est["status"] == "presupuesto_agotado", (
+            "la corrida acabo en %r en vez de avisar del tope" % est["status"]
+        )
+
+    def test_el_tope_no_corta_en_silencio(self, entorno):
+        """El gate de este tope: pararse sin que nadie se entere es lo unico
+        inaceptable."""
+        entorno.setattr(app, "PLACES_MAX_LLAMADAS_CORRIDA", 5)
+        gmaps = GmapsEspia(catalogo(negocios(20), []))
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        texto = " ".join(est["log"])
+        assert "presupuesto" in texto.lower() or "tope" in texto.lower(), (
+            "el tope corto la corrida sin decirlo: %r" % est["log"]
+        )
+        assert est["error"], "no se dejo una causa legible"
+
+    def test_conserva_lo_ya_guardado_al_agotar_presupuesto(self, entorno):
+        entorno.setattr(app, "PLACES_MAX_LLAMADAS_CORRIDA", 8)
+        gmaps = GmapsEspia(catalogo(negocios(20), []))
+        ws = WorksheetFalsa()
+        est = correr(entorno, gmaps, ws)
+        assert est["status"] == "presupuesto_agotado"
+        assert est["nuevos_en_sheet"] == ws.escrituras, (
+            "el contador no cuadra con lo que de verdad se escribio"
+        )
+
+    def test_sin_tope_configurado_la_corrida_no_se_corta(self, entorno):
+        """La otra direccion: el tope no puede dispararse solo."""
+        entorno.setattr(app, "PLACES_MAX_LLAMADAS_CORRIDA", None)
+        gmaps = GmapsEspia(catalogo(negocios(6), []))
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        assert est["status"] == "done"
+        assert est["nuevos_en_sheet"] == 6
