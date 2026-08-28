@@ -17,7 +17,7 @@ from gspread.exceptions import WorksheetNotFound
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-import os, json, time, io, base64, re, hmac, tempfile, requests as req_lib
+import os, json, time, io, base64, re, hmac, tempfile, subprocess, requests as req_lib
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
@@ -111,6 +111,41 @@ SHEET_GIDS = {
 
 _cache: dict = {}
 CACHE_TTL = 300
+
+# La cache se muta desde el hilo daemon del importador (_exportar_a_sheets) a la
+# vez que los hilos de peticion. Con --workers 2 cada proceso era monohilo para
+# peticiones y la carrera era estrecha; con un worker y 4 hilos deja de serlo.
+# `if key in _cache` seguido de `_cache[key]` es un check-then-act sin proteger.
+# RLock y no Lock a proposito: los helpers no se anidan hoy, pero si alguno
+# llegara a componer a otro, un Lock simple se autobloquearia en silencio.
+_cache_lock = threading.RLock()
+
+# Los clientes perezosos (_gs_client, _drive_service, _pago_folder_id) eran
+# seguros por construccion cuando cada worker atendia una peticion a la vez. Con
+# --threads 4 dos peticiones en frio pueden pasar la comprobacion de None a la
+# vez y autenticarse dos veces contra Google.
+_clientes_lock = threading.Lock()
+
+
+def _cache_get(clave):
+    """Valor cacheado o None. Devuelve la tupla (dato, ts) tal cual la guardo."""
+    with _cache_lock:
+        return _cache.get(clave)
+
+
+def _cache_set(clave, valor):
+    with _cache_lock:
+        _cache[clave] = valor
+
+
+def _cache_pop(clave):
+    with _cache_lock:
+        return _cache.pop(clave, None)
+
+
+def _cache_clear():
+    with _cache_lock:
+        _cache.clear()
 _gs_client = None
 _drive_service = None
 _pago_folder_id = None
@@ -121,6 +156,14 @@ def get_gs_client():
     global _gs_client
     if _gs_client:
         return _gs_client
+    with _clientes_lock:
+        if _gs_client:          # otro hilo lo construyo mientras esperabamos
+            return _gs_client
+        return _construir_gs_client()
+
+
+def _construir_gs_client():
+    global _gs_client
     scopes = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive',
@@ -140,6 +183,14 @@ def get_drive_service():
     global _drive_service
     if _drive_service:
         return _drive_service
+    with _clientes_lock:
+        if _drive_service:
+            return _drive_service
+        return _construir_drive_service()
+
+
+def _construir_drive_service():
+    global _drive_service
     scopes = [
         'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/spreadsheets',
@@ -160,6 +211,14 @@ def get_pago_folder_id():
     global _pago_folder_id
     if _pago_folder_id:
         return _pago_folder_id
+    with _clientes_lock:
+        if _pago_folder_id:
+            return _pago_folder_id
+        return _construir_pago_folder_id()
+
+
+def _construir_pago_folder_id():
+    global _pago_folder_id
     # Leer desde variable de entorno (carpeta de Drive del usuario compartida con la cuenta de servicio)
     folder_id = os.environ.get('PAGO_FOLDER_ID', '').strip()
     if folder_id:
@@ -219,22 +278,24 @@ def values_to_records(rows: list) -> list:
 
 def get_data(key: str, force: bool = False) -> list:
     now = time.time()
-    if not force and key in _cache:
-        data, ts = _cache[key]
+    entrada = None if force else _cache_get(key)
+    if entrada is not None:
+        data, ts = entrada
         if now - ts < CACHE_TTL:
             return data
     try:
         ws = get_worksheet(key)
         rows = ws.get_all_values()
         data = values_to_records(rows)
-        _cache[key] = (data, now)
+        _cache_set(key, (data, now))
         print(f"[OK] {key} -> {len(data)} filas desde '{ws.title}' (gid={ws.id})")
         return data
     except Exception as e:
         print(f"[ERROR] get_data({key}): {e}")
         traceback.print_exc()
-        if key in _cache:
-            return _cache[key][0]
+        entrada = _cache_get(key)
+        if entrada is not None:
+            return entrada[0]
         return []
 
 
@@ -245,8 +306,9 @@ def get_all_respuestas(force: bool = False) -> list:
     """Lee Respuestas de formulario 1 + Bruce FORMS y los combina en un dataset unificado."""
     cache_key = 'all_respuestas'
     now = time.time()
-    if not force and cache_key in _cache:
-        data, ts = _cache[cache_key]
+    entrada = None if force else _cache_get(cache_key)
+    if entrada is not None:
+        data, ts = entrada
         if now - ts < CACHE_TTL:
             return data
     try:
@@ -273,14 +335,15 @@ def get_all_respuestas(force: bool = False) -> list:
             for k in all_keys:
                 if k not in r:
                     r[k] = ''
-        _cache[cache_key] = (all_records, now)
+        _cache_set(cache_key, (all_records, now))
         print(f"[respuestas] TOTAL combinado: {len(all_records)} filas")
         return all_records
     except Exception as e:
         print(f"[ERROR] get_all_respuestas: {e}")
         traceback.print_exc()
-        if cache_key in _cache:
-            return _cache[cache_key][0]
+        entrada = _cache_get(cache_key)
+        if entrada is not None:
+            return entrada[0]
         return []
 
 
@@ -352,11 +415,11 @@ def str_val(v) -> str:
 def api_refresh():
     key = request.json.get('key', 'all')
     if key == 'all':
-        _cache.clear()
+        _cache_clear()
     else:
-        _cache.pop(key, None)
+        _cache_pop(key)
         if key == 'respuestas':
-            _cache.pop('all_respuestas', None)
+            _cache_pop('all_respuestas')
     return jsonify({'ok': True})
 
 
@@ -406,7 +469,7 @@ def update_pago_url():
         for i, row in enumerate(rows[1:], start=2):
             if str(row[col_factura - 1]).strip() == num_factura:
                 ws.update_cell(i, col_pago, url)
-                _cache.pop('ventas', None)
+                _cache_pop('ventas')
                 return jsonify({'ok': True})
         return jsonify({'ok': False, 'error': 'factura no encontrada'})
     except Exception as e:
@@ -471,7 +534,7 @@ def upload_pago():
                     break
 
         # Invalidar cache
-        _cache.pop('ventas', None)
+        _cache_pop('ventas')
 
         return jsonify({
             'ok': True,
@@ -876,7 +939,7 @@ def _sheet_update_row(ws_key, row_num, fields, cache_key=None):
             updates.append({'range': a1, 'values': [[str(value)]]})
     if updates:
         ws.batch_update(updates, value_input_option='USER_ENTERED')
-    _cache.pop(cache_key or ws_key, None)
+    _cache_pop(cache_key or ws_key)
     return len(updates)
 
 
@@ -909,7 +972,7 @@ def api_mensajes_update():
         ws = get_worksheet('mensajes')
         a1 = gsu.rowcol_to_a1(int(row_num), int(col_num))
         ws.update(a1, [[str(contenido)]], value_input_option='USER_ENTERED')
-        _cache.pop('mensajes', None)
+        _cache_pop('mensajes')
         print(f"[mensajes] update col={col_num} row={row_num}")
         return jsonify({'ok': True})
     except Exception as e:
@@ -3008,7 +3071,7 @@ def marcar_contacto_procesado(row_num, col_respuesta=6):
                 6
             )
         ws.update_cell(row_num, col_respuesta, 'Llamado')
-        _cache.pop('contactos', None)
+        _cache_pop('contactos')
         print(f"[formulario] fila {row_num} col {col_respuesta} → Llamado")
     except Exception as e:
         print(f"[formulario] marcar error: {e}")
@@ -3068,8 +3131,8 @@ def guardar_respuesta_formulario(datos):
 
         print(f"[formulario] guardando fila {f} → tienda='{tienda}' resultado='{resultado}' r0='{r0}' col_j='{col_j}'")
         ws.batch_update(actualizaciones, value_input_option='RAW')
-        _cache.pop('respuestas', None)
-        _cache.pop('all_respuestas', None)
+        _cache_pop('respuestas')
+        _cache_pop('all_respuestas')
         print(f"[formulario] OK — fila {f} guardada en '{ws.title}'")
         return True
     except Exception as e:
@@ -3094,8 +3157,9 @@ def get_bruce_ws():
 
 def get_bruce_records(force=False):
     now = time.time()
-    if not force and 'bruce' in _cache:
-        data, ts = _cache['bruce']
+    entrada = None if force else _cache_get('bruce')
+    if entrada is not None:
+        data, ts = entrada
         if now - ts < CACHE_TTL:
             return data
     try:
@@ -3112,7 +3176,7 @@ def get_bruce_records(force=False):
             r = {headers[j]: str(padded[j]).strip() for j in range(len(headers))}
             r['_row'] = i
             records.append(r)
-        _cache['bruce'] = (records, now)
+        _cache_set('bruce', (records, now))
         return records
     except Exception as e:
         print(f"[bruce] get error: {e}")
@@ -3137,7 +3201,7 @@ def api_bruce_agregar():
         ws = get_bruce_ws()
         fecha = datetime.now().strftime('%d/%m/%Y %H:%M')
         ws.append_row([fecha, nombre, telefono, tipo, '', nota])
-        _cache.pop('bruce', None)
+        _cache_pop('bruce')
         return jsonify({'ok': True})
     except Exception as e:
         traceback.print_exc()
@@ -3164,7 +3228,7 @@ def api_bruce_actualizar():
                 updates.append({'range': a1, 'values': [[str(value)]]})
         if updates:
             ws.batch_update(updates, value_input_option='USER_ENTERED')
-        _cache.pop('bruce', None)
+        _cache_pop('bruce')
         return jsonify({'ok': True})
     except Exception as e:
         traceback.print_exc()
@@ -3260,7 +3324,7 @@ def formulario_telefono():
             [{'range': gsu.rowcol_to_a1(row, tel_col), 'values': [[tel_hoja]]}],
             value_input_option='RAW',
         )
-        _cache.pop('contactos', None)
+        _cache_pop('contactos')
         return jsonify({'ok': True, 'telefono': tel_norm})
     except Exception:
         print(f"[telefono] no se pudo actualizar row={row}")
@@ -3295,7 +3359,7 @@ def formulario_correo():
               'values': [[_sanitizar_correo(correo)]]}],
             value_input_option='RAW',
         )
-        _cache.pop('contactos', None)
+        _cache_pop('contactos')
         return jsonify({'ok': True})
     except Exception:
         print(f"[correo] no se pudo guardar en LISTA DE CONTACTOS row={row}")
@@ -3376,7 +3440,7 @@ def encolar_envio_catalogo(tienda, telefono, referencia, conclusion):
         nc.nueva_fila_envio(tienda, telefono, referencia, conclusion),
         value_input_option='RAW',
     )
-    _cache.pop('envios_catalogo', None)
+    _cache_pop('envios_catalogo')
     # numero_valido=False: el worker lo dejará NUMERO_INVALIDO; el frontend puede avisar ya.
     return {'ok': True, 'estado': nc.PENDIENTE, 'numero_valido': numero_valido}
 
@@ -3490,12 +3554,12 @@ def catalogo_corregir_numero():
                         value_input_option='RAW',
                     )
                     contacto_actualizado = True
-                _cache.pop('contactos', None)
+                _cache_pop('contactos')
             except Exception:
                 print(f"[catalogo] corregir: no se pudo actualizar LISTA DE CONTACTOS "
                       f"fila={contacto_row_real} tel={nc.enmascarar_telefono(nuevo_tel)}")
                 traceback.print_exc()
-        _cache.pop('envios_catalogo', None)
+        _cache_pop('envios_catalogo')
         resp = {'ok': True, 'estado': nc.PENDIENTE}
         if contacto_actualizado is not None:
             resp['contacto_actualizado'] = contacto_actualizado
@@ -3532,7 +3596,7 @@ def catalogo_reintentar():
             {'range': gsu.rowcol_to_a1(envio_row, col['estado']), 'values': [[nc.PENDIENTE]]},
             {'range': gsu.rowcol_to_a1(envio_row, col['timestamp_estado']), 'values': [[ahora]]},
         ], value_input_option='RAW')
-        _cache.pop('envios_catalogo', None)
+        _cache_pop('envios_catalogo')
         return jsonify({'ok': True, 'estado': nc.PENDIENTE})
     except Exception:
         print("[catalogo] reintentar error")
@@ -4339,6 +4403,122 @@ _import_job = _nuevo_import_job()
 _import_lock = threading.Lock()
 
 
+# ─── Registro de corrida interrumpida ────────────────────────────────────────
+# El hilo del importador es daemon=True: un reinicio del contenedor lo mata a
+# media corrida y `_import_job` vuelve a 'idle', asi que el operador ve la
+# pantalla limpia como si nunca hubiera lanzado nada.
+#
+# Este registro existe SOLO para poder decir "se interrumpio". No es el estado
+# vivo del trabajo (ese sigue en memoria, que ahora es un unico proceso) y
+# **nunca veta** una corrida nueva: persistir 'running' sin comprobar si el
+# proceso vive cambiaria "arrancan dos corridas" por "no puede arrancar
+# ninguna", que es peor. Por eso se guarda el PID y se comprueba.
+#
+# No lleva datos personales. `resultados` (nombre, domicilio y telefono de cada
+# prospecto) y el log se quedan fuera a proposito: un archivo de estado es un
+# log con otro nombre, y las reglas del proyecto prohiben volcarlos.
+IMPORT_ESTADO_FILE = os.environ.get(
+    'IMPORT_ESTADO_FILE',
+    os.path.join(tempfile.gettempdir(), 'importador_estado.json'))
+
+_CAMPOS_PERSISTIDOS = ('status', 'ciudad', 'categoria', 'progreso', 'total',
+                       'encontrados', 'nuevos_en_sheet', 'duplicados',
+                       'descartados', 'error')
+
+
+def _proceso_vivo(pid):
+    """True si el PID sigue corriendo. Ante la duda, True.
+
+    Mismo criterio que worker_catalogo_run.py:65: es preferible dejar un
+    'running' de mas que declarar interrumpida una corrida que sigue viva.
+    """
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    if os.name == 'nt':
+        try:
+            salida = subprocess.run(['tasklist', '/FI', f'PID eq {pid}', '/NH'],
+                                    capture_output=True, text=True, timeout=10).stdout
+        except (OSError, subprocess.SubprocessError):
+            return True
+        return str(pid) in salida
+    try:
+        os.kill(pid, 0)          # senal 0: no envia nada, solo comprueba
+    except ProcessLookupError:
+        return False
+    except PermissionError:      # existe, es de otro usuario
+        return True
+    except OSError:
+        return True
+    return True
+
+
+def _sanear_error(texto):
+    """Enmascara datos personales y acota la longitud de un mensaje de error.
+
+    `str(e)` acaba en disco, en Telegram y en stdout. Hoy ninguna excepcion del
+    importador incrusta datos de prospectos, pero basta con que una futura se
+    formatee con la fila (f"fila invalida: {r}") para filtrar un telefono por los
+    tres sitios a la vez. La lista blanca de campos persistidos no protege de eso
+    porque `error` es texto libre.
+
+    Misma convencion que nucleo_catalogo.enmascarar_telefono: se dejan los
+    ultimos 4 digitos.
+    """
+    texto = str(texto)
+
+    def _tapar(m):
+        d = m.group(0)
+        return '*' * (len(d) - 4) + d[-4:]
+
+    # Rachas de 7+ digitos: telefonos. Menos que eso son codigos de error,
+    # cuotas y numeros de fila, que hay que poder leer.
+    texto = re.sub(r'\d{7,}', _tapar, texto)
+    return texto[:400]
+
+
+def _guardar_estado_importador(job, pid=None):
+    """Persiste el registro minimo. Escritura atomica via os.replace."""
+    datos = {k: job.get(k) for k in _CAMPOS_PERSISTIDOS}
+    datos['error'] = _sanear_error(datos.get('error') or '')
+    datos['pid'] = os.getpid() if pid is None else pid
+    datos['ts'] = time.time()
+    tmp = '%s.%d.tmp' % (IMPORT_ESTADO_FILE, os.getpid())
+    try:
+        with open(tmp, 'w', encoding='utf-8') as fh:
+            json.dump(datos, fh)
+        os.replace(tmp, IMPORT_ESTADO_FILE)
+    except OSError as e:
+        # Sin disco escribible el panel sigue sirviendo: solo se pierde el aviso
+        # de "se interrumpio". No es motivo para tumbar una corrida.
+        print(f'[importador] no se pudo guardar el estado: {e}')
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+    return datos
+
+
+def _leer_estado_importador():
+    """Ultimo registro, o None si no hay o esta ilegible.
+
+    Un 'running' cuyo proceso ya no existe se devuelve como 'interrumpido'.
+    """
+    try:
+        with open(IMPORT_ESTADO_FILE, encoding='utf-8') as fh:
+            datos = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(datos, dict) or 'status' not in datos:
+        return None
+    if datos.get('status') == 'running' and not _proceso_vivo(datos.get('pid')):
+        datos['status'] = 'interrumpido'
+    return datos
+
+
 def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None, con_detalle=None):
     """Busca negocios con filtros de calidad. Campos y lógica idénticos al script original.
 
@@ -4553,7 +4733,7 @@ def _exportar_a_sheets(resultados, categoria, ciudad):
     if nuevos:
         nuevos = [[_escapar_formula(v) for v in fila] for fila in nuevos]
         ws.append_rows(nuevos, value_input_option='USER_ENTERED')
-        _cache.pop('contactos', None)
+        _cache_pop('contactos')
     return len(nuevos)
 
 
@@ -4653,6 +4833,11 @@ def _worker_importador(ciudad, gmaps_api_key):
                     f'✓ {cat}: {len(resultados)} aprobados, {desc} descartados, '
                     f'{nuevos} nuevos en Sheet{aviso}'
                 )
+                copia_estado = dict(_import_job)
+            # Al cerrar cada categoria, para que una corrida cortada a la mitad
+            # deje contadores reales y no ceros. Fuera del lock: es una syscall y
+            # los sondeos de estado necesitan ese mismo lock.
+            _guardar_estado_importador(copia_estado)
 
         tiempo = (time.time() - inicio) / 60
         with _import_lock:
@@ -4667,10 +4852,12 @@ def _worker_importador(ciudad, gmaps_api_key):
         with _import_lock:
             _import_job['status']   = 'done'
             _import_job['progreso'] = len(CATEGORIAS_IMPORTADOR)
+            copia_estado = dict(_import_job)
             _import_job['log'].append(
                 f"✅ Completado en {tiempo:.1f} min — "
                 f"{resumen['nuevos']} nuevos en la hoja de {resumen['encontrados']} encontrados"
             )
+        _guardar_estado_importador(copia_estado)
 
     except Exception as e:
         # Telegram solo avisaba en el camino feliz: si la corrida se caia, el
@@ -4678,7 +4865,8 @@ def _worker_importador(ciudad, gmaps_api_key):
         tiempo = (time.time() - inicio) / 60
         with _import_lock:
             _import_job['status'] = 'error'
-            _import_job['error']  = str(e)
+            _import_job['error']  = _sanear_error(e)
+            copia_estado = dict(_import_job)
             _import_job['log'].append(f'❌ Falló: {e}')
             sin_intentar = [c for c in CATEGORIAS_IMPORTADOR if c not in desglose
                             and c != _import_job.get('categoria')]
@@ -4691,7 +4879,9 @@ def _worker_importador(ciudad, gmaps_api_key):
                 'duplicados':  _import_job['duplicados'],
                 'descartados': _import_job['descartados'],
             }
-        _enviar_telegram_importador(ciudad, resumen, desglose, tiempo, error=str(e))
+        _guardar_estado_importador(copia_estado)
+        _enviar_telegram_importador(ciudad, resumen, desglose, tiempo,
+                                    error=_sanear_error(e))
         traceback.print_exc()
 
 
@@ -4715,6 +4905,8 @@ def importador_iniciar():
         if _import_job['status'] == 'running':
             return jsonify({'ok': False, 'error': 'Ya hay una búsqueda en curso'})
         _import_job = _nuevo_import_job(ciudad, status='running')
+        copia_estado = dict(_import_job)
+    _guardar_estado_importador(copia_estado)   # I/O fuera del lock
 
     t = threading.Thread(target=_worker_importador, args=(ciudad, gmaps_api_key), daemon=True)
     t.start()
@@ -4724,7 +4916,7 @@ def importador_iniciar():
 @app.route('/api/importador/estado')
 def importador_estado():
     with _import_lock:
-        return jsonify({
+        snap = {
             'status':     _import_job['status'],
             'ciudad':     _import_job['ciudad'],
             'categoria':  _import_job['categoria'],
@@ -4736,7 +4928,22 @@ def importador_estado():
             'descartados':     _import_job['descartados'],
             'log':        _import_job['log'][-10:],
             'error':      _import_job['error'],
-        })
+        }
+
+    # Tras un reinicio del contenedor, `_import_job` vuelve a 'idle' y la pantalla
+    # aparece limpia, como si el operador nunca hubiera lanzado nada. El registro
+    # en disco es lo unico que sabe que hubo una corrida y que se corto.
+    if snap['status'] == 'idle':
+        rec = _leer_estado_importador()
+        if rec and rec.get('status') == 'interrumpido':
+            for clave in _CAMPOS_PERSISTIDOS:
+                if clave in snap and rec.get(clave) is not None:
+                    snap[clave] = rec[clave]
+            snap['status'] = 'interrumpido'
+            snap['error'] = ('La corrida se interrumpió porque el panel se reinició. '
+                             'Lo que ya se había guardado en la hoja sigue ahí.')
+            snap['log'] = [snap['error']]
+    return jsonify(snap)
 
 
 IMPORTADOR_HTML = r"""<!DOCTYPE html>
