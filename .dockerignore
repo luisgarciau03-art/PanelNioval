@@ -17,3 +17,7 @@ adjuntar_fail.png
 # Archivos del catalogo: 124 MB que solo usa el worker en la PC del owner.
 # En la imagen del panel no pintan nada y la engordarian un 30%.
 Files/
+# Registro de corrida del importador. Por defecto vive en el temp del sistema,
+# fuera del repo; se ignora por si alguien apunta IMPORT_ESTADO_FILE aqui dentro.
+importador_estado.json
+importador_estado.json.*.tmp

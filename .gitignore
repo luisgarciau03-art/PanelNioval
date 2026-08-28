@@ -20,3 +20,7 @@ debug_timeout_*
 adjuntar_fail.png
 # Respaldos de hojas: contienen datos de clientes (no versionar)
 docs/auditoria/respaldos/
+# Registro de corrida del importador. Por defecto vive en el temp del sistema,
+# fuera del repo; se ignora por si alguien apunta IMPORT_ESTADO_FILE aqui dentro.
+importador_estado.json
+importador_estado.json.*.tmp

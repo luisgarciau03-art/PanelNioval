@@ -17,7 +17,7 @@ from gspread.exceptions import WorksheetNotFound
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-import os, json, time, io, base64, re, hmac, tempfile, requests as req_lib
+import os, json, time, io, base64, re, hmac, tempfile, subprocess, requests as req_lib
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
@@ -111,6 +111,41 @@ SHEET_GIDS = {
 
 _cache: dict = {}
 CACHE_TTL = 300
+
+# La cache se muta desde el hilo daemon del importador (_exportar_a_sheets) a la
+# vez que los hilos de peticion. Con --workers 2 cada proceso era monohilo para
+# peticiones y la carrera era estrecha; con un worker y 4 hilos deja de serlo.
+# `if key in _cache` seguido de `_cache[key]` es un check-then-act sin proteger.
+# RLock y no Lock a proposito: los helpers no se anidan hoy, pero si alguno
+# llegara a componer a otro, un Lock simple se autobloquearia en silencio.
+_cache_lock = threading.RLock()
+
+# Los clientes perezosos (_gs_client, _drive_service, _pago_folder_id) eran
+# seguros por construccion cuando cada worker atendia una peticion a la vez. Con
+# --threads 4 dos peticiones en frio pueden pasar la comprobacion de None a la
+# vez y autenticarse dos veces contra Google.
+_clientes_lock = threading.Lock()
+
+
+def _cache_get(clave):
+    """Valor cacheado o None. Devuelve la tupla (dato, ts) tal cual la guardo."""
+    with _cache_lock:
+        return _cache.get(clave)
+
+
+def _cache_set(clave, valor):
+    with _cache_lock:
+        _cache[clave] = valor
+
+
+def _cache_pop(clave):
+    with _cache_lock:
+        return _cache.pop(clave, None)
+
+
+def _cache_clear():
+    with _cache_lock:
+        _cache.clear()
 _gs_client = None
 _drive_service = None
 _pago_folder_id = None
@@ -121,6 +156,14 @@ def get_gs_client():
     global _gs_client
     if _gs_client:
         return _gs_client
+    with _clientes_lock:
+        if _gs_client:          # otro hilo lo construyo mientras esperabamos
+            return _gs_client
+        return _construir_gs_client()
+
+
+def _construir_gs_client():
+    global _gs_client
     scopes = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive',
@@ -140,6 +183,14 @@ def get_drive_service():
     global _drive_service
     if _drive_service:
         return _drive_service
+    with _clientes_lock:
+        if _drive_service:
+            return _drive_service
+        return _construir_drive_service()
+
+
+def _construir_drive_service():
+    global _drive_service
     scopes = [
         'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/spreadsheets',
@@ -160,6 +211,14 @@ def get_pago_folder_id():
     global _pago_folder_id
     if _pago_folder_id:
         return _pago_folder_id
+    with _clientes_lock:
+        if _pago_folder_id:
+            return _pago_folder_id
+        return _construir_pago_folder_id()
+
+
+def _construir_pago_folder_id():
+    global _pago_folder_id
     # Leer desde variable de entorno (carpeta de Drive del usuario compartida con la cuenta de servicio)
     folder_id = os.environ.get('PAGO_FOLDER_ID', '').strip()
     if folder_id:
@@ -219,22 +278,24 @@ def values_to_records(rows: list) -> list:
 
 def get_data(key: str, force: bool = False) -> list:
     now = time.time()
-    if not force and key in _cache:
-        data, ts = _cache[key]
+    entrada = None if force else _cache_get(key)
+    if entrada is not None:
+        data, ts = entrada
         if now - ts < CACHE_TTL:
             return data
     try:
         ws = get_worksheet(key)
         rows = ws.get_all_values()
         data = values_to_records(rows)
-        _cache[key] = (data, now)
+        _cache_set(key, (data, now))
         print(f"[OK] {key} -> {len(data)} filas desde '{ws.title}' (gid={ws.id})")
         return data
     except Exception as e:
         print(f"[ERROR] get_data({key}): {e}")
         traceback.print_exc()
-        if key in _cache:
-            return _cache[key][0]
+        entrada = _cache_get(key)
+        if entrada is not None:
+            return entrada[0]
         return []
 
 
@@ -245,8 +306,9 @@ def get_all_respuestas(force: bool = False) -> list:
     """Lee Respuestas de formulario 1 + Bruce FORMS y los combina en un dataset unificado."""
     cache_key = 'all_respuestas'
     now = time.time()
-    if not force and cache_key in _cache:
-        data, ts = _cache[cache_key]
+    entrada = None if force else _cache_get(cache_key)
+    if entrada is not None:
+        data, ts = entrada
         if now - ts < CACHE_TTL:
             return data
     try:
@@ -273,14 +335,15 @@ def get_all_respuestas(force: bool = False) -> list:
             for k in all_keys:
                 if k not in r:
                     r[k] = ''
-        _cache[cache_key] = (all_records, now)
+        _cache_set(cache_key, (all_records, now))
         print(f"[respuestas] TOTAL combinado: {len(all_records)} filas")
         return all_records
     except Exception as e:
         print(f"[ERROR] get_all_respuestas: {e}")
         traceback.print_exc()
-        if cache_key in _cache:
-            return _cache[cache_key][0]
+        entrada = _cache_get(cache_key)
+        if entrada is not None:
+            return entrada[0]
         return []
 
 
@@ -352,11 +415,11 @@ def str_val(v) -> str:
 def api_refresh():
     key = request.json.get('key', 'all')
     if key == 'all':
-        _cache.clear()
+        _cache_clear()
     else:
-        _cache.pop(key, None)
+        _cache_pop(key)
         if key == 'respuestas':
-            _cache.pop('all_respuestas', None)
+            _cache_pop('all_respuestas')
     return jsonify({'ok': True})
 
 
@@ -406,7 +469,7 @@ def update_pago_url():
         for i, row in enumerate(rows[1:], start=2):
             if str(row[col_factura - 1]).strip() == num_factura:
                 ws.update_cell(i, col_pago, url)
-                _cache.pop('ventas', None)
+                _cache_pop('ventas')
                 return jsonify({'ok': True})
         return jsonify({'ok': False, 'error': 'factura no encontrada'})
     except Exception as e:
@@ -471,7 +534,7 @@ def upload_pago():
                     break
 
         # Invalidar cache
-        _cache.pop('ventas', None)
+        _cache_pop('ventas')
 
         return jsonify({
             'ok': True,
@@ -876,7 +939,7 @@ def _sheet_update_row(ws_key, row_num, fields, cache_key=None):
             updates.append({'range': a1, 'values': [[str(value)]]})
     if updates:
         ws.batch_update(updates, value_input_option='USER_ENTERED')
-    _cache.pop(cache_key or ws_key, None)
+    _cache_pop(cache_key or ws_key)
     return len(updates)
 
 
@@ -909,7 +972,7 @@ def api_mensajes_update():
         ws = get_worksheet('mensajes')
         a1 = gsu.rowcol_to_a1(int(row_num), int(col_num))
         ws.update(a1, [[str(contenido)]], value_input_option='USER_ENTERED')
-        _cache.pop('mensajes', None)
+        _cache_pop('mensajes')
         print(f"[mensajes] update col={col_num} row={row_num}")
         return jsonify({'ok': True})
     except Exception as e:
@@ -3008,7 +3071,7 @@ def marcar_contacto_procesado(row_num, col_respuesta=6):
                 6
             )
         ws.update_cell(row_num, col_respuesta, 'Llamado')
-        _cache.pop('contactos', None)
+        _cache_pop('contactos')
         print(f"[formulario] fila {row_num} col {col_respuesta} → Llamado")
     except Exception as e:
         print(f"[formulario] marcar error: {e}")
@@ -3068,8 +3131,8 @@ def guardar_respuesta_formulario(datos):
 
         print(f"[formulario] guardando fila {f} → tienda='{tienda}' resultado='{resultado}' r0='{r0}' col_j='{col_j}'")
         ws.batch_update(actualizaciones, value_input_option='RAW')
-        _cache.pop('respuestas', None)
-        _cache.pop('all_respuestas', None)
+        _cache_pop('respuestas')
+        _cache_pop('all_respuestas')
         print(f"[formulario] OK — fila {f} guardada en '{ws.title}'")
         return True
     except Exception as e:
@@ -3094,8 +3157,9 @@ def get_bruce_ws():
 
 def get_bruce_records(force=False):
     now = time.time()
-    if not force and 'bruce' in _cache:
-        data, ts = _cache['bruce']
+    entrada = None if force else _cache_get('bruce')
+    if entrada is not None:
+        data, ts = entrada
         if now - ts < CACHE_TTL:
             return data
     try:
@@ -3112,7 +3176,7 @@ def get_bruce_records(force=False):
             r = {headers[j]: str(padded[j]).strip() for j in range(len(headers))}
             r['_row'] = i
             records.append(r)
-        _cache['bruce'] = (records, now)
+        _cache_set('bruce', (records, now))
         return records
     except Exception as e:
         print(f"[bruce] get error: {e}")
@@ -3137,7 +3201,7 @@ def api_bruce_agregar():
         ws = get_bruce_ws()
         fecha = datetime.now().strftime('%d/%m/%Y %H:%M')
         ws.append_row([fecha, nombre, telefono, tipo, '', nota])
-        _cache.pop('bruce', None)
+        _cache_pop('bruce')
         return jsonify({'ok': True})
     except Exception as e:
         traceback.print_exc()
@@ -3164,7 +3228,7 @@ def api_bruce_actualizar():
                 updates.append({'range': a1, 'values': [[str(value)]]})
         if updates:
             ws.batch_update(updates, value_input_option='USER_ENTERED')
-        _cache.pop('bruce', None)
+        _cache_pop('bruce')
         return jsonify({'ok': True})
     except Exception as e:
         traceback.print_exc()
@@ -3260,7 +3324,7 @@ def formulario_telefono():
             [{'range': gsu.rowcol_to_a1(row, tel_col), 'values': [[tel_hoja]]}],
             value_input_option='RAW',
         )
-        _cache.pop('contactos', None)
+        _cache_pop('contactos')
         return jsonify({'ok': True, 'telefono': tel_norm})
     except Exception:
         print(f"[telefono] no se pudo actualizar row={row}")
@@ -3295,7 +3359,7 @@ def formulario_correo():
               'values': [[_sanitizar_correo(correo)]]}],
             value_input_option='RAW',
         )
-        _cache.pop('contactos', None)
+        _cache_pop('contactos')
         return jsonify({'ok': True})
     except Exception:
         print(f"[correo] no se pudo guardar en LISTA DE CONTACTOS row={row}")
@@ -3376,7 +3440,7 @@ def encolar_envio_catalogo(tienda, telefono, referencia, conclusion):
         nc.nueva_fila_envio(tienda, telefono, referencia, conclusion),
         value_input_option='RAW',
     )
-    _cache.pop('envios_catalogo', None)
+    _cache_pop('envios_catalogo')
     # numero_valido=False: el worker lo dejará NUMERO_INVALIDO; el frontend puede avisar ya.
     return {'ok': True, 'estado': nc.PENDIENTE, 'numero_valido': numero_valido}
 
@@ -3490,12 +3554,12 @@ def catalogo_corregir_numero():
                         value_input_option='RAW',
                     )
                     contacto_actualizado = True
-                _cache.pop('contactos', None)
+                _cache_pop('contactos')
             except Exception:
                 print(f"[catalogo] corregir: no se pudo actualizar LISTA DE CONTACTOS "
                       f"fila={contacto_row_real} tel={nc.enmascarar_telefono(nuevo_tel)}")
                 traceback.print_exc()
-        _cache.pop('envios_catalogo', None)
+        _cache_pop('envios_catalogo')
         resp = {'ok': True, 'estado': nc.PENDIENTE}
         if contacto_actualizado is not None:
             resp['contacto_actualizado'] = contacto_actualizado
@@ -3532,7 +3596,7 @@ def catalogo_reintentar():
             {'range': gsu.rowcol_to_a1(envio_row, col['estado']), 'values': [[nc.PENDIENTE]]},
             {'range': gsu.rowcol_to_a1(envio_row, col['timestamp_estado']), 'values': [[ahora]]},
         ], value_input_option='RAW')
-        _cache.pop('envios_catalogo', None)
+        _cache_pop('envios_catalogo')
         return jsonify({'ok': True, 'estado': nc.PENDIENTE})
     except Exception:
         print("[catalogo] reintentar error")
@@ -4308,26 +4372,224 @@ cargarContacto();
 
 CATEGORIAS_IMPORTADOR = ['Ferreterías', 'Distribuidoras Ferreterías']
 
-_import_job = {
-    'status':    'idle',   # idle | running | done | error
-    'ciudad':    '',
-    'categoria': '',
-    'progreso':  0,        # categorías completadas
-    'total':     len(CATEGORIAS_IMPORTADOR),
-    'encontrados': 0,
-    'descartados': 0,
-    'resultados': [],
-    'log':        [],
-    'error':      '',
-}
+def _avanzar_progreso(job, hechos=None, total=None, fase=None):
+    """Mueve la barra. Nunca hacia atras.
+
+    El denominador se puede ajustar en marcha: si el total crece, la fraccion
+    bajaria, y una barra que retrocede se lee como que algo salio mal. Se queda
+    en el maximo alcanzado hasta que el avance real lo supere. Si el total se
+    recorta y eso adelanta la barra, si se aplica.
+    """
+    if hechos is not None:
+        job['pasos_hechos'] = hechos
+    if total is not None:
+        job['pasos_total'] = total
+    if fase is not None:
+        job['fase'] = fase
+
+    tot = job.get('pasos_total') or 0
+    if tot > 0:
+        cruda = int(round(job.get('pasos_hechos', 0) * 100 / tot))
+    else:
+        cruda = job.get('fraccion', 0)
+    job['fraccion'] = max(job.get('fraccion', 0), min(100, cruda))
+    return job['fraccion']
+
+
+def _nuevo_import_job(ciudad='', status='idle'):
+    """Forma canonica del estado del importador.
+
+    Estaba escrita dos veces (al importar el modulo y en importador_iniciar). Con
+    dos copias, un contador nuevo se olvida en una de ellas y el trabajo revienta
+    con KeyError a media corrida. Una sola definicion, dos llamadas.
+
+    Los cuatro contadores son independientes a proposito: `encontrados` es lo que
+    aprobo Places y `nuevos_en_sheet` son las filas que de verdad se escribieron.
+    Presentar el primero como si fuera el segundo es el bug que reporto el owner.
+    """
+    return {
+        'status':    status,   # idle | running | done | error
+        'ciudad':    ciudad,
+        'categoria': '',
+        'progreso':  0,        # categorías completadas (para las insignias)
+        'total':     len(CATEGORIAS_IMPORTADOR),
+        # La barra ya no se mueve por categoria: con dos, `progreso` solo valia
+        # 0, 1 o 2 y pasaba minutos clavada en 0 %. Ahora avanza por paso
+        # (categoria x variacion x pagina) y el denominador es ajustable, porque
+        # el Plan 2 va a recortar variaciones y el total dejara de ser fijo.
+        'fraccion':  0,        # 0-100, monotona no decreciente
+        'fase':      '',       # etiqueta legible del paso actual
+        'pasos_hechos': 0,
+        'pasos_total':  0,
+        'encontrados':     0,  # pasaron los filtros de Places
+        'nuevos_en_sheet': 0,  # filas REALMENTE escritas en la hoja
+        'duplicados':      0,  # ya estaban en LISTA DE CONTACTOS
+        'descartados':     0,  # rechazados por resenas, calificacion o sin telefono
+        'log':        [],
+        'error':      '',
+        'cancelado':  False,
+    }
+
+
+_import_job = _nuevo_import_job()
 _import_lock = threading.Lock()
 
 
-def _buscar_negocios(gmaps_client, categoria, ciudad):
-    """Busca negocios con filtros de calidad. Campos y lógica idénticos al script original."""
+# ─── Registro de corrida interrumpida ────────────────────────────────────────
+# El hilo del importador es daemon=True: un reinicio del contenedor lo mata a
+# media corrida y `_import_job` vuelve a 'idle', asi que el operador ve la
+# pantalla limpia como si nunca hubiera lanzado nada.
+#
+# Este registro existe SOLO para poder decir "se interrumpio". No es el estado
+# vivo del trabajo (ese sigue en memoria, que ahora es un unico proceso) y
+# **nunca veta** una corrida nueva: persistir 'running' sin comprobar si el
+# proceso vive cambiaria "arrancan dos corridas" por "no puede arrancar
+# ninguna", que es peor. Por eso se guarda el PID y se comprueba.
+#
+# No lleva datos personales. `resultados` (nombre, domicilio y telefono de cada
+# prospecto) y el log se quedan fuera a proposito: un archivo de estado es un
+# log con otro nombre, y las reglas del proyecto prohiben volcarlos.
+IMPORT_ESTADO_FILE = os.environ.get(
+    'IMPORT_ESTADO_FILE',
+    os.path.join(tempfile.gettempdir(), 'importador_estado.json'))
+
+_CAMPOS_PERSISTIDOS = ('status', 'ciudad', 'categoria', 'progreso', 'total',
+                       'fraccion', 'fase',
+                       'encontrados', 'nuevos_en_sheet', 'duplicados',
+                       'descartados', 'error')
+
+
+def _proceso_vivo(pid):
+    """True si el PID sigue corriendo. Ante la duda, True.
+
+    Mismo criterio que worker_catalogo_run.py:65: es preferible dejar un
+    'running' de mas que declarar interrumpida una corrida que sigue viva.
+    """
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    if os.name == 'nt':
+        try:
+            salida = subprocess.run(['tasklist', '/FI', f'PID eq {pid}', '/NH'],
+                                    capture_output=True, text=True, timeout=10).stdout
+        except (OSError, subprocess.SubprocessError):
+            return True
+        return str(pid) in salida
+    try:
+        os.kill(pid, 0)          # senal 0: no envia nada, solo comprueba
+    except ProcessLookupError:
+        return False
+    except PermissionError:      # existe, es de otro usuario
+        return True
+    except OSError:
+        return True
+    return True
+
+
+def _sanear_error(texto):
+    """Enmascara datos personales y acota la longitud de un mensaje de error.
+
+    `str(e)` acaba en disco, en Telegram y en stdout. Hoy ninguna excepcion del
+    importador incrusta datos de prospectos, pero basta con que una futura se
+    formatee con la fila (f"fila invalida: {r}") para filtrar un telefono por los
+    tres sitios a la vez. La lista blanca de campos persistidos no protege de eso
+    porque `error` es texto libre.
+
+    Misma convencion que nucleo_catalogo.enmascarar_telefono: se dejan los
+    ultimos 4 digitos.
+    """
+    texto = str(texto)
+
+    def _tapar(m):
+        d = m.group(0)
+        return '*' * (len(d) - 4) + d[-4:]
+
+    # Rachas de 7+ digitos: telefonos. Menos que eso son codigos de error,
+    # cuotas y numeros de fila, que hay que poder leer.
+    texto = re.sub(r'\d{7,}', _tapar, texto)
+    return texto[:400]
+
+
+def _guardar_estado_importador(job, pid=None):
+    """Persiste el registro minimo. Escritura atomica via os.replace."""
+    datos = {k: job.get(k) for k in _CAMPOS_PERSISTIDOS}
+    datos['error'] = _sanear_error(datos.get('error') or '')
+    datos['pid'] = os.getpid() if pid is None else pid
+    datos['ts'] = time.time()
+    tmp = '%s.%d.tmp' % (IMPORT_ESTADO_FILE, os.getpid())
+    try:
+        with open(tmp, 'w', encoding='utf-8') as fh:
+            json.dump(datos, fh)
+        os.replace(tmp, IMPORT_ESTADO_FILE)
+    except OSError as e:
+        # Sin disco escribible el panel sigue sirviendo: solo se pierde el aviso
+        # de "se interrumpio". No es motivo para tumbar una corrida.
+        print(f'[importador] no se pudo guardar el estado: {e}')
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+    return datos
+
+
+def _leer_estado_importador():
+    """Ultimo registro, o None si no hay o esta ilegible.
+
+    Un 'running' cuyo proceso ya no existe se devuelve como 'interrumpido'.
+    """
+    try:
+        with open(IMPORT_ESTADO_FILE, encoding='utf-8') as fh:
+            datos = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(datos, dict) or 'status' not in datos:
+        return None
+    if datos.get('status') == 'running' and not _proceso_vivo(datos.get('pid')):
+        datos['status'] = 'interrumpido'
+    return datos
+
+
+def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
+                     con_detalle=None, avisar=None):
+    """Busca negocios con filtros de calidad. Campos y lógica idénticos al script original.
+
+    `vistos` es el conjunto de place_id ya procesados. Si quien llama pasa el
+    suyo, la deduplicacion pasa a ser de CORRIDA en vez de por categoria: una
+    ferreteria que sale en 'Ferreterías' y en 'Distribuidoras Ferreterías' es un
+    solo negocio, se cuenta una vez y se paga un solo Place Details.
+
+    (El Plan 2 reutiliza este mismo conjunto para no pagar detalles repetidos;
+    no se crea una segunda estructura.)
+    """
     resultados = []
-    vistos = set()
+    if vistos is None:
+        vistos = set()
+    # Solo cuenta como SOLAPAMIENTO lo que ya estaba visto al entrar, es decir lo
+    # que aporto otra categoria. Las tres variaciones de esta misma categoria
+    # devuelven en gran parte los mismos negocios; contar eso como solape daria
+    # numeros inflados (24 de 12) y no dice nada sobre cuanto se pisan las dos
+    # busquedas, que es la pregunta.
+    ya_de_otra_categoria = set(vistos)
+    # `con_detalle` separa "ya lo vi" de "ya lo PAGUE": un negocio rechazado por
+    # resenas se descarta antes de pedir el detalle, asi que saltarselo despues no
+    # ahorra dinero. Sin esta distincion, el contador de solapamiento se lee como
+    # ahorro de Places y lo sobrestima. El Plan 2 necesita el numero exacto.
+    if con_detalle is None:
+        con_detalle = set()
     stats  = {'pocas_resenas': 0, 'baja_calificacion': 0, 'cerrado': 0, 'sin_telefono': 0}
+    # Distinguir "Places dijo que no hay nada" de "no se pudo preguntar". Sin esto,
+    # una clave invalida o la cuota agotada devuelven lista vacia y la corrida
+    # termina en 'done' informando "0 aprobados": un fallo de autenticacion
+    # presentado como una ciudad sin ferreterias.
+    consultas_ok        = 0
+    ya_vistos_otra_cat  = 0   # negocios que ya habia procesado OTRA categoria
+    detalles_evitados   = 0   # de esos, los que ya habian costado un place()
+    detalles_fallidos   = 0
+    paginas_fallidas  = 0
+    ultimo_error      = None
 
     variaciones = [
         f"{categoria} en {ciudad}",
@@ -4335,10 +4597,14 @@ def _buscar_negocios(gmaps_client, categoria, ciudad):
         f"{categoria} {ciudad}",
     ]
 
-    for query in variaciones:
+    for idx_q, query in enumerate(variaciones, 1):
+        consulta_ok = False
+        if avisar:
+            avisar(f'{categoria} — variación {idx_q} de {len(variaciones)}')
         for intento in range(3):
             try:
                 resp   = gmaps_client.places(query=query, language='es', type='establishment')
+                consulta_ok = True
                 lugares = resp.get('results', [])
                 paginas = 1
                 while 'next_page_token' in resp and paginas < 3:
@@ -4347,23 +4613,39 @@ def _buscar_negocios(gmaps_client, categoria, ciudad):
                         resp = gmaps_client.places(page_token=resp['next_page_token'])
                         lugares.extend(resp.get('results', []))
                         paginas += 1
+                        if avisar:
+                            avisar(f'{categoria} — variación {idx_q} de '
+                                   f'{len(variaciones)}, página {paginas}',
+                                   extra=True)
                     except Exception:
+                        paginas_fallidas += 1
                         break
 
                 for lugar in lugares:
                     pid     = lugar.get('place_id')
-                    if pid in vistos: continue
+                    if pid in vistos:
+                        if pid in ya_de_otra_categoria:
+                            ya_de_otra_categoria.discard(pid)  # se cuenta una vez
+                            ya_vistos_otra_cat += 1
+                            if pid in con_detalle:
+                                detalles_evitados += 1
+                        continue
                     cal     = lugar.get('rating')
                     resenas = lugar.get('user_ratings_total')
+
+                    # El place_id se apunta ANTES de filtrar. Estaba despues, con
+                    # lo que un negocio rechazado no quedaba registrado y volvia a
+                    # contarse en cada variacion y en cada categoria: un solo
+                    # negocio con 2 resenas se reportaba como 6 descartados.
+                    vistos.add(pid)
 
                     if not resenas or resenas < 5:
                         stats['pocas_resenas'] += 1; continue
                     if not cal or cal < 3.5:
                         stats['baja_calificacion'] += 1; continue
-
-                    vistos.add(pid)
                     try:
                         det = gmaps_client.place(pid, language='es')['result']
+                        con_detalle.add(pid)
                         # Filtro "Cerrado" eliminado — se capturan negocios sin importar horario
                         tel = det.get('formatted_phone_number', '')
                         if not tel:
@@ -4387,17 +4669,36 @@ def _buscar_negocios(gmaps_client, categoria, ciudad):
                         })
                         time.sleep(0.3)
                     except Exception:
+                        # Un negocio que se cae aqui no aparece ni en `resultados`
+                        # ni en `stats`: se evaporaba sin dejar numero.
+                        detalles_fallidos += 1
                         continue
 
                 if lugares: break
 
             except Exception as e:
+                ultimo_error = e
                 print(f'[importador] error query intento {intento+1}: {e}')
                 if intento < 2: time.sleep(2 ** intento)
 
+        if consulta_ok:
+            consultas_ok += 1
         if query != variaciones[-1]: time.sleep(1)
 
-    return resultados, stats
+    # Ninguna de las variaciones logro hablar con Places: eso no es "no hay
+    # resultados", es que no se pudo preguntar. Se propaga, igual que hace
+    # _exportar_a_sheets con los fallos de escritura.
+    if consultas_ok == 0:
+        raise RuntimeError(
+            f'no se pudo consultar Google Places para {categoria} en {ciudad}: {ultimo_error}'
+        )
+
+    incidencias = {'detalles_fallidos': detalles_fallidos,
+                   'paginas_fallidas': paginas_fallidas,
+                   'consultas_fallidas': len(variaciones) - consultas_ok,
+                   'ya_vistos_otra_cat': ya_vistos_otra_cat,
+                   'detalles_evitados': detalles_evitados}
+    return resultados, stats, incidencias
 
 
 def _escapar_formula(valor):
@@ -4420,127 +4721,272 @@ def _escapar_formula(valor):
 
 
 def _exportar_a_sheets(resultados, categoria, ciudad):
-    """Exporta a LISTA DE CONTACTOS con columnas idénticas al script original."""
-    try:
-        ws = get_worksheet('contactos')
-        datos_actuales = ws.get_all_values()
+    """Exporta a LISTA DE CONTACTOS con columnas idénticas al script original.
 
-        # Detección de duplicados: Nombre|Dirección (igual que el original)
-        nombres_existentes = set()
-        for fila in datos_actuales[1:]:
-            if len(fila) > 7:
-                nombres_existentes.add(f"{fila[1]}|{fila[7]}")
+    PROPAGA cualquier fallo de Sheets. Antes lo atrapaba y devolvia 0, con lo que
+    "no habia nada nuevo que escribir" y "la escritura reventó" eran el mismo
+    numero: la corrida seguia, terminaba en 'done' con palomita verde y el unico
+    rastro era un print al stdout del contenedor. Quien llama decide que hacer.
+    """
+    ws = get_worksheet('contactos')
+    datos_actuales = ws.get_all_values()
 
-        fecha  = datetime.now().strftime('%d/%m/%Y')
-        semana = datetime.now().isocalendar()[1]
-        nuevos = []
+    # Detección de duplicados: Nombre|Dirección (igual que el original)
+    nombres_existentes = set()
+    for fila in datos_actuales[1:]:
+        if len(fila) > 7:
+            nombres_existentes.add(f"{fila[1]}|{fila[7]}")
 
-        for r in resultados:
-            key = f"{r['Nombre']}|{r['Dirección']}"
-            if key not in nombres_existentes:
-                # Orden de columnas EXACTO al script original:
-                # NUM SEMANA | Nombre | Ciudad | Categoría | Teléfono | "" | "" |
-                # Dirección | Calificación | Núm. de Reseñas | Google Maps Link |
-                # Sitio Web | Horarios | Estado | Latitud | Longitud | Tamaño | Tipo Cliente | Fecha
-                nuevos.append([
-                    semana,
-                    r['Nombre'],
-                    ciudad,
-                    categoria,
-                    r['Teléfono'],
-                    '',
-                    '',
-                    r['Dirección'],
-                    r['Calificación'],
-                    r['Núm. de Reseñas'],
-                    r['Google Maps Link'],
-                    r['Sitio Web'],
-                    r['Horarios'],
-                    r['Estado'],
-                    r['Latitud'],
-                    r['Longitud'],
-                    r['Tamaño'],
-                    r['Tipo Cliente'],
-                    fecha,
-                ])
+    fecha  = datetime.now().strftime('%d/%m/%Y')
+    semana = datetime.now().isocalendar()[1]
+    nuevos = []
 
-        if nuevos:
-            nuevos = [[_escapar_formula(v) for v in fila] for fila in nuevos]
-            ws.append_rows(nuevos, value_input_option='USER_ENTERED')
-            _cache.pop('contactos', None)
-        return len(nuevos)
-    except Exception as e:
-        print(f'[importador] sheets error: {e}')
-        traceback.print_exc()
-        return 0
+    for r in resultados:
+        key = f"{r['Nombre']}|{r['Dirección']}"
+        if key not in nombres_existentes:
+            # Orden de columnas EXACTO al script original:
+            # NUM SEMANA | Nombre | Ciudad | Categoría | Teléfono | "" | "" |
+            # Dirección | Calificación | Núm. de Reseñas | Google Maps Link |
+            # Sitio Web | Horarios | Estado | Latitud | Longitud | Tamaño | Tipo Cliente | Fecha
+            nuevos.append([
+                semana,
+                r['Nombre'],
+                ciudad,
+                categoria,
+                r['Teléfono'],
+                '',
+                '',
+                r['Dirección'],
+                r['Calificación'],
+                r['Núm. de Reseñas'],
+                r['Google Maps Link'],
+                r['Sitio Web'],
+                r['Horarios'],
+                r['Estado'],
+                r['Latitud'],
+                r['Longitud'],
+                r['Tamaño'],
+                r['Tipo Cliente'],
+                fecha,
+            ])
+
+    if nuevos:
+        nuevos = [[_escapar_formula(v) for v in fila] for fila in nuevos]
+        ws.append_rows(nuevos, value_input_option='USER_ENTERED')
+        _cache_pop('contactos')
+    return len(nuevos)
 
 
-def _enviar_telegram_importador(ciudad, total, desglose, tiempo_min):
+def _enviar_telegram_importador(ciudad, resumen, desglose, tiempo_min,
+                                error=None, cancelado=False):
     try:
         token   = os.environ.get('TELEGRAM_TOKEN')
         chat_id = os.environ.get('TELEGRAM_CHAT_ID')
         if not token or not chat_id:
             return
-        msg = f"<b>📥 Importador Completado</b>\n\n<b>Ciudad:</b> {ciudad}\n<b>Total:</b> {total} contactos\n<b>Tiempo:</b> {tiempo_min:.1f} min\n\n"
+        msg = (
+            f"<b>{'❌ Importador FALLÓ' if error else ('⏹ Importador DETENIDO' if cancelado else '📥 Importador Completado')}</b>\n\n"
+            f"<b>Ciudad:</b> {ciudad}\n"
+            + (f"<b>Causa:</b> {error}\n" if error else "")
+            + f"<b>Nuevos en la hoja:</b> {resumen['nuevos']}\n"
+            + f"<b>Aprobados por filtros:</b> {resumen['encontrados']}\n"
+            + f"<b>Ya estaban:</b> {resumen['duplicados']}\n"
+            + f"<b>Descartados:</b> {resumen['descartados']}\n"
+            + f"<b>Tiempo:</b> {tiempo_min:.1f} min\n\n"
+        )
         for cat, n in desglose.items():
-            msg += f"  {cat}: {n}\n"
+            msg += f"  {cat}: {n} aprobados\n"
         req_lib.post(f'https://api.telegram.org/bot{token}/sendMessage',
                      data={'chat_id': chat_id, 'text': msg, 'parse_mode': 'HTML'}, timeout=10)
-    except Exception:
-        pass
+    except Exception as e:
+        # Este aviso ES la via por la que el owner se entera de que algo fallo.
+        # Tragarselo lo deja sin enterarse de nada, que es justo lo que esta
+        # tarea vino a arreglar.
+        print(f'[importador] no se pudo avisar por telegram: {e}')
+        traceback.print_exc()
 
 
 def _worker_importador(ciudad, gmaps_api_key):
-    global _import_job
     inicio = time.time()
+    desglose = {}
     try:
         if not GMAPS_OK:
-            with _import_lock:
-                _import_job['status'] = 'error'
-                _import_job['error']  = 'googlemaps no instalado'
-            return
+            raise RuntimeError('googlemaps no instalado')
 
         gmaps = googlemaps.Client(key=gmaps_api_key)
         todos = []
-        desglose = {}
+        # Un solo conjunto para toda la corrida. Antes vivia dentro de
+        # _buscar_negocios, o sea que se reiniciaba en cada categoria y el mismo
+        # negocio se contaba (y se pagaba) dos veces.
+        vistos_corrida = set()
+        con_detalle_corrida = set()
 
+        # Presupuesto de pasos GARANTIZADOS por categoria: 1 al preparar, 3 (una
+        # por variacion, que siempre corren) y 1 al guardar. Nada mas.
+        #
+        # Presupuestar el peor caso (asumiendo que toda variacion pagina hasta el
+        # maximo) hacia que en la corrida normal solo se cumpliera la mitad del
+        # presupuesto, y la barra pegara un salto de 25 puntos en cada frontera de
+        # categoria. Las paginas son trabajo que se DESCUBRE en marcha: cuando
+        # aparece una, crece el numerador y el denominador a la vez, que es
+        # justamente para lo que el denominador es ajustable.
+        BASE_POR_CATEGORIA = 1 + 3 + 1
+        pasos_hechos = 0
+        # El +1 reserva el ultimo tramo para el cierre. Sin el, la ultima
+        # escritura marcaba 100 % con la escritura todavia en curso: una barra
+        # llena mientras el trabajo sigue es la misma clase de mentira que este
+        # plan vino a quitar.
+        pasos_total = len(CATEGORIAS_IMPORTADOR) * BASE_POR_CATEGORIA + 1
+
+        def avanzar(fase, extra=False):
+            nonlocal pasos_hechos, pasos_total
+            pasos_hechos += 1
+            if extra:
+                pasos_total += 1
+            with _import_lock:
+                _avanzar_progreso(_import_job, hechos=pasos_hechos,
+                                  total=pasos_total, fase=fase)
+
+        def solo_fase(fase):
+            """Cambia la etiqueta sin consumir un paso del presupuesto."""
+            with _import_lock:
+                _avanzar_progreso(_import_job, fase=fase)
+
+        corte_por_cancelacion = False
         for i, cat in enumerate(CATEGORIAS_IMPORTADOR):
+            with _import_lock:
+                cancelado = _import_job.get('cancelado')
+            if cancelado:
+                # Solo cuenta como detenida si quedaba algo por hacer. Pedir
+                # Detener mientras la ultima categoria ya escribia no convierte
+                # una corrida entera en una parcial.
+                corte_por_cancelacion = True
+                break
+
             with _import_lock:
                 _import_job['categoria'] = cat
                 _import_job['progreso']  = i
                 _import_job['log'].append(f'Buscando {cat} en {ciudad}...')
+            # Un paso nada mas empezar: la barra no se queda en 0 % mientras el
+            # operador se pregunta si pulso el boton.
+            avanzar(f'Preparando {cat}…')
 
-            resultados, stats = _buscar_negocios(gmaps, cat, ciudad)
+            resultados, stats, incidencias = _buscar_negocios(
+                gmaps, cat, ciudad, vistos=vistos_corrida,
+                con_detalle=con_detalle_corrida, avisar=avanzar)
+
+            avanzar(f'Guardando {cat} en Google Sheets…')
 
             # Agregar ciudad a cada resultado
             for r in resultados:
                 r['CIUDAD'] = ciudad
 
-            nuevos = _exportar_a_sheets(resultados, cat, ciudad)
+            desc = sum(stats.values())
+            try:
+                nuevos = _exportar_a_sheets(resultados, cat, ciudad)
+            except Exception as e:
+                # Lo que se sabe se apunta; lo que no, no se inventa.
+                # `encontrados` y `descartados` son hechos de la BUSQUEDA y siguen
+                # siendo ciertos. `nuevos_en_sheet` y `duplicados` dependen de una
+                # escritura que reventó: contarlos como duplicados afirmaria que
+                # esos negocios "ya estaban", que es falso y peor que no decir nada.
+                with _import_lock:
+                    _import_job['encontrados'] += len(resultados)
+                    _import_job['descartados'] += desc
+                raise RuntimeError(
+                    f'{cat}: fallo al escribir en Google Sheets — {e}'
+                ) from e
+
             todos.extend(resultados)
             desglose[cat] = len(resultados)
-
-            desc = sum(stats.values())
+            solo_fase(f'{cat}: {len(resultados)} aprobados')
+            # `nuevos` es el valor de retorno de _exportar_a_sheets: las filas que
+            # de verdad se escribieron. Antes solo iba al log, y la UI mostraba
+            # `encontrados` rotulado como si fueran guardados. Son cosas distintas
+            # y el operador necesita las dos.
             with _import_lock:
-                _import_job['encontrados'] += len(resultados)
-                _import_job['descartados'] += desc
-                _import_job['resultados']   = todos[:]
+                _import_job['encontrados']     += len(resultados)
+                _import_job['nuevos_en_sheet'] += nuevos
+                _import_job['duplicados']      += len(resultados) - nuevos
+                _import_job['descartados']     += desc
+                perdidos = incidencias['detalles_fallidos'] + incidencias['paginas_fallidas']
+                aviso = f' · ⚠ {perdidos} se perdieron por errores de Places' if perdidos else ''
+                solape = incidencias['ya_vistos_otra_cat']
+                if solape:
+                    evitados = incidencias['detalles_evitados']
+                    aviso += (f' · {solape} ya vistos en otra categoría'
+                              f' ({evitados} consultas de detalle ahorradas)')
                 _import_job['log'].append(
-                    f'✓ {cat}: {len(resultados)} aprobados, {desc} descartados, {nuevos} nuevos en Sheet'
+                    f'✓ {cat}: {len(resultados)} aprobados, {desc} descartados, '
+                    f'{nuevos} nuevos en Sheet{aviso}'
                 )
+                copia_estado = dict(_import_job)
+            # Al cerrar cada categoria, para que una corrida cortada a la mitad
+            # deje contadores reales y no ceros. Fuera del lock: es una syscall y
+            # los sondeos de estado necesitan ese mismo lock.
+            _guardar_estado_importador(copia_estado)
 
         tiempo = (time.time() - inicio) / 60
-        _enviar_telegram_importador(ciudad, len(todos), desglose, tiempo)
+        with _import_lock:
+            fue_cancelada = corte_por_cancelacion
+            resumen = {
+                'nuevos':      _import_job['nuevos_en_sheet'],
+                'encontrados': _import_job['encontrados'],
+                'duplicados':  _import_job['duplicados'],
+                'descartados': _import_job['descartados'],
+            }
+        _enviar_telegram_importador(ciudad, resumen, desglose, tiempo,
+                                    cancelado=fue_cancelada)
 
         with _import_lock:
-            _import_job['status']   = 'done'
-            _import_job['progreso'] = len(CATEGORIAS_IMPORTADOR)
-            _import_job['log'].append(f'✅ Completado en {tiempo:.1f} min — {len(todos)} contactos encontrados')
+            # Una corrida cancelada NO es una corrida completada: lo escrito
+            # antes del corte es valido, pero decir 'done' seria afirmar que se
+            # recorrio todo.
+            _import_job['status'] = 'cancelado' if fue_cancelada else 'done'
+            if fue_cancelada:
+                # `desglose` solo tiene las categorias que llegaron a escribir.
+                completadas = len(desglose)
+                _import_job['progreso'] = completadas
+                _avanzar_progreso(_import_job, fase=(
+                    f'Detenida tras {completadas} de '
+                    f'{len(CATEGORIAS_IMPORTADOR)} categorías'))
+            else:
+                _import_job['progreso'] = len(CATEGORIAS_IMPORTADOR)
+                _avanzar_progreso(_import_job, hechos=pasos_total,
+                                  total=pasos_total, fase='Completado')
+            copia_estado = dict(_import_job)
+            cierre = ('⏹ Cancelada a los' if fue_cancelada
+                      else '✅ Completado en')
+            _import_job['log'].append(
+                f"{cierre} {tiempo:.1f} min — "
+                f"{resumen['nuevos']} nuevos en la hoja de "
+                f"{resumen['encontrados']} encontrados"
+            )
+        _guardar_estado_importador(copia_estado)
 
     except Exception as e:
+        # Telegram solo avisaba en el camino feliz: si la corrida se caia, el
+        # owner no se enteraba por ningun canal.
+        tiempo = (time.time() - inicio) / 60
         with _import_lock:
             _import_job['status'] = 'error'
-            _import_job['error']  = str(e)
+            _import_job['error']  = _sanear_error(e)
+            copia_estado = dict(_import_job)
+            _import_job['log'].append(f'❌ Falló: {e}')
+            sin_intentar = [c for c in CATEGORIAS_IMPORTADOR if c not in desglose
+                            and c != _import_job.get('categoria')]
+            if sin_intentar:
+                _import_job['log'].append(
+                    'Sin intentar por el fallo: ' + ', '.join(sin_intentar))
+            resumen = {
+                'nuevos':      _import_job['nuevos_en_sheet'],
+                'encontrados': _import_job['encontrados'],
+                'duplicados':  _import_job['duplicados'],
+                'descartados': _import_job['descartados'],
+            }
+        _guardar_estado_importador(copia_estado)
+        _enviar_telegram_importador(ciudad, resumen, desglose, tiempo,
+                                    error=_sanear_error(e))
         traceback.print_exc()
 
 
@@ -4563,33 +5009,68 @@ def importador_iniciar():
     with _import_lock:
         if _import_job['status'] == 'running':
             return jsonify({'ok': False, 'error': 'Ya hay una búsqueda en curso'})
-        _import_job = {
-            'status': 'running', 'ciudad': ciudad,
-            'categoria': '', 'progreso': 0,
-            'total': len(CATEGORIAS_IMPORTADOR),
-            'encontrados': 0, 'descartados': 0,
-            'resultados': [], 'log': [], 'error': '',
-        }
+        _import_job = _nuevo_import_job(ciudad, status='running')
+        copia_estado = dict(_import_job)
+    _guardar_estado_importador(copia_estado)   # I/O fuera del lock
 
     t = threading.Thread(target=_worker_importador, args=(ciudad, gmaps_api_key), daemon=True)
     t.start()
     return jsonify({'ok': True})
 
 
+@app.route('/api/importador/cancelar', methods=['POST'])
+def importador_cancelar():
+    """Marca la corrida para que el worker salga limpio.
+
+    No mata el hilo: le pone una bandera que el worker comprueba ENTRE pasos,
+    nunca a mitad de un append_rows. Lo que ya se escribio en la hoja es valido
+    y el dedup impide duplicarlo si se vuelve a correr la ciudad.
+    """
+    with _import_lock:
+        if _import_job['status'] != 'running':
+            # No se puede cancelar lo que no esta corriendo, y decir que si
+            # seria otra respuesta que no corresponde a la realidad.
+            return jsonify({'ok': False, 'error': 'No hay ninguna búsqueda en curso'})
+        _import_job['cancelado'] = True
+        _import_job['log'].append('⏹ Cancelación pedida; terminando el paso en curso…')
+        copia_estado = dict(_import_job)
+    _guardar_estado_importador(copia_estado)
+    return jsonify({'ok': True})
+
+
 @app.route('/api/importador/estado')
 def importador_estado():
     with _import_lock:
-        return jsonify({
+        snap = {
             'status':     _import_job['status'],
             'ciudad':     _import_job['ciudad'],
             'categoria':  _import_job['categoria'],
             'progreso':   _import_job['progreso'],
             'total':      _import_job['total'],
-            'encontrados': _import_job['encontrados'],
-            'descartados': _import_job['descartados'],
+            'fraccion':   _import_job.get('fraccion', 0),
+            'fase':       _import_job.get('fase', ''),
+            'encontrados':     _import_job['encontrados'],
+            'nuevos_en_sheet': _import_job['nuevos_en_sheet'],
+            'duplicados':      _import_job['duplicados'],
+            'descartados':     _import_job['descartados'],
             'log':        _import_job['log'][-10:],
             'error':      _import_job['error'],
-        })
+        }
+
+    # Tras un reinicio del contenedor, `_import_job` vuelve a 'idle' y la pantalla
+    # aparece limpia, como si el operador nunca hubiera lanzado nada. El registro
+    # en disco es lo unico que sabe que hubo una corrida y que se corto.
+    if snap['status'] == 'idle':
+        rec = _leer_estado_importador()
+        if rec and rec.get('status') == 'interrumpido':
+            for clave in _CAMPOS_PERSISTIDOS:
+                if clave in snap and rec.get(clave) is not None:
+                    snap[clave] = rec[clave]
+            snap['status'] = 'interrumpido'
+            snap['error'] = ('La corrida se interrumpió porque el panel se reinició. '
+                             'Lo que ya se había guardado en la hoja sigue ahí.')
+            snap['log'] = [snap['error']]
+    return jsonify(snap)
 
 
 IMPORTADOR_HTML = r"""<!DOCTYPE html>
@@ -4624,7 +5105,11 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399
 .cat-badge{padding:5px 12px;border-radius:20px;font-size:.78em;font-weight:600;background:#e6f0ff;color:#888;transition:all .3s}
 .cat-badge.active{background:var(--blue);color:#fff}
 .cat-badge.done{background:var(--green);color:#fff}
-.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px}
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.stats-row .stat-box.principal{background:#eefaf1;border-top-width:4px}
+.stat-box.principal .n{font-size:2.4em}
+@media(max-width:620px){.stats-row{grid-template-columns:1fr 1fr}}
+.progreso-row{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:16px}
 .stat-box{background:#f8f9fa;border-radius:10px;padding:12px;text-align:center;border-top:3px solid #dde}
 .stat-box.green{border-color:var(--green)}.stat-box.red{border-color:#e74c3c}.stat-box.blue{border-color:var(--blue)}
 .stat-box .n{font-size:1.8em;font-weight:800;color:var(--blue)}.stat-box.green .n{color:var(--green)}.stat-box.red .n{color:#e74c3c}
@@ -4680,6 +5165,8 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399
     <div class="input-row">
       <input type="text" id="input-ciudad" placeholder="O escribe una ciudad manualmente..." onkeydown="if(event.key==='Enter') iniciar()">
       <button class="btn btn-blue" id="btn-iniciar" onclick="iniciar()">🔍 Buscar</button>
+      <button class="btn" id="btn-cancelar" onclick="cancelar()"
+        style="display:none;background:#f3f4f6;border:1px solid #dde;color:#666">⏹ Detener</button>
     </div>
 
     <!-- PROGRESO -->
@@ -4693,9 +5180,13 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399
 
     <!-- STATS -->
     <div class="stats-row" id="stats-row" style="display:none">
-      <div class="stat-box green"><div class="n" id="s-encontrados">0</div><div class="l">Encontrados</div></div>
+      <div class="stat-box green principal"><div class="n" id="s-nuevos">0</div><div class="l">Nuevos en la hoja</div></div>
+      <div class="stat-box blue"><div class="n" id="s-encontrados">0</div><div class="l">Aprobados por filtros</div></div>
+      <div class="stat-box"><div class="n" id="s-duplicados">0</div><div class="l">Ya estaban</div></div>
       <div class="stat-box red"><div class="n" id="s-descartados">0</div><div class="l">Descartados</div></div>
-      <div class="stat-box blue"><div class="n" id="s-progreso">0/0</div><div class="l">Progreso</div></div>
+    </div>
+    <div class="progreso-row" id="progreso-row" style="display:none">
+      <div class="stat-box blue"><div class="n" id="s-progreso">0/0</div><div class="l">Categorias procesadas</div></div>
     </div>
 
     <!-- LOG -->
@@ -4716,7 +5207,6 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399
 <script>
 const CATS = ["Ferreterías","Distribuidoras Ferreterías"];
 let polling = null;
-let ciudadSeleccionada = '';
 
 // Render categoria badges
 document.getElementById('cats-list').innerHTML = CATS.map((c,i) =>
@@ -4812,121 +5302,301 @@ async function cargarCiudades() {
 
     // Fusionar: panel (con datos) + estáticas (sin datos)
     todasCiudades = [...conDatos, ...sinDatos];
+    todasCiudades.forEach((c, i) => { c.rank = i + 1; });
 
     document.getElementById('ciudades-count').textContent = `(${todasCiudades.length})`;
     renderChips(todasCiudades);
   } catch(e) {
     // Fallback: solo estáticas
-    todasCiudades = [...new Set(CIUDADES_MX)].map(c => ({
-      ciudad: c, total: 0, llamados: 0, aprobados: 0, interes_pct: 0, relevancia: 0
+    todasCiudades = [...new Set(CIUDADES_MX)].map((c, i) => ({
+      ciudad: c, total: 0, llamados: 0, aprobados: 0, interes_pct: 0, relevancia: 0,
+      rank: i + 1
     }));
     document.getElementById('ciudades-count').textContent = `(${todasCiudades.length})`;
     renderChips(todasCiudades);
   }
 }
 
+// El nombre de la ciudad viene de LISTA DE CONTACTOS, escrito a mano, y antes
+// de eso lo tecleo un operador en el campo de texto sin validacion. Se
+// interpolaba crudo en DOS sitios de la misma linea: dentro del atributo
+// onclick y como texto del chip. Una ciudad llamada O'Brien rompia el handler
+// y dejaba el chip muerto; una con <img onerror=...> ejecutaba.
+// El dashboard ya cerraba este mismo agujero (app.py:2064).
+function escaparHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function renderChips(lista) {
   const cont = document.getElementById('ciudades-chips');
   if (!lista.length) { cont.innerHTML = '<div style="color:#aaa;font-size:.82em">Sin resultados</div>'; return; }
 
-  cont.innerHTML = lista.map((c, i) => {
-    const rank   = i + 1;
+  cont.innerHTML = lista.map((c) => {
+    // El rango es el del catalogo completo, no el de la lista filtrada: antes
+    // se calculaba sobre el indice recibido, asi que al escribir en el filtro
+    // la ciudad numero 47 aparecia con medalla de oro.
+    const rank   = (c.rank != null) ? c.rank : 0;
     const medal  = rank === 1 ? '🥇 ' : rank === 2 ? '🥈 ' : rank === 3 ? '🥉 ' : `${rank}. `;
-    const isTop  = rank <= 3;
+    const isTop  = rank >= 1 && rank <= 3;
     const hasInt = c.interes_pct > 0;
     const badge  = hasInt
       ? `<span style="background:rgba(0,204,71,.2);color:#155724;padding:1px 5px;border-radius:8px;font-size:.85em">${c.interes_pct}%</span>`
       : `<span style="opacity:.55;font-size:.85em">${c.total}</span>`;
-    return `<span class="chip ${isTop?'top':''}" onclick="seleccionarCiudad('${c.ciudad}',this)">${medal}${c.ciudad} ${badge}</span>`;
+    const nombre = escaparHtml(c.ciudad);
+    return `<span class="chip ${isTop?'top':''}" data-ciudad="${nombre}">${medal}${nombre} ${badge}</span>`;
   }).join('');
 }
+
+// Listener delegado: el nombre viaja por dataset, nunca dentro de un atributo
+// de codigo. Se registra una sola vez sobre el contenedor, asi que sobrevive a
+// cada re-render de los chips.
+document.getElementById('ciudades-chips').addEventListener('click', (ev) => {
+  const chip = ev.target.closest('.chip');
+  if (!chip) return;
+  document.getElementById('input-ciudad').value = chip.dataset.ciudad || '';
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+});
 
 function filtrarCiudades() {
   const q = document.getElementById('ciudad-filter').value.toLowerCase().trim();
   renderChips(q ? todasCiudades.filter(c => c.ciudad.toLowerCase().includes(q)) : todasCiudades);
 }
 
-function seleccionarCiudad(ciudad, el) {
-  document.getElementById('input-ciudad').value = ciudad;
-  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
+cargarCiudades();
+
+// ── Sondeo ────────────────────────────────────────────────────────────────
+// Antes: setInterval fijo de 3 s que solo paraba en 'done' o 'error'. Si el
+// contenedor se reiniciaba, el estado llegaba 'idle' para siempre y el sondeo
+// seguia latiendo indefinidamente contra un trabajo que ya no existia.
+let intervaloSondeo = 3000;
+let ciclosIdle = 0;          // el panel responde, pero dice que no hay trabajo
+let ciclosSinRespuesta = 0;  // el panel no responde
+const MAX_CICLOS_IDLE = 5;
+const MAX_CICLOS_SIN_RESPUESTA = 5;
+
+function arrancarSondeo(ms) {
+  clearInterval(polling);          // sin esto quedaban dos intervalos vivos
+  intervaloSondeo = ms || 3000;
+  polling = setInterval(actualizarEstado, intervaloSondeo);
 }
 
-cargarCiudades();
+function pararSondeo() {
+  clearInterval(polling);
+  polling = null;
+}
+
+function limpiarPantalla() {
+  // La corrida anterior dejaba sus numeros y sus insignias puestos: la segunda
+  // busqueda de la sesion arrancaba con todo marcado como completado.
+  ['s-nuevos','s-encontrados','s-duplicados','s-descartados'].forEach(id => {
+    document.getElementById(id).textContent = '0';
+  });
+  document.getElementById('s-progreso').textContent = '0/0';
+  document.getElementById('prog-fill').style.width = '0%';
+  document.getElementById('prog-pct').textContent = '0%';
+  document.getElementById('log-box').innerHTML = '';
+  CATS.forEach((_, i) => document.getElementById('cat-'+i).className = 'cat-badge');
+  ciclosIdle = 0;
+  ciclosSinRespuesta = 0;
+}
+
+function mostrarPaneles() {
+  document.getElementById('progress-box').style.display = 'block';
+  document.getElementById('stats-row').style.display = 'grid';
+  document.getElementById('progreso-row').style.display = 'grid';
+  document.getElementById('log-box').style.display = 'block';
+  document.getElementById('result-box').style.display = 'none';
+}
+
+function ponerEnMarcha(enMarcha) {
+  const btn = document.getElementById('btn-iniciar');
+  btn.disabled = enMarcha;
+  btn.textContent = enMarcha ? '⏳ Buscando...' : '🔍 Buscar';
+  // El campo nunca se deshabilitaba, asi que pulsar Enter a media corrida
+  // relanzaba iniciar() y podia arrancar una SEGUNDA importacion.
+  document.getElementById('input-ciudad').disabled = enMarcha;
+  document.getElementById('btn-cancelar').style.display = enMarcha ? 'inline-flex' : 'none';
+}
 
 async function iniciar() {
   const ciudad = document.getElementById('input-ciudad').value.trim();
   if (!ciudad) { alert('Ingresa una ciudad'); return; }
 
-  const btn = document.getElementById('btn-iniciar');
-  btn.disabled = true;
-  btn.textContent = '⏳ Buscando...';
+  ponerEnMarcha(true);
+  limpiarPantalla();
+  mostrarPaneles();
 
-  document.getElementById('progress-box').style.display = 'block';
-  document.getElementById('stats-row').style.display = 'grid';
-  document.getElementById('log-box').style.display = 'block';
-  document.getElementById('result-box').style.display = 'none';
-
-  const r = await fetch('/api/importador/iniciar', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ciudad})
-  });
-  const d = await r.json();
-  if (!d.ok) { alert('Error: ' + d.error); btn.disabled=false; btn.textContent='🔍 Buscar'; return; }
-
-  polling = setInterval(actualizarEstado, 3000);
-  actualizarEstado();
+  try {
+    const r = await fetch('/api/importador/iniciar', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ciudad})
+    });
+    const d = await r.json();
+    if (!d.ok) {
+      alert('Error: ' + d.error);
+      ponerEnMarcha(false);
+      return;
+    }
+    arrancarSondeo(3000);
+    actualizarEstado();
+  } catch (e) {
+    // Sin este catch la promesa reventaba y el boton se quedaba en
+    // "Buscando..." deshabilitado para siempre: hacia falta recargar.
+    document.getElementById('prog-label').textContent =
+      '❌ No se pudo contactar con el panel: ' + e;
+    ponerEnMarcha(false);
+  }
 }
 
-async function actualizarEstado() {
-  const r = await fetch('/api/importador/estado');
-  const d = await r.json();
+async function cancelar() {
+  if (!confirm('¿Detener la búsqueda? Lo que ya se guardó en la hoja se queda.')) return;
+  try {
+    const r = await fetch('/api/importador/cancelar', {method: 'POST'});
+    const d = await r.json();
+    if (!d.ok) alert(d.error || 'No se pudo cancelar');
+  } catch (e) {
+    alert('No se pudo contactar con el panel: ' + e);
+  }
+}
 
-  // Progreso
-  const pct = d.total > 0 ? Math.round((d.progreso / d.total) * 100) : 0;
+async function restaurarEstado() {
+  // Al abrir la pagina se pregunta si hay algo corriendo. Antes solo iniciar()
+  // arrancaba el sondeo, asi que recargar a media corrida dejaba la pantalla
+  // inerte y el operador encerrado fuera de su propio trabajo.
+  try {
+    const d = await (await fetch('/api/importador/estado')).json();
+    if (d.status === 'running') {
+      mostrarPaneles();
+      ponerEnMarcha(true);
+      pintarEstado(d);
+      arrancarSondeo(3000);
+    } else if (d.status !== 'idle') {
+      // done, error, cancelado e interrumpido: la corrida anterior sigue en
+      // memoria y el operador tiene derecho a verla al volver a la pagina.
+      // Antes solo se contemplaban 'running' e 'interrumpido', asi que recargar
+      // tras un fallo dejaba la pantalla en blanco, sin rastro del error.
+      mostrarPaneles();
+      pintarEstado(d);
+      rematar(d);
+    }
+  } catch (e) {
+    // Que falle la restauracion no puede impedir usar la pagina.
+    console.warn('No se pudo restaurar el estado del importador:', e);
+  }
+}
+
+function pintarEstado(d) {
+  const pct = d.fraccion || 0;
   document.getElementById('prog-fill').style.width  = pct + '%';
   document.getElementById('prog-pct').textContent   = pct + '%';
-  document.getElementById('prog-label').textContent = d.categoria ? `Buscando: ${d.categoria}...` : 'Procesando...';
+  document.getElementById('prog-label').textContent =
+    d.fase || (d.categoria ? `Buscando: ${d.categoria}...` : 'Procesando...');
 
-  // Stats
+  document.getElementById('s-nuevos').textContent      = d.nuevos_en_sheet;
   document.getElementById('s-encontrados').textContent = d.encontrados;
+  document.getElementById('s-duplicados').textContent  = d.duplicados;
   document.getElementById('s-descartados').textContent = d.descartados;
   document.getElementById('s-progreso').textContent    = `${d.progreso}/${d.total}`;
 
-  // Cat badges
   CATS.forEach((c, i) => {
     const el = document.getElementById('cat-'+i);
     if (i < d.progreso) el.className = 'cat-badge done';
     else if (d.categoria === c) el.className = 'cat-badge active';
+    else el.className = 'cat-badge';       // sin esta rama se quedaban rancias
   });
 
-  // Log
   const logEl = document.getElementById('log-box');
-  logEl.innerHTML = d.log.map(l => `<div class="entry">> ${l}</div>`).join('');
+  logEl.innerHTML = (d.log || []).map(l => `<div class="entry">> ${escaparHtml(l)}</div>`).join('');
   logEl.scrollTop = logEl.scrollHeight;
+}
 
-  if (d.status === 'done') {
-    clearInterval(polling);
-    document.getElementById('prog-fill').style.width = '100%';
-    document.getElementById('prog-pct').textContent = '100%';
-    document.getElementById('prog-label').textContent = '¡Completado!';
-    CATS.forEach((_,i) => document.getElementById('cat-'+i).className = 'cat-badge done');
-    document.getElementById('result-box').style.display = 'block';
-    document.getElementById('result-titulo').textContent = `✅ Búsqueda completada — ${d.ciudad}`;
-    document.getElementById('result-desc').textContent =
-      `${d.encontrados} contactos encontrados · ${d.descartados} descartados · Guardados en Google Sheets`;
+async function actualizarEstado() {
+  let d;
+  try {
+    const r = await fetch('/api/importador/estado');
+    d = await r.json();
+  } catch (e) {
+    // Un corte de red no puede dejar el sondeo latiendo a ciegas: se espacia y,
+    // si no vuelve, se para solo.
+    ciclosSinRespuesta++;
+    if (ciclosSinRespuesta >= MAX_CICLOS_SIN_RESPUESTA) {
+      pararSondeo();
+      document.getElementById('prog-label').textContent =
+        '❌ Se perdió el contacto con el panel. Recarga la página.';
+      ponerEnMarcha(false);
+    } else if (intervaloSondeo < 15000) {
+      arrancarSondeo(intervaloSondeo * 2);
+    }
+    return;
+  }
+
+  if (d.status === 'idle') {
+    // El contenedor se reinicio a media corrida: el trabajo ya no existe.
+    ciclosIdle++;
+    if (ciclosIdle >= MAX_CICLOS_IDLE) {
+      pararSondeo();
+      document.getElementById('prog-label').textContent =
+        '⚠ La corrida ya no está en curso (el panel se reinició).';
+      ponerEnMarcha(false);
+    }
+    return;
+  }
+  ciclosIdle = 0;
+  ciclosSinRespuesta = 0;
+
+  pintarEstado(d);
+
+  // El sondeo se espacia si la corrida se alarga, en vez de 3 s eternos.
+  if (intervaloSondeo < 10000 && (d.fraccion || 0) > 0 && (d.fraccion || 0) < 90) {
+    const deseado = Math.min(10000, intervaloSondeo + 1000);
+    if (deseado !== intervaloSondeo) arrancarSondeo(deseado);
+  }
+
+  if (d.status !== 'running') rematar(d);
+}
+
+function rematar(d) {
+  if (d.status === 'done' || d.status === 'cancelado' || d.status === 'interrumpido') {
+    pararSondeo();
+    ponerEnMarcha(false);
     document.getElementById('btn-iniciar').textContent = '🔍 Nueva Búsqueda';
-    document.getElementById('btn-iniciar').disabled = false;
+    document.getElementById('result-box').style.display = 'block';
+
+    if (d.status === 'done') {
+      document.getElementById('prog-label').textContent = '¡Completado!';
+      document.getElementById('result-titulo').textContent =
+        `✅ ${d.nuevos_en_sheet} contactos nuevos en la hoja — ${d.ciudad}`;
+      document.getElementById('result-desc').textContent =
+        `De ${d.encontrados + d.descartados} candidatos de Google, ${d.encontrados} pasaron los ` +
+        `filtros de calidad: ${d.nuevos_en_sheet} se guardaron y ${d.duplicados} ya estaban en la lista. ` +
+        `Los otros ${d.descartados} se descartaron por reseñas, calificación o falta de teléfono.`;
+    } else {
+      document.getElementById('result-titulo').textContent =
+        (d.status === 'cancelado' ? '⏹ Búsqueda detenida — ' : '⚠ Búsqueda interrumpida — ') + d.ciudad;
+      document.getElementById('result-desc').textContent =
+        `Se alcanzaron a guardar ${d.nuevos_en_sheet} contactos nuevos, y siguen en la hoja. ` +
+        `Volver a correr la misma ciudad no los duplica.`;
+    }
   }
 
   if (d.status === 'error') {
-    clearInterval(polling);
+    pararSondeo();
+    ponerEnMarcha(false);
     document.getElementById('prog-label').textContent = '❌ Error: ' + d.error;
-    document.getElementById('btn-iniciar').disabled = false;
     document.getElementById('btn-iniciar').textContent = '🔍 Reintentar';
+    document.getElementById('result-box').style.display = 'block';
+    document.getElementById('result-titulo').textContent = '❌ La búsqueda falló — ' + d.ciudad;
+    document.getElementById('result-desc').textContent =
+      (d.error || '') + ` Se alcanzaron a guardar ${d.nuevos_en_sheet} contactos nuevos.`;
   }
 }
+
+restaurarEstado();
+
 </script>
 </body>
 </html>"""

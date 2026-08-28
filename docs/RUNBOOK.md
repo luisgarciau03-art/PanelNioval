@@ -124,6 +124,72 @@ python tools/inspeccionar_contactos.py   # confirma que la columna T está libre
 | Panel 401 en todo | `PANEL_DASHBOARD_TOKEN` activo | Acceder con `?token=<valor>` una vez (queda en la sesión) |
 | Envíos duplicados | Dos corridas del worker solapadas | El lock lo previene; no correr 2 instancias manuales a la vez |
 
+## Importador de prospectos (desde 2026-08-27)
+
+### Qué significa cada número
+
+El panel muestra cuatro, y **no son intercambiables**. El grande es el que
+responde a la pregunta "¿cuántos contactos gané?".
+
+| Recuadro | Significa |
+|---|---|
+| **Nuevos en la hoja** | Filas que de verdad se escribieron en `LISTA DE CONTACTOS`. **Es el número grande.** |
+| Aprobados por filtros | Negocios distintos que pasaron los filtros de Google (≥5 reseñas, ≥3.5 ⭐, con teléfono) |
+| Ya estaban | Aprobados que ya figuraban en la hoja de antes |
+| Descartados | Rechazados por reseñas, calificación o falta de teléfono |
+
+Se cumple siempre **Nuevos + Ya estaban = Aprobados**. `Descartados` va aparte:
+se descartan *antes* de aprobar, no son una parte de los aprobados.
+
+> Antes del 2026-08-27 el panel mostraba un solo número, rotulado de forma que se
+> leía como "guardados". No lo era: contaba los aprobados. De ahí el "dice 20 y
+> aparecen 10".
+
+### Cómo detener una corrida
+
+Botón **⏹ Detener** mientras la búsqueda corre. La cancelación se comprueba
+**entre categorías**, nunca a mitad de una escritura, así que:
+
+- lo que ya se guardó en la hoja **se queda** y es válido;
+- volver a correr la misma ciudad **no lo duplica** (el dedup lo impide);
+- la corrida queda como `cancelado`, **no** como completada — ni en el panel ni
+  en el aviso de Telegram. Si el aviso dijera "Completado", nadie volvería a
+  correr las categorías que faltaron.
+
+### Si el panel se reinicia a media corrida
+
+El trabajo se pierde (el hilo es `daemon=True`), pero **lo escrito hasta ese
+momento sigue en la hoja**. Al volver a `/importador` el panel dice *"La corrida
+se interrumpió"* con los contadores que había alcanzado, en vez de aparecer en
+blanco como si nunca hubiera pasado nada.
+
+Ese aviso sale de un registro en `IMPORT_ESTADO_FILE` (por defecto, el temp del
+sistema). El registro **no lleva datos personales**: solo estado, contadores y
+PID. Y **nunca bloquea** una corrida nueva: si el proceso que lo escribió ya no
+existe, se marca como interrumpido y se sigue adelante.
+
+### Errores que ahora se ven (y antes no)
+
+| Síntoma | Qué pasó |
+|---|---|
+| `error` con "fallo al escribir en Google Sheets" | Cuota, permisos o red al escribir. **Nada se guardó de esa categoría.** Reintentar |
+| `error` con "no se pudo consultar Google Places" | Clave inválida, cuota agotada o sin red. Revisar `GMAPS_API_KEY` |
+| Log con "⚠ N se perdieron por errores de Places" | Algunos negocios fallaron al pedir su detalle. El resto sí entró |
+| Log con "N ya vistos en otra categoría" | Solapamiento entre las dos búsquedas. Es normal e informativo |
+
+Antes, los dos primeros terminaban en ✅ con la hoja intacta.
+
+### Por qué un solo worker
+
+`--workers 1 --threads 4`. El estado del importador y la caché son globales de
+módulo; con dos procesos son dos memorias distintas y la mitad de los sondeos
+respondía `idle` con el trabajo corriendo. Razonamiento completo y alternativas
+descartadas: `docs/adr/2026-08-27-estado-compartido-importador.md`.
+
+**No subir `--workers` sin leer ese ADR.** Hay tres tests que fallan si se hace.
+
+---
+
 ## Gates del owner pendientes (seguridad)
 
 - **Rotar** `TELEGRAM_TOKEN` (bot `8404009072`, expuesto en ~14 copias del historial) y la **Google Places key**; cargarlas en `/srv/panel/secretos/.env` y `/srv/bruce/secretos/.env` en el VPS (ya no en Railway).
