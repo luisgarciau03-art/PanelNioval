@@ -9,6 +9,66 @@
 
 ---
 
+## 0. VALIDACIÓN AL 2026-08-28 (revisión contra el código en disco)
+
+Plan diseñado el 2026-08-27, **validado contra el código en disco el 2026-08-28** con
+**7 de sus 9 tareas ya ejecutadas**. Lo de abajo **manda** sobre el resto del documento.
+
+### 0.1 Anclajes corregidos
+
+| Lo que dice el plan | Realidad verificada el 2026-08-28 |
+|---|---|
+| Superficie `app.py:4324-4545` | `_buscar_negocios` en **`app.py:4760`**, `_worker_importador` en **`app.py:5183`**, `_exportar_a_sheets` en **`app.py:5056`** |
+| `gmaps_client.place(pid)` en `app.py:4366` | encapsulado en **`_detalle_de_place` (`app.py:4557`)**, ya con `fields` (T2.2) |
+| D5: "con `--workers 2` el caché de 300 s es por proceso" | gunicorn corre **`--workers 1 --threads 4`** desde el Plan 3, en **tres** sitios: `Dockerfile:23`, `nixpacks.toml:8`, `Procfile:1`. D5 pierde su mitad de concurrencia; queda solo la cuota de Sheets |
+| D3: "`if lugares: break` corta las variaciones" | corta **reintentos**. Las tres variaciones corrían siempre. Resuelto por T2.4 con `MAX_VARIACIONES_SIN_APORTE` (`app.py:4395`) y `CORTAR_PAGINAS_SIN_APORTE` (`app.py:4396`) |
+| Baseline `230 passed` | **357 passed, 1 skipped** |
+
+### 0.2 R5 ya está mitigado en código
+
+El riesgo R5 (el archivo de caché commiteado con teléfonos dentro) está cerrado:
+`.gitignore` y `.dockerignore` cubren `places_detalles.json`, `places_detalles.json.*.tmp`,
+`importador_estado.json` y su temporal, cada uno con el comentario que explica por qué.
+
+### 0.3 CE6 no se puede cumplir tal como está escrito
+
+CE6 pide **reducción de costo ≥ 60 %** medida contra CE1, y CE1 es el consumo por SKU de la
+consola de facturación de Google Cloud — **gate del owner, abierto**. Sin el multiplicador
+no hay pesos, y sin pesos no hay porcentaje de costo.
+
+`SUPUESTO: CE6 se evalúa en reducción de LLAMADAS por corrida, no en pesos, y el importe se
+calcula después aplicando la tarifa cuando el owner la entregue — afecta Plan 2, Tareas T2.7
+y T2.8.` Ver **D2** en DECISIONES PENDIENTES del índice.
+
+Con esa lectura, lo medido por `tools/medir_llamadas_places.py` ya es concluyente:
+
+| SKU | Antes | Ciudad nueva | A medio trabajar | Ya trabajada |
+|---|---|---|---|---|
+| Text Search | 18 | **13** | 13 | 13 |
+| Place Details | 80 | 80 | **60** | **0** |
+
+Además, de los Details que quedan se dejó de facturar **Basic (26 campos)** y
+**Atmosphere (18)**: solo se pide el grupo Contact que el código realmente lee.
+
+### 0.4 Lo que queda
+
+**T2.7** (verificación A/B + diff de calidad CE7) y **T2.8** (cierre y PR). El diff de
+calidad CE7 **necesita una corrida real** de la ciudad de referencia, que es gate del owner:
+factura la API y escribe en `LISTA DE CONTACTOS` de producción.
+
+`SUPUESTO: T2.7 cierra con la verificación A/B por conteo de llamadas y con el diff de
+calidad ejecutado sobre respuestas grabadas (fixtures), dejando la corrida real anotada como
+riesgo aceptado y no como criterio cumplido — afecta Plan 2, Tarea T2.7.`
+
+Ese riesgo ya tiene su válvula documentada y **no exige tocar código** para revertirlo:
+
+```python
+MAX_VARIACIONES_SIN_APORTE = 99     # desactiva el corte de variaciones
+CORTAR_PAGINAS_SIN_APORTE  = False  # desactiva el corte de páginas
+```
+
+---
+
 ## 1. QUÉ SE GASTA HOY Y POR QUÉ
 
 Google Places es **la única API facturable del panel**. Barrido de imports sobre todo el
@@ -78,7 +138,7 @@ conserve la calidad del resultado**, y hacer ese costo visible y acotable por el
 | CE7 | Sin pérdida de calidad | La misma ciudad devuelve el mismo conjunto de negocios aprobados que antes (diff = ∅) |
 | CE8 | El owner ve el costo | La UI y el mensaje de Telegram reportan llamadas por SKU y costo estimado |
 | CE9 | Existe un tope | Superado el presupuesto de la corrida, el trabajo se detiene y lo reporta; no se corta en silencio |
-| CE10 | Baseline sin regresiones | `python -m pytest tests/ -q` ≥ 230 passed |
+| CE10 | Baseline sin regresiones | `python -m pytest tests/` ≥ 357 passed |
 
 **CE7 es un gate duro.** Una optimización que ahorra dinero perdiendo prospectos no es una
 optimización, es un recorte de producto.
@@ -304,7 +364,7 @@ precisamente un sitio donde algo puede pararse sin que nadie se entere).
 **Depende de:** T2.2–T2.6.
 
 **Qué hacer.**
-1. `python -m pytest tests/ -q` → ≥ 230 passed.
+1. `python -m pytest tests/` → ≥ 357 passed.
 2. **Correr la misma ciudad de referencia de T2.0**, dos veces (la segunda prueba el caché).
 3. Sacar de la consola de facturación el delta de llamadas por SKU de cada corrida.
 4. Tabla comparativa antes/después: llamadas por SKU, costo, y **% de reducción**.
@@ -392,7 +452,7 @@ diversidad; el plan lo cumple sin ella.
 | T2.4 | ✅ TDD, 3 tests + **verificación CE7** | python-reviewer | ✅ | — | ✅ sin regresiones |
 | T2.5 | ✅ TDD, 4 tests | python-reviewer | ✅ | ✅ teléfonos en disco | ✅ sin regresiones |
 | T2.6 | ✅ TDD, 4 tests | python-reviewer | ✅ | ✅ variables de entorno | ✅ sin regresiones |
-| T2.7 | ✅ suite completa + medición A/B + diff CE7 | ✅ | ✅ | ✅ | ✅ ≥230 passed |
+| T2.7 | ✅ suite completa + medición A/B + diff CE7 | ✅ | ✅ | ✅ | ✅ ≥357 passed |
 | T2.8 | ✅ suite completa antes del merge | — | ✅ | — | ✅ verde para mergear |
 
 ---
