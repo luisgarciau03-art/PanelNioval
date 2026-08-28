@@ -4372,6 +4372,30 @@ cargarContacto();
 
 CATEGORIAS_IMPORTADOR = ['Ferreterías', 'Distribuidoras Ferreterías']
 
+def _avanzar_progreso(job, hechos=None, total=None, fase=None):
+    """Mueve la barra. Nunca hacia atras.
+
+    El denominador se puede ajustar en marcha: si el total crece, la fraccion
+    bajaria, y una barra que retrocede se lee como que algo salio mal. Se queda
+    en el maximo alcanzado hasta que el avance real lo supere. Si el total se
+    recorta y eso adelanta la barra, si se aplica.
+    """
+    if hechos is not None:
+        job['pasos_hechos'] = hechos
+    if total is not None:
+        job['pasos_total'] = total
+    if fase is not None:
+        job['fase'] = fase
+
+    tot = job.get('pasos_total') or 0
+    if tot > 0:
+        cruda = int(round(job.get('pasos_hechos', 0) * 100 / tot))
+    else:
+        cruda = job.get('fraccion', 0)
+    job['fraccion'] = max(job.get('fraccion', 0), min(100, cruda))
+    return job['fraccion']
+
+
 def _nuevo_import_job(ciudad='', status='idle'):
     """Forma canonica del estado del importador.
 
@@ -4387,8 +4411,16 @@ def _nuevo_import_job(ciudad='', status='idle'):
         'status':    status,   # idle | running | done | error
         'ciudad':    ciudad,
         'categoria': '',
-        'progreso':  0,        # categorías completadas
+        'progreso':  0,        # categorías completadas (para las insignias)
         'total':     len(CATEGORIAS_IMPORTADOR),
+        # La barra ya no se mueve por categoria: con dos, `progreso` solo valia
+        # 0, 1 o 2 y pasaba minutos clavada en 0 %. Ahora avanza por paso
+        # (categoria x variacion x pagina) y el denominador es ajustable, porque
+        # el Plan 2 va a recortar variaciones y el total dejara de ser fijo.
+        'fraccion':  0,        # 0-100, monotona no decreciente
+        'fase':      '',       # etiqueta legible del paso actual
+        'pasos_hechos': 0,
+        'pasos_total':  0,
         'encontrados':     0,  # pasaron los filtros de Places
         'nuevos_en_sheet': 0,  # filas REALMENTE escritas en la hoja
         'duplicados':      0,  # ya estaban en LISTA DE CONTACTOS
@@ -4422,6 +4454,7 @@ IMPORT_ESTADO_FILE = os.environ.get(
     os.path.join(tempfile.gettempdir(), 'importador_estado.json'))
 
 _CAMPOS_PERSISTIDOS = ('status', 'ciudad', 'categoria', 'progreso', 'total',
+                       'fraccion', 'fase',
                        'encontrados', 'nuevos_en_sheet', 'duplicados',
                        'descartados', 'error')
 
@@ -4519,7 +4552,8 @@ def _leer_estado_importador():
     return datos
 
 
-def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None, con_detalle=None):
+def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
+                     con_detalle=None, avisar=None):
     """Busca negocios con filtros de calidad. Campos y lógica idénticos al script original.
 
     `vistos` es el conjunto de place_id ya procesados. Si quien llama pasa el
@@ -4563,8 +4597,10 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None, con_detalle=N
         f"{categoria} {ciudad}",
     ]
 
-    for query in variaciones:
+    for idx_q, query in enumerate(variaciones, 1):
         consulta_ok = False
+        if avisar:
+            avisar(f'{categoria} — variación {idx_q} de {len(variaciones)}')
         for intento in range(3):
             try:
                 resp   = gmaps_client.places(query=query, language='es', type='establishment')
@@ -4577,6 +4613,10 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None, con_detalle=N
                         resp = gmaps_client.places(page_token=resp['next_page_token'])
                         lugares.extend(resp.get('results', []))
                         paginas += 1
+                        if avisar:
+                            avisar(f'{categoria} — variación {idx_q} de '
+                                   f'{len(variaciones)}, página {paginas}',
+                                   extra=True)
                     except Exception:
                         paginas_fallidas += 1
                         break
@@ -4780,15 +4820,51 @@ def _worker_importador(ciudad, gmaps_api_key):
         vistos_corrida = set()
         con_detalle_corrida = set()
 
+        # Presupuesto de pasos GARANTIZADOS por categoria: 1 al preparar, 3 (una
+        # por variacion, que siempre corren) y 1 al guardar. Nada mas.
+        #
+        # Presupuestar el peor caso (asumiendo que toda variacion pagina hasta el
+        # maximo) hacia que en la corrida normal solo se cumpliera la mitad del
+        # presupuesto, y la barra pegara un salto de 25 puntos en cada frontera de
+        # categoria. Las paginas son trabajo que se DESCUBRE en marcha: cuando
+        # aparece una, crece el numerador y el denominador a la vez, que es
+        # justamente para lo que el denominador es ajustable.
+        BASE_POR_CATEGORIA = 1 + 3 + 1
+        pasos_hechos = 0
+        # El +1 reserva el ultimo tramo para el cierre. Sin el, la ultima
+        # escritura marcaba 100 % con la escritura todavia en curso: una barra
+        # llena mientras el trabajo sigue es la misma clase de mentira que este
+        # plan vino a quitar.
+        pasos_total = len(CATEGORIAS_IMPORTADOR) * BASE_POR_CATEGORIA + 1
+
+        def avanzar(fase, extra=False):
+            nonlocal pasos_hechos, pasos_total
+            pasos_hechos += 1
+            if extra:
+                pasos_total += 1
+            with _import_lock:
+                _avanzar_progreso(_import_job, hechos=pasos_hechos,
+                                  total=pasos_total, fase=fase)
+
+        def solo_fase(fase):
+            """Cambia la etiqueta sin consumir un paso del presupuesto."""
+            with _import_lock:
+                _avanzar_progreso(_import_job, fase=fase)
+
         for i, cat in enumerate(CATEGORIAS_IMPORTADOR):
             with _import_lock:
                 _import_job['categoria'] = cat
                 _import_job['progreso']  = i
                 _import_job['log'].append(f'Buscando {cat} en {ciudad}...')
+            # Un paso nada mas empezar: la barra no se queda en 0 % mientras el
+            # operador se pregunta si pulso el boton.
+            avanzar(f'Preparando {cat}…')
 
             resultados, stats, incidencias = _buscar_negocios(
                 gmaps, cat, ciudad, vistos=vistos_corrida,
-                con_detalle=con_detalle_corrida)
+                con_detalle=con_detalle_corrida, avisar=avanzar)
+
+            avanzar(f'Guardando {cat} en Google Sheets…')
 
             # Agregar ciudad a cada resultado
             for r in resultados:
@@ -4812,6 +4888,7 @@ def _worker_importador(ciudad, gmaps_api_key):
 
             todos.extend(resultados)
             desglose[cat] = len(resultados)
+            solo_fase(f'{cat}: {len(resultados)} aprobados')
             # `nuevos` es el valor de retorno de _exportar_a_sheets: las filas que
             # de verdad se escribieron. Antes solo iba al log, y la UI mostraba
             # `encontrados` rotulado como si fueran guardados. Son cosas distintas
@@ -4852,6 +4929,8 @@ def _worker_importador(ciudad, gmaps_api_key):
         with _import_lock:
             _import_job['status']   = 'done'
             _import_job['progreso'] = len(CATEGORIAS_IMPORTADOR)
+            _avanzar_progreso(_import_job, hechos=pasos_total, total=pasos_total,
+                              fase='Completado')  # cierra en 100 % exacto
             copia_estado = dict(_import_job)
             _import_job['log'].append(
                 f"✅ Completado en {tiempo:.1f} min — "
@@ -4922,6 +5001,8 @@ def importador_estado():
             'categoria':  _import_job['categoria'],
             'progreso':   _import_job['progreso'],
             'total':      _import_job['total'],
+            'fraccion':   _import_job.get('fraccion', 0),
+            'fase':       _import_job.get('fase', ''),
             'encontrados':     _import_job['encontrados'],
             'nuevos_en_sheet': _import_job['nuevos_en_sheet'],
             'duplicados':      _import_job['duplicados'],
@@ -5246,11 +5327,13 @@ async function actualizarEstado() {
   const r = await fetch('/api/importador/estado');
   const d = await r.json();
 
-  // Progreso
-  const pct = d.total > 0 ? Math.round((d.progreso / d.total) * 100) : 0;
+  // Progreso: la fraccion viene ya calculada y es monotona. Calcularla aqui
+  // desde progreso/total daria otra vez 0/50/100.
+  const pct = d.fraccion || 0;
   document.getElementById('prog-fill').style.width  = pct + '%';
   document.getElementById('prog-pct').textContent   = pct + '%';
-  document.getElementById('prog-label').textContent = d.categoria ? `Buscando: ${d.categoria}...` : 'Procesando...';
+  document.getElementById('prog-label').textContent =
+    d.fase || (d.categoria ? `Buscando: ${d.categoria}...` : 'Procesando...');
 
   // Stats
   document.getElementById('s-nuevos').textContent      = d.nuevos_en_sheet;
