@@ -440,8 +440,8 @@ prospección en frío sobre Google Places. No aplica, y esta es la constancia po
 | T2.3 | Deduplicar antes de pagar Details | **HECHA** | `2bb1980` · **ciudad ya trabajada: 80 → 0 Place Details** · gates python-reviewer + silent-failure-hunter: 0 CRITICAL/HIGH, 4 MEDIUM corregidos | 2026-08-28 |
 | T2.4 | Cortar variaciones y páginas sin aporte | **HECHA** | `ba18bd9` · 335 passed · **Text Search 18 → 13** · 3 cortes, todos por aporte MEDIDO de cero · gates python-reviewer (1 HIGH corregido, verificado en las dos direcciones) + code-reviewer APPROVE · ⚠️ **CE7 sin verificar** (necesita corrida real: gate del owner); los dos cortes con riesgo se desactivan con una constante | 2026-08-28 |
 | T2.5 | Caché persistente `place_id` → detalle | **HECHA** | `031f0f5` · 344 passed · **2ª corrida de la misma ciudad: 80 → 0 Place Details** · ahorra sobre todo a los RECHAZADOS sin teléfono, que nunca llegan a la hoja y se repagaban indefinidamente · TTL 30 d · gate security-reviewer: 0 CRITICAL/HIGH, 2 correcciones (poda real en disco, 0600 + O_EXCL) | 2026-08-28 |
-| T2.6 | Medidor de costo y tope de presupuesto | PENDIENTE | | |
+| T2.6 | Medidor de costo y tope de presupuesto | **HECHA** | `887a29e` · 357 passed · 4 contadores en UI + Telegram · tarifas por entorno **sin valor por defecto** (sin tarifa no se publica importe) · dos topes: llamadas (funciona sin tarifas) y dinero · gates python-reviewer + **silent-failure-hunter**: 2 CRITICAL, 1 HIGH y 4 menores corregidos | 2026-08-28 |
 | T2.7 | Verificación: medición A/B + diff de calidad | PENDIENTE | | |
 | T2.8 | Cierre: docs, PR, handoff | PENDIENTE | | |
 
-**Avance del plan: 6 / 9 tareas (67 %)** · T2.0 bloqueada en su mitad monetaria
+**Avance del plan: 7 / 9 tareas (78 %)** · T2.0 bloqueada en su mitad monetaria
