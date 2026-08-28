@@ -145,3 +145,62 @@ Ninguno se puede cerrar desde una sesión de Claude.
 El Plan 1 hereda además **B11** (filtrar ciudades renumeraba el ranking); ya está
 corregido en el cliente con `c.rank` fijado una sola vez sobre el catálogo
 completo — **verificar y no duplicar**.
+
+
+---
+
+# Actualización 2026-08-28 — Plan 2 va 4 de 9
+
+**PR #38 (borrador)**, rama `perf/gasto-places-importador`. **No mergeado**: el
+plan no está cerrado. Baseline **314 → 326 passed**.
+
+## Hecho
+
+| Tarea | Estado |
+|---|---|
+| T2.0 | 🚫 **BLOQUEADA** en su mitad monetaria · sustituida por conteo de llamadas |
+| T2.1 | ✅ ADR `docs/adr/2026-08-28-places-legacy-vs-new.md` |
+| T2.2 | ✅ `fields` explícitos en `place()` |
+| T2.3 | ✅ prefiltro antes de pagar Details |
+
+**Ahorro medido** (`python tools/medir_llamadas_places.py`), Place Details por
+corrida: ciudad nueva 80→80, a medio trabajar 80→60, **ya trabajada 80→0**. Más,
+en las que quedan, se deja de facturar Basic (26 campos) y Atmosphere (18).
+
+## Lo que falta, y lo que ya no hace falta
+
+**T2.4 — cortar variaciones y páginas sin aporte.** Sigue pendiente y sigue
+valiendo la pena: son 18 Text Search por corrida, invariables en los tres
+escenarios. Ojo: el plan dice que `if lugares: break` corta variaciones. **No**:
+corta reintentos. Las tres variaciones corren siempre.
+
+El denominador de progreso ya es ajustable (Plan 3 · T3.6), así que recortar
+variaciones solo pide bajar `BASE_POR_CATEGORIA`; la barra se ajusta sola y no
+retrocede.
+
+**T2.5 — caché persistente `place_id` → detalle.** Ojo con dos cosas que el plan
+da por supuestas y ya no son ciertas:
+- Dice que gunicorn corre `--workers 2` y que por eso hace falta caché fuera del
+  proceso. **Ya no**: desde el Plan 3 corre `--workers 1 --threads 4`. La razón
+  para persistir sigue siendo sobrevivir al reinicio, no compartir entre workers.
+- El archivo llevaría **teléfonos de negocios**, que son datos personales. Va a
+  `.gitignore` y `.dockerignore` **en el mismo commit que lo crea**.
+
+**T2.6 — medidor de costo y tope.** Para reportar ahorro use
+`incidencias['detalles_evitados']`, **no** `ya_vistos_otra_cat`: el segundo
+incluye negocios rechazados por reseñas, que nunca costaron un `place()`.
+
+**T2.7 — verificación A/B.** `tools/medir_llamadas_places.py --json` da la salida
+comparable entre corridas.
+
+## Gate del owner que sigue abierto y bloquea el cierre
+
+Sin el **consumo por SKU de la consola de Google Cloud** (proyecto
+`bubbly-subject-412101`) no se puede expresar el ahorro en pesos. Los conteos ya
+están; falta solo el multiplicador.
+
+## Trampa que volví a pisar
+
+`git add docs/superpowers/plans/` arrastra otra vez los ocho archivos de la tanda
+`2026-08-15-*`, que son de otro proyecto. **Añadir siempre por ruta explícita.**
+Ya me pasó en el Plan 3 y volvió a pasar aquí.
