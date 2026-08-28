@@ -438,10 +438,10 @@ prospección en frío sobre Google Places. No aplica, y esta es la constancia po
 | T2.1 | Docs del SKU de Places + ADR legacy vs New | **HECHA** | `2bb1980` · ADR `docs/adr/2026-08-28-places-legacy-vs-new.md`, con la documentación citada y fechada y verificada además contra el cliente instalado | 2026-08-28 |
 | T2.2 | Place Details con `fields` explícitos | **HECHA** | `2bb1980` · 326 passed · deja de facturar Basic (26 campos) y Atmosphere (18) | 2026-08-28 |
 | T2.3 | Deduplicar antes de pagar Details | **HECHA** | `2bb1980` · **ciudad ya trabajada: 80 → 0 Place Details** · gates python-reviewer + silent-failure-hunter: 0 CRITICAL/HIGH, 4 MEDIUM corregidos | 2026-08-28 |
-| T2.4 | Cortar variaciones y páginas sin aporte | PENDIENTE | | |
+| T2.4 | Cortar variaciones y páginas sin aporte | **HECHA** | `ba18bd9` · 335 passed · **Text Search 18 → 13** · 3 cortes, todos por aporte MEDIDO de cero · gates python-reviewer (1 HIGH corregido, verificado en las dos direcciones) + code-reviewer APPROVE · ⚠️ **CE7 sin verificar** (necesita corrida real: gate del owner); los dos cortes con riesgo se desactivan con una constante | 2026-08-28 |
 | T2.5 | Caché persistente `place_id` → detalle | PENDIENTE | | |
 | T2.6 | Medidor de costo y tope de presupuesto | PENDIENTE | | |
 | T2.7 | Verificación: medición A/B + diff de calidad | PENDIENTE | | |
 | T2.8 | Cierre: docs, PR, handoff | PENDIENTE | | |
 
-**Avance del plan: 4 / 9 tareas (44 %)** · T2.0 bloqueada en su mitad monetaria
+**Avance del plan: 5 / 9 tareas (56 %)** · T2.0 bloqueada en su mitad monetaria

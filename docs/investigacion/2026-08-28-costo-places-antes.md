@@ -59,13 +59,13 @@ Y **cada uno de esos 80 Details facturaba los tres grupos de campos** —Basic (
 Contact (6) y Atmosphere (18)— porque la llamada iba sin `fields`. Cincuenta
 campos facturados para leer tres.
 
-### DESPUÉS (T2.2 + T2.3)
+### DESPUÉS (T2.2 + T2.3 + T2.4)
 
 | Escenario | Text Search | Place Details | Filas nuevas | Ahorro en Details |
 |---|---|---|---|---|
-| Ciudad nueva | 18 | 80 | 80 | 0 % |
-| Ciudad a medio trabajar | 18 | **60** | 60 | **25 %** |
-| **Ciudad ya trabajada** | 18 | **0** | 0 | **100 %** |
+| Ciudad nueva | **13** | 80 | 80 | 0 % |
+| Ciudad a medio trabajar | **13** | **60** | 60 | **25 %** |
+| **Ciudad ya trabajada** | **13** | **0** | 0 | **100 %** |
 
 Más, en las llamadas que quedan: se dejan de facturar **Basic y Atmosphere**.
 
@@ -105,10 +105,10 @@ Son ~7,000 filas.
 
 ```
 python -m pytest tests/
-324 passed
+335 passed
 ```
 
-Partida del Plan 2: 314. Los 10 nuevos son de `tests/test_costo_places.py`.
+Partida del Plan 2: 314. Los 21 nuevos son de `tests/test_costo_places.py`.
 
 ---
 
