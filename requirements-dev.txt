@@ -1,5 +1,7 @@
 # Dependencias de desarrollo/test de PanelNioval.
-# Baseline oficial: python -m pytest tests/ -q
+# Baseline oficial: python -m pytest tests/   <- SIN -q.
+# pytest.ini ya trae addopts = -q; un segundo -q lo vuelve -qq, que suprime la
+# linea del resumen: se ven los puntos y exit 0, pero nunca el numero de tests.
 pytest>=8.0.0
 
 # Dependencias RUNTIME de envio_catalogo.py (no en requirements.txt del panel Flask).

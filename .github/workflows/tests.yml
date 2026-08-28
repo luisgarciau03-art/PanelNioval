@@ -1,0 +1,157 @@
+name: Tests
+
+# El proyecto tiene una regla que dice "nada se mergea con la suite en rojo".
+# Hasta ahora esa regla solo se cumplia si alguien se acordaba de correr pytest a
+# mano: habia intencion, no mecanismo. Esto es el mecanismo.
+#
+# `main` tiene auto-deploy a Railway y a Vultr, asi que un merge en rojo llega a
+# produccion sin escala intermedia.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Permiso minimo: lo unico que hacen estos jobs es clonar y leer.
+# NUNCA `pull_request_target`: corre con el contexto del repositorio destino
+# incluso para PR de forks, y no hace falta para nada de lo que hay aqui.
+permissions:
+  contents: read
+
+# Un push que llega mientras corre el anterior cancela al viejo. Sin esto, en
+# una rafaga de commits se pagan corridas que ya no le importan a nadie.
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    name: Suite de pytest
+    runs-on: ubuntu-latest
+    # El objetivo del plan es que la corrida baje de 5 minutos. Un timeout de 10
+    # dejaria que la suite se degradara hasta 9 sin que nada lo dijera, y volveria
+    # ese objetivo en intencion sin mecanismo, que es justo el problema que este
+    # workflow existe para resolver. 6 = el objetivo mas un margen razonable.
+    timeout-minutes: 6
+
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          # Las dos listas cuentan para la clave del cache: si cambia
+          # cualquiera, el cache se invalida solo.
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      # No se le pasa NINGUN secreto del repositorio, y es a proposito.
+      # `tests/conftest.py` ya fija PANEL_AUTH_DESACTIVADA=1 por su cuenta y
+      # stubea los clientes externos en sys.modules. Comprobado en la maquina
+      # del owner: la suite corre en verde con cero variables de Google o de
+      # Telegram definidas. Si algun test llegara a pedir un secreto, el test
+      # esta mal aislado y se corrige el test, no el workflow.
+      - name: Correr la suite
+        shell: bash
+        run: |
+          # `shell: bash` ya implica `-eo pipefail`, pero se declara aparte
+          # porque de ello depende que este gate sirva de algo: SIN pipefail,
+          # `pytest | tee` devuelve el codigo de salida de `tee`, que siempre es
+          # 0, y el check saldria VERDE con la suite en rojo.
+          set -o pipefail
+          python -m pytest tests/ -p no:cacheprovider | tee pytest-salida.log
+
+      - name: Publicar el resumen
+        if: always()
+        shell: bash
+        run: |
+          # El numero de tests tiene que verse. `pytest.ini` trae `addopts = -q`;
+          # anadir otro `-q` lo vuelve `-qq`, que suprime justo esta linea: se
+          # verian los puntos y el exit code, nunca el numero. Por eso el
+          # comando de arriba no lleva `-q` adicional.
+          {
+            echo "## Suite de pytest"
+            echo ""
+            resumen=$(grep -E '[0-9]+ (passed|failed|error)' pytest-salida.log | tail -n 1 || true)
+            if [ -n "$resumen" ]; then
+              echo '```'
+              echo "$resumen"
+              echo '```'
+            else
+              echo "La suite no llego a imprimir resumen: reventó antes de terminar."
+              echo "Mira el log completo del paso \"Correr la suite\"."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  barrido-secretos:
+    name: Barrido de secretos sobre el diff
+    # Solo en PR: en un push a main no hay "lineas anadidas por este cambio"
+    # con un base contra el que comparar.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Clonar el repositorio con historial
+        uses: actions/checkout@v4
+        with:
+          # Hace falta el commit base para poder sacar el diff del PR.
+          fetch-depth: 0
+
+      - name: Preparar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # El barrido corre SOLO sobre las lineas anadidas del PR, nunca sobre el
+      # historial: el historial de este repositorio YA contiene el
+      # TELEGRAM_TOKEN (~14 copias, su rotacion es gate del owner), asi que un
+      # barrido sobre el historial marcaria todos los PR desde el primer dia.
+      #
+      # El SHA va por `env` y no interpolado en el script: interpolar `${{ }}`
+      # dentro de un `run` es la via clasica de inyeccion de comandos, aunque en
+      # este caso concreto el valor lo ponga GitHub y no una persona.
+      - name: Barrer las lineas anadidas
+        shell: bash
+        env:
+          SHA_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -o pipefail
+          # Tres puntos, no dos: `A...B` compara contra el merge-base, que es lo
+          # que GitHub muestra como "Files changed". Con dos puntos, si `main`
+          # avanzo desde que salio la rama, el diff incluye cambios de otros.
+          git diff "$SHA_BASE...HEAD" | python tools/barrer_secretos.py | tee barrido.log
+
+      - name: Publicar el resultado del barrido
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Barrido de secretos"
+            echo ""
+            echo '```'
+            cat barrido.log 2>/dev/null || echo "El barrido no llego a producir salida."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # En su primera version el barrido AVISA y no bloquea (por eso no lleva
+      # `--estricto`). Bloquear el dia uno con patrones sin calibrar convierte el
+      # gate en algo que la gente aprende a saltarse. Cuando lleve unas semanas
+      # sin falsos positivos, se le anade `--estricto` al paso de arriba y pasa a
+      # bloquear.
+      #
+      # Ojo con confundir esto con "el barrido no puede fallar": si el script
+      # revienta, el paso sale en rojo. Un barrido que se traga su excepcion
+      # devuelve cero hallazgos y PARECE un exito, y esa es justo la forma en que
+      # un gate de seguridad deja de servir sin que nadie se entere.
