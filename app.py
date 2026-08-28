@@ -4386,6 +4386,15 @@ CATEGORIAS_IMPORTADOR = ['Ferreterías', 'Distribuidoras Ferreterías']
 # Ver docs/adr/2026-08-28-places-legacy-vs-new.md
 CAMPOS_PLACE_DETAILS = ['formatted_phone_number', 'website', 'opening_hours']
 
+# Cortes de gasto (Plan 2 - T2.4). Constantes con nombre, no numeros sueltos.
+#
+# Solo se corta ante un aporte MEDIDO de cero: no se predice que una consulta no
+# va a servir, se comprueba que no sirvio. Y cada corte se registra en el log,
+# porque un tope silencioso se lee como "cubri todo" cuando no lo hizo.
+MAX_PAGINAS_POR_CONSULTA = 3
+MAX_VARIACIONES_SIN_APORTE = 2   # variaciones seguidas con 0 nuevos antes de parar
+CORTAR_PAGINAS_SIN_APORTE = True # False deja de cortar por pagina sin tocar codigo
+
 def _avanzar_progreso(job, hechos=None, total=None, fase=None):
     """Mueve la barra. Nunca hacia atras.
 
@@ -4604,6 +4613,7 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
     # termina en 'done' informando "0 aprobados": un fallo de autenticacion
     # presentado como una ciudad sin ferreterias.
     consultas_ok        = 0
+    cortes              = []  # lo que se dejo de pedir, y por que
     ya_en_hoja          = 0   # saltados ANTES de pagar su detalle
     ya_vistos_otra_cat  = 0   # negocios que ya habia procesado OTRA categoria
     detalles_evitados   = 0   # de esos, los que ya habian costado un place()
@@ -4617,29 +4627,70 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
         f"{categoria} {ciudad}",
     ]
 
+    variaciones_sin_aporte = 0
     for idx_q, query in enumerate(variaciones, 1):
+        if variaciones_sin_aporte >= MAX_VARIACIONES_SIN_APORTE:
+            cortes.append(
+                f'{categoria}: se omitieron las variaciones {idx_q}-{len(variaciones)} '
+                f'tras {variaciones_sin_aporte} seguidas que trajeron resultados '
+                f'pero ninguno nuevo')
+            break
         consulta_ok = False
         if avisar:
             avisar(f'{categoria} — variación {idx_q} de {len(variaciones)}')
         for intento in range(3):
+            # Por INTENTO, no por variacion: un reintento que ocurra despues de
+            # haber leido resultados encontraria aqui sus propios place_id y
+            # mediria 0 nuevos sobre datos identicos. Ese cero es falso y
+            # empuja hacia un corte que nadie se gano.
+            ids_de_esta_consulta = set()
             try:
                 resp   = gmaps_client.places(query=query, language='es', type='establishment')
                 consulta_ok = True
                 lugares = resp.get('results', [])
+                aporte_variacion = _aporte_nuevo(lugares, vistos, ids_de_esta_consulta)
                 paginas = 1
-                while 'next_page_token' in resp and paginas < 3:
+                while 'next_page_token' in resp and paginas < MAX_PAGINAS_POR_CONSULTA:
                     time.sleep(2)
                     try:
                         resp = gmaps_client.places(page_token=resp['next_page_token'])
-                        lugares.extend(resp.get('results', []))
+                        pagina = resp.get('results', [])
+                        aporte_pagina = _aporte_nuevo(pagina, vistos, ids_de_esta_consulta)
+                        lugares.extend(pagina)
                         paginas += 1
+                        aporte_variacion += aporte_pagina
                         if avisar:
                             avisar(f'{categoria} — variación {idx_q} de '
                                    f'{len(variaciones)}, página {paginas}',
                                    extra=True)
+                        # Una pagina entera de negocios ya vistos: pedir la
+                        # siguiente es pagar por lo mismo otra vez.
+                        if CORTAR_PAGINAS_SIN_APORTE and aporte_pagina == 0:
+                            cortes.append(
+                                f'{categoria} v{idx_q}: no se pidieron mas paginas '
+                                f'tras la {paginas}, que no trajo ninguno nuevo')
+                            break
                     except Exception:
                         paginas_fallidas += 1
                         break
+
+                # Solo cuenta como "sin aporte" una variacion que TRAJO
+                # resultados y ninguno era nuevo: eso es saturacion, y la
+                # siguiente consulta —casi la misma frase— dara lo mismo.
+                #
+                # Una variacion VACIA no cuenta. Vacio no significa saturado,
+                # significa que esa fraseologia no caso; otra puede casar. Contar
+                # los vacios hacia que dos consultas sin resultados cancelaran la
+                # tercera, y si esa tercera era la que funcionaba, se perdia la
+                # categoria entera.
+                if lugares and aporte_variacion == 0:
+                    variaciones_sin_aporte += 1
+                else:
+                    # Cualquier cosa que no sea saturacion rompe la racha, y una
+                    # variacion vacia no es saturacion. Hoy da igual con 3
+                    # variaciones y umbral 2, pero dejarlo implicito es una trampa
+                    # para quien anada una cuarta.
+                    variaciones_sin_aporte = 0
 
                 for lugar in lugares:
                     pid     = lugar.get('place_id')
@@ -4707,7 +4758,12 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                         detalles_fallidos += 1
                         continue
 
-                if lugares: break
+                # Exito: no se reintenta, ni siquiera si vino vacia. Una
+                # consulta que responde BIEN y sin resultados devolvera lo mismo
+                # al repetirla: mismos parametros, misma respuesta. Antes solo se
+                # cortaba `if lugares`, asi que una variacion legitimamente vacia
+                # se lanzaba tres veces identicas.
+                break
 
             except Exception as e:
                 ultimo_error = e
@@ -4727,12 +4783,29 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
         )
 
     incidencias = {'ya_en_hoja': ya_en_hoja,
+                   'cortes': cortes,
                    'detalles_fallidos': detalles_fallidos,
                    'paginas_fallidas': paginas_fallidas,
                    'consultas_fallidas': len(variaciones) - consultas_ok,
                    'ya_vistos_otra_cat': ya_vistos_otra_cat,
                    'detalles_evitados': detalles_evitados}
     return resultados, stats, incidencias
+
+
+def _aporte_nuevo(pagina, vistos, ya_contados):
+    """Cuantos place_id de esta pagina NO se habian visto todavia en la corrida.
+
+    Es la medida que decide los cortes de T2.4: no se predice que una consulta no
+    va a servir, se comprueba que no sirvio. `ya_contados` se muta para que dos
+    paginas de la misma consulta no se acrediten el mismo negocio.
+    """
+    nuevos = 0
+    for lugar in pagina:
+        pid = lugar.get('place_id')
+        if pid and pid not in vistos and pid not in ya_contados:
+            ya_contados.add(pid)
+            nuevos += 1
+    return nuevos
 
 
 def _clave_contacto(nombre, direccion):
@@ -5000,6 +5073,10 @@ def _worker_importador(ciudad, gmaps_api_key):
                 if saltados:
                     aviso += (f' · {saltados} ya estaban en la hoja'
                               f' (detalle no pagado)')
+                # Los cortes se dicen, uno por uno. Un tope silencioso se lee
+                # como "cubri todo" cuando justamente no lo hizo.
+                for corte in incidencias.get('cortes', []):
+                    _import_job['log'].append(f'✂ {corte}')
                 solape = incidencias['ya_vistos_otra_cat']
                 if solape:
                     evitados = incidencias['detalles_evitados']

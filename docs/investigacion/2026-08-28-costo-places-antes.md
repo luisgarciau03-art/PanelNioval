@@ -120,3 +120,51 @@ Partida del Plan 2: 314. Los 10 nuevos son de `tests/test_costo_places.py`.
 3. Opcionalmente, una **corrida real** sobre una ciudad de referencia para
    contrastar los conteos sintéticos contra el consumo observado. Esa corrida
    factura y escribe en producción, así que también es decisión suya.
+
+
+---
+
+## 6. T2.4 — los cortes, y el riesgo que no pude cerrar
+
+Tres cortes, **todos disparados por un aporte MEDIDO de cero**, nunca por
+predicción. Efecto: Text Search por corrida **18 → 13**.
+
+| # | Corte | Riesgo |
+|---|---|---|
+| 1 | Una consulta que responde bien y **vacía** no se reintenta | **Ninguno.** Misma consulta, mismos parámetros, misma respuesta vacía |
+| 2 | Se deja de paginar tras una página que no aportó ningún `place_id` nuevo | Bajo. Asume que Places pagina por relevancia decreciente |
+| 3 | Se dejan de pedir variaciones tras 2 seguidas que **trajeron resultados y ninguno nuevo** | **El único real.** Ver abajo |
+
+Una variación **vacía no cuenta** para el corte 3, a propósito. Vacío no es
+saturación: significa que esa fraseología no casó, y otra puede casar. Contar los
+vacíos habría dejado que dos consultas sin resultados cancelaran una tercera que
+sí funcionaba, perdiendo la categoría entera.
+
+### El riesgo que queda abierto
+
+El corte 3 asume que si *"Ferreterías en X"* y *"Ferreterías cerca de X"* se
+saturan, *"Ferreterías X"* también. Las tres son casi la misma frase, así que es
+razonable — **pero no está probado**, y la búsqueda de texto de Google no
+garantiza monotonía entre fraseologías parecidas.
+
+**El plan exige verificarlo (CE7): correr la ciudad de referencia y comparar el
+conjunto de negocios aprobados contra el de T2.0. Esa corrida factura la API y
+escribe en producción, así que es gate del owner y no se pudo hacer.**
+
+Se documenta como **riesgo aceptado y no verificado**, no como algo resuelto.
+
+### Cómo revertir cada corte sin tocar código
+
+```python
+MAX_VARIACIONES_SIN_APORTE = 99     # desactiva el corte 3 (el de riesgo)
+CORTAR_PAGINAS_SIN_APORTE  = False  # desactiva el corte 2
+```
+
+El corte 1 no tiene interruptor porque no tiene riesgo que revertir.
+
+### Nota de diseño
+
+Dentro de la **primera** categoría el corte 3 no puede dispararse: en la
+variación 1 el conjunto de vistos está vacío, así que todo cuenta como nuevo. El
+ahorro es **entre categorías**, que es justo el caso de este proyecto —
+`Distribuidoras Ferreterías` se solapa fuerte con `Ferreterías`.

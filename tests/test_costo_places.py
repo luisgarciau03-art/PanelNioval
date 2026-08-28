@@ -306,3 +306,224 @@ class TestFalloDeEscrituraConSaltados:
         assert est["nuevos_en_sheet"] == 0, (
             "la escritura reventó; no puede haber filas nuevas contadas"
         )
+
+
+# ─────────── T2.4 · no gastar en consultas que no aportan nada ───────────
+
+class GmapsPorVariacion:
+    """Devuelve un lote distinto por variacion y por pagina, a eleccion.
+
+    `plan` es {(n_variacion, n_pagina): [place_ids]}. Lo que no este en el plan
+    devuelve vacio. Permite montar el caso "la variacion 2 no aporta nada nuevo"
+    sin depender de la casualidad.
+    """
+
+    def __init__(self, plan):
+        self.plan = plan
+        self.consultas = []          # [(query, page_token), ...]
+        self.llamadas_place = []
+        self._tokens = {}
+
+    def _negocios(self, ids):
+        return [negocio("Neg %s" % i, "pid-%s" % i, "Calle %s" % i) for i in ids]
+
+    def places(self, query=None, page_token=None, **kw):
+        self.consultas.append((query, page_token))
+        if page_token is None:
+            var = sum(1 for q, t in self.consultas if t is None)
+            pag = 1
+        else:
+            var, pag = self._tokens[page_token]
+        ids = self.plan.get((var, pag), [])
+        resp = {"results": self._negocios(ids)}
+        if (var, pag + 1) in self.plan:
+            tok = "t-%d-%d" % (var, pag)
+            self._tokens[tok] = (var, pag + 1)
+            resp["next_page_token"] = tok
+        return resp
+
+    def place(self, pid, **kw):
+        self.llamadas_place.append(pid)
+        return {"result": {"formatted_phone_number": "+52 33 1234 5678"}}
+
+
+class TestNoRepetirConsultasVacias:
+    def test_una_consulta_vacia_no_se_reintenta(self, entorno):
+        """Una consulta que responde BIEN y vacia devolvera lo mismo al repetirla.
+
+        `if lugares: break` solo rompe cuando hubo resultados, asi que una
+        variacion legitimamente vacia se lanzaba 3 veces identicas. Es gasto
+        puro: mismos parametros, misma respuesta.
+        """
+        gmaps = GmapsPorVariacion({})       # todo vacio
+        correr(entorno, gmaps, WorksheetFalsa())
+        # Antes: 3 variaciones x 3 reintentos x 2 categorias = 18 consultas.
+        # Ahora 6: no se reintenta una consulta que respondio vacia, pero las
+        # tres variaciones SI se lanzan. Vacio no es saturacion: puede ser que
+        # esa fraseologia no case y otra si.
+        assert len(gmaps.consultas) == 6, (
+            "se lanzaron %d consultas; deberian ser 6" % len(gmaps.consultas)
+        )
+
+    def test_un_fallo_de_verdad_si_se_reintenta(self, entorno):
+        """La otra direccion: un error transitorio merece sus reintentos."""
+        class GmapsQueFallaYLuegoVa:
+            def __init__(self):
+                self.intentos = 0
+                self.llamadas_place = []
+
+            def places(self, query=None, page_token=None, **kw):
+                self.intentos += 1
+                if self.intentos == 1:
+                    raise RuntimeError("timeout transitorio")
+                return {"results": []}
+
+            def place(self, pid, **kw):
+                return {"result": {"formatted_phone_number": "+52 33 1234 5678"}}
+
+        gmaps = GmapsQueFallaYLuegoVa()
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        assert gmaps.intentos > 1, "no se reintento tras un error transitorio"
+        assert est["status"] == "done", (
+            "un error transitorio del que se salio no puede tumbar la corrida"
+        )
+
+
+class TestCortarPaginasYVariaciones:
+    def test_no_pide_la_siguiente_pagina_si_la_actual_no_aporto_nada(self, entorno):
+        # Variacion 1: pagina 1 trae A y B; pagina 2 repite A y B; pagina 3
+        # traeria C, pero no se debe llegar a pedirla.
+        plan = {(1, 1): ["A", "B"], (1, 2): ["A", "B"], (1, 3): ["C"]}
+        gmaps = GmapsPorVariacion(plan)
+        correr(entorno, gmaps, WorksheetFalsa())
+        paginadas = [t for _, t in gmaps.consultas if t is not None]
+        assert len(paginadas) == 1, (
+            "se pidieron %d paginas; tras una pagina sin aporte no deberia "
+            "pedirse otra" % len(paginadas)
+        )
+
+    def test_si_la_pagina_aporta_se_sigue_paginando(self, entorno):
+        """Comprobacion en la otra direccion: el corte no puede dispararse solo."""
+        plan = {(1, 1): ["A"], (1, 2): ["B"], (1, 3): ["C"]}
+        gmaps = GmapsPorVariacion(plan)
+        correr(entorno, gmaps, WorksheetFalsa())
+        paginadas = [t for _, t in gmaps.consultas if t is not None]
+        assert len(paginadas) >= 2, (
+            "se cortó la paginación aunque cada página aportaba negocios nuevos"
+        )
+
+    def test_el_log_registra_cada_corte(self, entorno):
+        """Un tope silencioso se lee como 'cubri todo' cuando no lo hizo."""
+        plan = {(1, 1): ["A", "B"], (1, 2): ["A", "B"], (1, 3): ["C"]}
+        gmaps = GmapsPorVariacion(plan)
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        cortes = [l for l in est["log"] if l.startswith("✂")]
+        assert cortes, "no se avisa de ningun corte: %r" % est["log"]
+        # El aviso tiene que decir QUE se dejo de pedir, no solo que se corto algo.
+        assert any("pagina" in c or "página" in c for c in cortes), cortes
+        assert any("Ferreterías" in c for c in cortes), cortes
+
+    def test_dos_vacias_no_cancelan_una_tercera_que_si_encuentra(self, entorno):
+        """El caso que casi se me cuela.
+
+        Si "Ferreterias en X" y "Ferreterias cerca de X" vuelven vacias pero
+        "Ferreterias X" si encuentra, contar los vacios como saturacion habria
+        cancelado la unica consulta que funcionaba, y con ella la categoria
+        entera. Vacio no es saturado.
+        """
+        plan = {(3, 1): ["UNICO"]}          # solo la tercera variacion encuentra
+        gmaps = GmapsPorVariacion(plan)
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        assert len(gmaps.consultas) >= 3, (
+            "se corto antes de llegar a la tercera variacion: %d consultas"
+            % len(gmaps.consultas)
+        )
+        assert est["nuevos_en_sheet"] == 1, (
+            "se perdio el negocio que solo encontraba la tercera variacion"
+        )
+
+    def test_el_corte_solo_se_activa_con_saturacion_real(self, entorno):
+        """Dos variaciones que TRAEN resultados y ninguno nuevo: eso si es
+        saturacion.
+
+        Nota de diseno: dentro de la PRIMERA categoria el corte no puede
+        dispararse, porque en la variacion 1 el conjunto de vistos esta vacio y
+        todo cuenta como nuevo. El ahorro real es ENTRE categorias, que es
+        justamente el caso de este proyecto: 'Distribuidoras Ferreterías' se
+        solapa fuerte con 'Ferreterías'.
+
+        En el doble, las variaciones se numeran de corrido: 1-3 son de la primera
+        categoria y 4-6 de la segunda.
+        """
+        plan = {(1, 1): ["A"],                    # categoria 1 encuentra A
+                (4, 1): ["A"], (5, 1): ["A"]}     # categoria 2 solo repite A
+        gmaps = GmapsPorVariacion(plan)
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        cortes = [l for l in est["log"] if l.startswith("✂")]
+        assert cortes, "no se corto ante saturacion evidente: %r" % est["log"]
+        assert any("Distribuidoras" in c for c in cortes), cortes
+        assert est["nuevos_en_sheet"] == 1, (
+            "el corte se llevo por delante algun negocio: %d" % est["nuevos_en_sheet"]
+        )
+
+    def test_un_reintento_no_falsea_la_medicion_de_aporte(self, entorno):
+        """El HIGH que encontro la review.
+
+        El conjunto que mide "cuantos son nuevos" se reiniciaba por variacion y
+        no por intento. Si un intento leia resultados y luego algo reventaba
+        procesandolos, el reintento encontraba ahi sus propios place_id y medía
+        0 nuevos sobre datos identicos. Ese cero es falso, y empuja hacia el
+        corte que esta funcion existe justamente para no disparar de mas.
+
+        Se fuerza el tropiezo con un resultado malformado: `_buscar_negocios`
+        revienta al procesarlo, DESPUES de haber medido el aporte.
+        """
+        class GmapsQueRevientaAlProcesar:
+            def __init__(self):
+                self.intentos = 0
+                self.llamadas_place = []
+                self.consultas = []
+
+            def places(self, query=None, page_token=None, **kw):
+                self.consultas.append((query, page_token))
+                self.intentos += 1
+                bueno = negocio("Bueno", "pid-bueno", "Calle B")
+                if self.intentos == 1:
+                    # El segundo elemento no es un dict: al procesarlo revienta,
+                    # ya con el aporte del primero contabilizado.
+                    return {"results": [bueno, "esto-no-es-un-dict"]}
+                return {"results": [bueno]}
+
+            def place(self, pid, **kw):
+                self.llamadas_place.append(pid)
+                return {"result": {"formatted_phone_number": "+52 33 1234 5678"}}
+
+        gmaps = GmapsQueRevientaAlProcesar()
+        est = correr(entorno, gmaps, WorksheetFalsa())
+
+        assert gmaps.intentos > 1, "el escenario no llego a provocar un reintento"
+        # Con el conjunto contaminado, el reintento habria medido 0 nuevos y el
+        # negocio no habria llegado a la hoja.
+        assert est["nuevos_en_sheet"] == 1, (
+            "se perdio el negocio tras el reintento: %d" % est["nuevos_en_sheet"]
+        )
+        # El corte se comprueba en la categoria donde ocurrio el reintento. Con
+        # el conjunto contaminado, la variacion 1 habria medido 0 nuevos, la 2
+        # tambien, y la 3 se habria cortado sin que nadie se lo ganara.
+        # (En la segunda categoria SI hay un corte, y es legitimo: el doble
+        # devuelve el mismo negocio en todas las consultas, que es saturacion.)
+        cortes_cat1 = [l for l in est["log"]
+                       if l.startswith("✂ Ferreterías:")]
+        assert not cortes_cat1, (
+            "un reintento disparo un corte que nadie se gano: %r" % cortes_cat1
+        )
+
+    def test_una_sola_variacion_saturada_no_corta(self, entorno):
+        """El limite exacto: hace falta llegar al umbral, no acercarse."""
+        plan = {(1, 1): ["A"], (4, 1): ["A"], (5, 1): ["B"]}
+        gmaps = GmapsPorVariacion(plan)
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        cortes = [l for l in est["log"] if l.startswith("✂") and "variaciones" in l]
+        assert not cortes, (
+            "se corto con una sola variacion saturada, antes del umbral: %r" % cortes
+        )
