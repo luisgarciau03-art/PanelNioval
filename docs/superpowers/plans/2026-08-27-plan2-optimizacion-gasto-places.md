@@ -434,14 +434,14 @@ prospección en frío sobre Google Places. No aplica, y esta es la constancia po
 
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
-| T2.0 | Tarea Cero: rama, respaldo y medición del costo actual | PENDIENTE | | |
-| T2.1 | Docs del SKU de Places + ADR legacy vs New | PENDIENTE | | |
-| T2.2 | Place Details con `fields` explícitos | PENDIENTE | | |
-| T2.3 | Deduplicar antes de pagar Details | PENDIENTE | | |
+| T2.0 | Tarea Cero: rama, respaldo y medición del costo actual | 🚫 **BLOQUEADA** (importe) · **HECHA** (conteo) | Sin `gcloud`, cuenta de servicio solo con Sheets/Drive, sin navegador → **escalada al owner**. Sustituida por conteo exacto de llamadas: `tools/medir_llamadas_places.py` · `docs/investigacion/2026-08-28-costo-places-antes.md` · respaldo `docs/auditoria/respaldos/2026-08-28/` | 2026-08-28 |
+| T2.1 | Docs del SKU de Places + ADR legacy vs New | **HECHA** | `2bb1980` · ADR `docs/adr/2026-08-28-places-legacy-vs-new.md`, con la documentación citada y fechada y verificada además contra el cliente instalado | 2026-08-28 |
+| T2.2 | Place Details con `fields` explícitos | **HECHA** | `2bb1980` · 326 passed · deja de facturar Basic (26 campos) y Atmosphere (18) | 2026-08-28 |
+| T2.3 | Deduplicar antes de pagar Details | **HECHA** | `2bb1980` · **ciudad ya trabajada: 80 → 0 Place Details** · gates python-reviewer + silent-failure-hunter: 0 CRITICAL/HIGH, 4 MEDIUM corregidos | 2026-08-28 |
 | T2.4 | Cortar variaciones y páginas sin aporte | PENDIENTE | | |
 | T2.5 | Caché persistente `place_id` → detalle | PENDIENTE | | |
 | T2.6 | Medidor de costo y tope de presupuesto | PENDIENTE | | |
 | T2.7 | Verificación: medición A/B + diff de calidad | PENDIENTE | | |
 | T2.8 | Cierre: docs, PR, handoff | PENDIENTE | | |
 
-**Avance del plan: 0 / 9 tareas (0 %)**
+**Avance del plan: 4 / 9 tareas (44 %)** · T2.0 bloqueada en su mitad monetaria

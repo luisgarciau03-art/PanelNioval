@@ -252,11 +252,11 @@ de Fuentes, en vez de mapearla por conveniencia a una de las 6.
 | Plan | Tareas | Estado | Avance |
 |---|---|---|---|
 | Plan 3 — Bug de conteo y pantallas de carga | 10 | **COMPLETADO** | **10 / 10** |
-| Plan 2 — Optimización del gasto de Places | 9 | PENDIENTE | 0 / 9 |
+| Plan 2 — Optimización del gasto de Places | 9 | EN CURSO | 4 / 9 |
 | Plan 1 — Relevancia de ciudades nacional | 10 | PENDIENTE | 0 / 10 |
 | Plan 4 — Rediseño profesional del panel | 12 | PENDIENTE | 0 / 12 |
 
-**PROGRESO GLOBAL DEL PROYECTO: 10 / 41 tareas (24 %) · 1 de 4 planes completados**
+**PROGRESO GLOBAL DEL PROYECTO: 14 / 41 tareas (34 %) · 1 de 4 planes completados**
 
 > El ejecutor actualiza esta tabla al cerrar cada tarea, y la tabla PROGRESO del documento
 > del plan correspondiente, con evidencia (commit / test / PR) y fecha.
