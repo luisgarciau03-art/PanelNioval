@@ -42,7 +42,28 @@ Panel web interno de NIOVAL (distribuidora mayorista de ferretería/plomería) p
 
 ## Planes activos
 
-**Tanda 2026-08-13** (5 planes). Índice: `docs/superpowers/plans/2026-08-13-indice-tanda.md`.
+**Tanda 2026-08-27, validada y ampliada el 2026-08-28** (6 planes, 53 tareas, **17 hechas**).
+Índice: `docs/superpowers/plans/2026-08-27-indice-tanda.md`.
+⚠️ **Empieza por** `docs/superpowers/plans/2026-08-28-validacion-tanda.md`: los anclajes
+`archivo:línea` de los planes originales quedaron desplazados hasta 1,000 líneas cuando
+`app.py` creció de 4,948 a 6,098, y ese documento trae los corregidos, dice qué trabajo ya
+está hecho (B9 y B11 del Plan 1) y qué criterios cambiaron (CE1 del Plan 4, CE6 del Plan 2).
+Cada plan abre además con una §0 de validación que **manda** sobre el resto del documento.
+
+Orden de ejecución **0 → 2 → 1 → 4 → 5** (el Plan 3 está cerrado, PR #36 `ae0e1c9`):
+
+| Plan | Estado | Qué resuelve |
+|---|---|---|
+| 0 — Integración continua | 0/4 | No hay CI: los 357 tests solo corren si alguien se acuerda |
+| 2 — Gasto de Google Places | **7/9** | `perf/gasto-places-importador`, PR #38 en borrador |
+| 1 — Relevancia de ciudades | 0/10 | El ranking mide el historial de NIOVAL, no el mercado |
+| 4 — Rediseño del panel | 0/12 | Movimiento, presentación y estados de carga en las 3 superficies |
+| 5 — Endurecimiento | 0/8 | Rate limiting, escape de fórmulas, zona horaria, healthcheck |
+
+Las decisiones abiertas al owner están en el índice §8; los nueve gates del owner, en §7.1.
+
+**Tanda anterior 2026-08-13** (5 planes, histórica). Índice:
+`docs/superpowers/plans/2026-08-13-indice-tanda.md`.
 1. Evaluación `envio_catalogo.py` + baseline de tests + sanitización de secretos (**este plan**).
 2. Evaluación del formulario de llamadas + matriz de flujo.
 3. Integración catálogo + estados + corrección de número.

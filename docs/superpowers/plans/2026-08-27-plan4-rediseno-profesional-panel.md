@@ -9,6 +9,57 @@
 
 ---
 
+## 0. VALIDACIÓN AL 2026-08-28 (revisión contra el código en disco)
+
+Plan diseñado el 2026-08-27, **validado contra el código en disco el 2026-08-28**. `app.py`
+pasó de 4,948 a **6,098** líneas mientras corrían los Planes 3 y 2. Lo de abajo **manda**
+sobre los números de línea del resto del documento.
+
+### 0.1 Anclajes corregidos
+
+| Lo que dice el plan | Realidad verificada el 2026-08-28 |
+|---|---|
+| `HTML` en `app.py:968` | **`app.py:1031`** |
+| `FORMULARIO_HTML` en `app.py:3618` | **`app.py:3682`** |
+| `IMPORTADOR_HTML` en `app.py:4595` | **`app.py:5534`** |
+| `app.py` tiene 4,948 líneas | **6,098** |
+| "las tres superficies son ~3,000 líneas" | **5,067 líneas**: dashboard 2,651 · formulario 1,852 · importador 564 |
+| Logo de Cloudinary sin dimensiones en `app.py:4651` | **tres** sitios: `app.py:1172`, `3736`, `5594` |
+| Rejilla fija `1fr 1fr 1fr` en `app.py:4627` | ahora **`1fr 1fr 1fr 1fr`** en `app.py:5566` — son los **cuatro** contadores del Plan 3, no tres |
+| `div` con `onclick` en `app.py:1154`, `1158`, `4840` | los del dashboard siguen; **el del importador ya no existe** (ver 0.2) |
+| Baseline `230 passed` | **357 passed, 1 skipped** |
+
+Se mantienen sin cambio, verificados hoy: **16** apariciones de `class="loading"`,
+**12** de `transition:all`, **4** llamadas a `render_template_string`, **0** `HEALTHCHECK`.
+
+### 0.2 M13 quedó obsoleta
+
+El plan dice que el escape de HTML existe en el dashboard y **falta** en el importador.
+**Ya no falta**: el Plan 3 lo introdujo, y `app.py:5810` usa `escaparHtml(c.ciudad)` con
+listener delegado. T4.3 punto 3 sigue siendo válido —centralizar el helper en `js/comun.js`
+para que no haya dos copias— pero **ya no cierra una brecha de seguridad**, solo elimina
+duplicación.
+
+### 0.3 CE1 no se alcanza solo con T4.3
+
+CE1 pide `wc -l app.py` **< 800**. Sacando las tres superficies quedan **1,031 líneas de
+Python**, no menos de 800. T4.3 es necesaria pero no suficiente.
+
+`SUPUESTO: CE1 se reescribe como "app.py < 1,100 líneas Y ningún archivo nuevo supera 800",
+y el troceo del Python restante en módulos queda fuera de este plan — afecta Plan 4, Tarea
+T4.3 y criterio CE1.` Ver **D1** en DECISIONES PENDIENTES del índice.
+
+### 0.4 Lo que el Plan 4 hereda y no debe rehacer
+
+| Origen | Qué ya existe | Qué hace el Plan 4 |
+|---|---|---|
+| Plan 3 · T3.2 | Los **cuatro** contadores (`encontrados`, `nuevos_en_sheet`, `duplicados`, `descartados`) y su rejilla de 4 columnas | Darles jerarquía: `nuevos_en_sheet` es el número grande |
+| Plan 3 · T3.6 | Progreso con denominador ajustable y fracción monótona | Presentarlo con ritmo y etiqueta de fase |
+| Plan 3 · T3.7 | `escaparHtml` + `data-ciudad` + listener delegado en el importador | Conservarlo al mover el JS a `static/` |
+| Plan 2 · T2.6 | Medidor de gasto (`medidor-box`) y estado `presupuesto_agotado` como estado terminal en la UI | Presentarlo como estado de primera clase, no como error |
+
+---
+
 ## 1. DE QUÉ SE PARTE
 
 ### 1.1 El HTML vive dentro de `app.py`
@@ -110,7 +161,7 @@ que aclare el flujo, y accesibilidad verificada — todo sin salir de Flask.
 | CE9 | Contraste verificado | Todo par texto/fondo cumple 4.5:1 (3:1 en texto grande) |
 | CE10 | Responsive sin desborde | 320, 375, 768, 1024, 1440 px sin scroll horizontal |
 | CE11 | No parece plantilla | Cumple ≥4 de las 10 cualidades requeridas por las reglas de calidad de diseño del entorno |
-| CE12 | Comportamiento idéntico | Toda la funcionalidad actual sigue funcionando: baseline ≥230 passed + verificación en navegador |
+| CE12 | Comportamiento idéntico | Toda la funcionalidad actual sigue funcionando: baseline ≥357 passed + verificación en navegador |
 
 **CE12 es un gate duro.** Un rediseño que rompe el formulario de llamadas destruye la
 operación diaria de NIOVAL. La extracción de T4.3 es explícitamente **preservadora de
@@ -241,7 +292,7 @@ static/
    reemplazo por patrón que no casa no lanza error: devuelve el texto igual.
 
 **Verificación — es el corazón de la tarea.**
-- `python -m pytest tests/ -q` → ≥ 230 passed.
+- `python -m pytest tests/` → ≥ 357 passed.
 - Las tres superficies cargan y **se ven idénticas** a las capturas de T4.0. Comparación
   visual explícita, captura contra captura.
 - Recorrido funcional completo: guardar una respuesta del formulario, ordenar una tabla del
