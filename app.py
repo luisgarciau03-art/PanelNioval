@@ -4372,6 +4372,20 @@ cargarContacto();
 
 CATEGORIAS_IMPORTADOR = ['Ferreterías', 'Distribuidoras Ferreterías']
 
+# Los UNICOS tres campos que se leen de Place Details. Todo lo demas que se
+# exporta (nombre, direccion, calificacion, resenas, coordenadas) sale del Text
+# Search, que ya esta pagado.
+#
+# Sin este parametro, la documentacion de Places legacy es explicita: "if you
+# omit the `fields` parameter ... ALL possible fields will be returned, and you
+# will be billed accordingly". Eran 50 campos facturados para leer tres, con los
+# 18 de Atmosphere (reviews, editorial_summary, price_level...) entre ellos.
+#
+# Los tres estan en PLACES_DETAIL_FIELDS_CONTACT del cliente instalado, asi que
+# la peticion factura base + Contact y deja de facturar Basic + Atmosphere.
+# Ver docs/adr/2026-08-28-places-legacy-vs-new.md
+CAMPOS_PLACE_DETAILS = ['formatted_phone_number', 'website', 'opening_hours']
+
 def _avanzar_progreso(job, hechos=None, total=None, fase=None):
     """Mueve la barra. Nunca hacia atras.
 
@@ -4553,8 +4567,13 @@ def _leer_estado_importador():
 
 
 def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
-                     con_detalle=None, avisar=None):
+                     con_detalle=None, avisar=None, claves_en_hoja=None):
     """Busca negocios con filtros de calidad. Campos y lógica idénticos al script original.
+
+    `claves_en_hoja`, si se pasa, es el conjunto de claves `Nombre|Dirección` que
+    ya existen en la hoja. Se usa SOLO para leer: un negocio cuya clave esta ahi
+    se salta antes de pedir su Place Details, que es donde esta el gasto. Nombre y
+    direccion vienen del Text Search, ya pagado, asi que compararlos es gratis.
 
     `vistos` es el conjunto de place_id ya procesados. Si quien llama pasa el
     suyo, la deduplicacion pasa a ser de CORRIDA en vez de por categoria: una
@@ -4585,6 +4604,7 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
     # termina en 'done' informando "0 aprobados": un fallo de autenticacion
     # presentado como una ciudad sin ferreterias.
     consultas_ok        = 0
+    ya_en_hoja          = 0   # saltados ANTES de pagar su detalle
     ya_vistos_otra_cat  = 0   # negocios que ya habia procesado OTRA categoria
     detalles_evitados   = 0   # de esos, los que ya habian costado un place()
     detalles_fallidos   = 0
@@ -4639,12 +4659,25 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                     # negocio con 2 resenas se reportaba como 6 descartados.
                     vistos.add(pid)
 
+                    # Si ya esta en la hoja, no hace falta su detalle: la clave se
+                    # arma con nombre y direccion, y los dos vienen del Text
+                    # Search. Antes se pagaba el Details, se filtraba por telefono
+                    # y solo al exportar se descubria que ya estaba. En una ciudad
+                    # ya trabajada eso era el 100 % del gasto de Details tirado.
+                    if claves_en_hoja is not None and _clave_contacto(
+                            lugar.get('name', ''),
+                            lugar.get('formatted_address', '')) in claves_en_hoja:
+                        ya_en_hoja += 1
+                        continue
+
                     if not resenas or resenas < 5:
                         stats['pocas_resenas'] += 1; continue
                     if not cal or cal < 3.5:
                         stats['baja_calificacion'] += 1; continue
                     try:
-                        det = gmaps_client.place(pid, language='es')['result']
+                        det = gmaps_client.place(
+                            pid, language='es',
+                            fields=CAMPOS_PLACE_DETAILS)['result']
                         con_detalle.add(pid)
                         # Filtro "Cerrado" eliminado — se capturan negocios sin importar horario
                         tel = det.get('formatted_phone_number', '')
@@ -4693,12 +4726,23 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
             f'no se pudo consultar Google Places para {categoria} en {ciudad}: {ultimo_error}'
         )
 
-    incidencias = {'detalles_fallidos': detalles_fallidos,
+    incidencias = {'ya_en_hoja': ya_en_hoja,
+                   'detalles_fallidos': detalles_fallidos,
                    'paginas_fallidas': paginas_fallidas,
                    'consultas_fallidas': len(variaciones) - consultas_ok,
                    'ya_vistos_otra_cat': ya_vistos_otra_cat,
                    'detalles_evitados': detalles_evitados}
     return resultados, stats, incidencias
+
+
+def _clave_contacto(nombre, direccion):
+    """Clave de deduplicacion: la MISMA que usa la hoja (`Nombre|Dirección`).
+
+    Vive aparte a proposito. El prefiltro (antes de pagar Place Details) y la
+    exportacion tienen que calcularla igual: si divergen, o se paga el detalle de
+    duplicados, o peor, se descartan negocios buenos creyendo que ya estaban.
+    """
+    return f"{nombre}|{direccion}"
 
 
 def _escapar_formula(valor):
@@ -4720,7 +4764,7 @@ def _escapar_formula(valor):
     return valor
 
 
-def _exportar_a_sheets(resultados, categoria, ciudad):
+def _exportar_a_sheets(resultados, categoria, ciudad, claves_existentes=None):
     """Exporta a LISTA DE CONTACTOS con columnas idénticas al script original.
 
     PROPAGA cualquier fallo de Sheets. Antes lo atrapaba y devolvia 0, con lo que
@@ -4729,21 +4773,29 @@ def _exportar_a_sheets(resultados, categoria, ciudad):
     rastro era un print al stdout del contenedor. Quien llama decide que hacer.
     """
     ws = get_worksheet('contactos')
-    datos_actuales = ws.get_all_values()
 
-    # Detección de duplicados: Nombre|Dirección (igual que el original)
-    nombres_existentes = set()
-    for fila in datos_actuales[1:]:
-        if len(fila) > 7:
-            nombres_existentes.add(f"{fila[1]}|{fila[7]}")
+    # La escritura SIEMPRE relee la hoja. El conjunto que trae quien llama sirve
+    # para el prefiltro —donde un duplicado no detectado solo cuesta una llamada
+    # de mas— pero aqui se decide que filas se escriben, y ahi un duplicado es un
+    # dato malo. Si alguien edito la hoja a mano a media corrida, esta relectura
+    # lo ve; el conjunto de la corrida se refresca de paso, asi que la categoria
+    # siguiente tambien se entera.
+    frescas = _claves_de_la_hoja(ws)
+    if claves_existentes is None:
+        nombres_existentes = frescas
+    else:
+        claves_existentes.update(frescas)
+        nombres_existentes = claves_existentes
 
     fecha  = datetime.now().strftime('%d/%m/%Y')
     semana = datetime.now().isocalendar()[1]
     nuevos = []
+    claves_nuevas = set()   # se vuelcan al conjunto compartido solo si se escribe
 
     for r in resultados:
-        key = f"{r['Nombre']}|{r['Dirección']}"
-        if key not in nombres_existentes:
+        key = _clave_contacto(r['Nombre'], r['Dirección'])
+        if key not in nombres_existentes and key not in claves_nuevas:
+            claves_nuevas.add(key)
             # Orden de columnas EXACTO al script original:
             # NUM SEMANA | Nombre | Ciudad | Categoría | Teléfono | "" | "" |
             # Dirección | Calificación | Núm. de Reseñas | Google Maps Link |
@@ -4773,8 +4825,31 @@ def _exportar_a_sheets(resultados, categoria, ciudad):
     if nuevos:
         nuevos = [[_escapar_formula(v) for v in fila] for fila in nuevos]
         ws.append_rows(nuevos, value_input_option='USER_ENTERED')
+        # Solo ahora: si append_rows revienta, el conjunto del que depende el
+        # prefiltro no se queda afirmando que estos negocios ya estan en la hoja.
+        nombres_existentes.update(claves_nuevas)
         _cache_pop('contactos')
     return len(nuevos)
+
+
+def _claves_de_la_hoja(ws):
+    """Las claves `Nombre|Dirección` que ya existen en LISTA DE CONTACTOS.
+
+    Una fila con menos de 8 columnas no tiene domicilio, asi que no se le puede
+    construir la clave. Se cuentan y se avisan: cada una es un contacto que el
+    dedup no ve y que se reimportara —pagando su detalle— en cada corrida.
+    """
+    claves = set()
+    incompletas = 0
+    for fila in ws.get_all_values()[1:]:
+        if len(fila) > 7:
+            claves.add(_clave_contacto(fila[1], fila[7]))
+        elif any(str(c).strip() for c in fila):
+            incompletas += 1
+    if incompletas:
+        print(f'[importador] {incompletas} filas de la hoja sin domicilio: '
+              f'quedan fuera del dedup y se reimportarian')
+    return claves
 
 
 def _enviar_telegram_importador(ciudad, resumen, desglose, tiempo_min,
@@ -4820,6 +4895,10 @@ def _worker_importador(ciudad, gmaps_api_key):
         # negocio se contaba (y se pagaba) dos veces.
         vistos_corrida = set()
         con_detalle_corrida = set()
+        # La hoja se lee UNA vez por corrida. Sirve para dos cosas: saltar el
+        # Place Details de lo que ya esta (que es donde esta el ahorro) y evitar
+        # releer ~7,000 filas una vez por categoria.
+        claves_en_hoja = _claves_de_la_hoja(get_worksheet('contactos'))
 
         # Presupuesto de pasos GARANTIZADOS por categoria: 1 al preparar, 3 (una
         # por variacion, que siempre corren) y 1 al guardar. Nada mas.
@@ -4873,7 +4952,8 @@ def _worker_importador(ciudad, gmaps_api_key):
 
             resultados, stats, incidencias = _buscar_negocios(
                 gmaps, cat, ciudad, vistos=vistos_corrida,
-                con_detalle=con_detalle_corrida, avisar=avanzar)
+                con_detalle=con_detalle_corrida, avisar=avanzar,
+                claves_en_hoja=claves_en_hoja)
 
             avanzar(f'Guardando {cat} en Google Sheets…')
 
@@ -4882,8 +4962,13 @@ def _worker_importador(ciudad, gmaps_api_key):
                 r['CIUDAD'] = ciudad
 
             desc = sum(stats.values())
+            # Los que se saltaron por estar ya en la hoja no dejan de existir
+            # solo porque ahora se detecten antes de pagar su detalle: siguen
+            # contando como encontrados y como duplicados.
+            saltados = incidencias['ya_en_hoja']
             try:
-                nuevos = _exportar_a_sheets(resultados, cat, ciudad)
+                nuevos = _exportar_a_sheets(resultados, cat, ciudad,
+                                            claves_existentes=claves_en_hoja)
             except Exception as e:
                 # Lo que se sabe se apunta; lo que no, no se inventa.
                 # `encontrados` y `descartados` son hechos de la BUSQUEDA y siguen
@@ -4891,7 +4976,8 @@ def _worker_importador(ciudad, gmaps_api_key):
                 # escritura que reventó: contarlos como duplicados afirmaria que
                 # esos negocios "ya estaban", que es falso y peor que no decir nada.
                 with _import_lock:
-                    _import_job['encontrados'] += len(resultados)
+                    _import_job['encontrados'] += len(resultados) + saltados
+                    _import_job['duplicados']  += saltados
                     _import_job['descartados'] += desc
                 raise RuntimeError(
                     f'{cat}: fallo al escribir en Google Sheets — {e}'
@@ -4905,12 +4991,15 @@ def _worker_importador(ciudad, gmaps_api_key):
             # `encontrados` rotulado como si fueran guardados. Son cosas distintas
             # y el operador necesita las dos.
             with _import_lock:
-                _import_job['encontrados']     += len(resultados)
+                _import_job['encontrados']     += len(resultados) + saltados
                 _import_job['nuevos_en_sheet'] += nuevos
-                _import_job['duplicados']      += len(resultados) - nuevos
+                _import_job['duplicados']      += (len(resultados) - nuevos) + saltados
                 _import_job['descartados']     += desc
                 perdidos = incidencias['detalles_fallidos'] + incidencias['paginas_fallidas']
                 aviso = f' · ⚠ {perdidos} se perdieron por errores de Places' if perdidos else ''
+                if saltados:
+                    aviso += (f' · {saltados} ya estaban en la hoja'
+                              f' (detalle no pagado)')
                 solape = incidencias['ya_vistos_otra_cat']
                 if solape:
                     evitados = incidencias['detalles_evitados']

@@ -68,13 +68,27 @@ class WorksheetFalsa:
             fila[1], fila[7] = nombre, direccion
             self.filas.append(fila)
         self.escrituras = 0
+        self.lecturas = 0
 
     def get_all_values(self):
+        self.lecturas += 1
         return [list(f) for f in self.filas]
 
     def append_rows(self, filas, **kw):
         self.escrituras += len(filas)
-        self.filas.extend(filas)
+        # Sheets NO guarda el apostrofo inicial de `_escapar_formula`: es la
+        # marca de "esto es texto" y no forma parte del valor almacenado. El
+        # doble tiene que hacer lo mismo, o la clave de deduplicacion
+        # `Nombre|Dirección` no casaria aqui y si en produccion (o al reves), y
+        # los tests de dedup estarian midiendo un comportamiento que no existe.
+        self.filas.extend([[self._como_lo_guarda_sheets(v) for v in fila]
+                           for fila in filas])
+
+    @staticmethod
+    def _como_lo_guarda_sheets(valor):
+        if isinstance(valor, str) and valor.startswith("'"):
+            return valor[1:]
+        return valor
 
 
 def catalogo(ferreterias, distribuidoras):
@@ -477,8 +491,12 @@ class TestDedupEntreCategorias:
             "se pidio el detalle repetido de %d negocios"
             % (len(pedidos) - len(set(pedidos)))
         )
-        assert len(pedidos) == 14, (
-            "se pagaron %d detalles para 14 negocios distintos" % len(pedidos)
+        # 14 negocios distintos, pero 4 ya estaban en la hoja y desde el Plan 2
+        # (T2.3) se saltan ANTES de pagar su detalle: la clave `Nombre|Dirección`
+        # se arma con datos del Text Search, que ya esta pagado.
+        assert len(pedidos) == 10, (
+            "se pagaron %d detalles; deberian ser 10 (14 distintos menos 4 que ya "
+            "estaban en la hoja)" % len(pedidos)
         )
 
     def test_un_negocio_rechazado_se_cuenta_una_sola_vez(self, entorno):
