@@ -4433,8 +4433,18 @@ def _leer_cache_places():
         print('[importador] cache de Places con formato inesperado, se ignora')
         return {}
     ahora = time.time()
-    return {pid: v for pid, v in datos.items()
-            if isinstance(v, dict) and ahora - (v.get('ts') or 0) < PLACES_CACHE_TTL}
+    vigentes = {}
+    for pid, v in datos.items():
+        # Cada entrada se valida por separado: una sola mal formada no puede
+        # tirar la cache entera, y mucho menos la corrida.
+        if not isinstance(v, dict) or not isinstance(v.get('det'), dict):
+            continue
+        ts = v.get('ts')
+        if not isinstance(ts, (int, float)) or isinstance(ts, bool):
+            continue
+        if ahora - ts < PLACES_CACHE_TTL:
+            vigentes[pid] = v
+    return vigentes
 
 
 def _guardar_cache_places(cache):
@@ -4448,7 +4458,11 @@ def _guardar_cache_places(cache):
         with os.fdopen(fd, 'w', encoding='utf-8') as fh:
             json.dump(cache, fh)
         os.replace(tmp, PLACES_CACHE_FILE)
-    except OSError as e:
+    except Exception as e:
+        # Amplio a proposito: json.dump lanza TypeError, no OSError, y esta
+        # funcion corre en el `finally`. Dejar escapar cualquier cosa de aqui
+        # convertiria una corrida terminada en una corrida "fallida" por un
+        # problema que solo afecta al ahorro.
         print(f'[importador] no se pudo guardar la cache de Places: {e}')
         try:
             os.unlink(tmp)
@@ -4467,9 +4481,12 @@ def _detalle_de_place(gmaps_client, pid, cache):
     if entrada is not None:
         return entrada.get('det', {}), True
     det = gmaps_client.place(pid, language='es', fields=CAMPOS_PLACE_DETAILS)['result']
+    # Se guarda y se DEVUELVE lo mismo, para que una fila fresca y una servida de
+    # cache sean identicas. Si se devolviera el crudo, un campo explicitamente
+    # nulo llegaria a la hoja distinto segun viniera de la API o del disco.
     guardado = {c: det.get(c) for c in CAMPOS_PLACE_DETAILS if det.get(c) is not None}
     cache[pid] = {'det': guardado, 'ts': time.time()}
-    return det, False
+    return guardado, False
 
 def _avanzar_progreso(job, hechos=None, total=None, fase=None):
     """Mueve la barra. Nunca hacia atras.

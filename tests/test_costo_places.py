@@ -702,3 +702,67 @@ class TestCachePersistente:
             pytest.skip("los permisos POSIX no aplican en Windows")
         modo = _st.S_IMODE(_o.stat(cache_temporal).st_mode)
         assert not modo & 0o077, "la cache es legible por otros: %o" % modo
+
+    def test_una_marca_de_tiempo_corrupta_no_tumba_la_corrida(self, entorno, cache_temporal):
+        """El MEDIO-ALTO de la review.
+
+        El filtro por vigencia corria FUERA del try, asi que un `ts` no numerico
+        —de una edicion a mano o de un cambio de formato futuro— lanzaba
+        TypeError, escapaba y tumbaba la corrida antes de la primera llamada a
+        Places. Peor que quedarse sin cache: quedarse sin importar.
+        """
+        import json
+        cache_temporal.write_text(json.dumps({
+            "pid-malo":  {"det": {"formatted_phone_number": "x"}, "ts": "ayer"},
+            "pid-peor":  {"det": {"formatted_phone_number": "x"}, "ts": {"raro": 1}},
+            "pid-sin":   {"det": {"formatted_phone_number": "x"}},
+            "pid-nodict": "esto tampoco es un dict",
+        }), encoding="utf-8")
+
+        gmaps = GmapsEspia(catalogo(negocios(2), []))
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        assert est["status"] == "done", (
+            "una entrada de cache mal formada tumbo la corrida: %r" % est["error"]
+        )
+        assert est["nuevos_en_sheet"] == 2
+        assert len(gmaps.llamadas_place) == 2, "deberia haber pegado a la API"
+
+    def test_un_fallo_al_guardar_la_cache_no_marca_la_corrida_como_fallida(
+            self, entorno, cache_temporal):
+        """Solo se capturaba OSError, y json.dump lanza TypeError.
+
+        Un tropiezo guardando la cache reclasificaba como 'error' una corrida que
+        si habia terminado: se reportaria como fallida por un problema que solo
+        afecta al ahorro.
+        """
+        def dump_que_revienta(*a, **k):
+            raise TypeError("objeto no serializable")
+
+        entorno.setattr(app.json, "dump", dump_que_revienta)
+        gmaps = GmapsEspia(catalogo(negocios(2), []))
+        est = correr(entorno, gmaps, WorksheetFalsa())
+        assert est["status"] == "done", (
+            "un fallo al guardar la cache marco como fallida una corrida que "
+            "termino: %r" % est["error"]
+        )
+        assert est["nuevos_en_sheet"] == 2, "las filas si se escribieron"
+
+    def test_una_fila_de_cache_y_una_fresca_salen_identicas(self, entorno, cache_temporal):
+        """En un acierto se devolvia el dict guardado y en un fallo el crudo."""
+        gmaps = GmapsEspia(catalogo(negocios(1), []))
+        ws1 = WorksheetFalsa()
+        correr(entorno, gmaps, ws1)
+        fresca = ws1.filas[-1]
+
+        app._import_job = app._nuevo_import_job("CiudadDemo", status="running")
+        gmaps2 = GmapsEspia(catalogo(negocios(1), []))
+        ws2 = WorksheetFalsa()
+        correr(entorno, gmaps2, ws2)
+        cacheada = ws2.filas[-1]
+
+        assert len(gmaps2.llamadas_place) == 0, "el escenario no uso la cache"
+        # Todo salvo la fecha/semana, que dependen del momento.
+        assert fresca[1:18] == cacheada[1:18], (
+            "la fila servida de cache difiere de la fresca:\n  %r\n  %r"
+            % (fresca[1:18], cacheada[1:18])
+        )

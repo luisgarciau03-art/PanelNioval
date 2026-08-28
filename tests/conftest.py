@@ -65,4 +65,4 @@ def _cache_de_places_aislada(tmp_path, monkeypatch):
     """
     import app
     monkeypatch.setattr(app, "PLACES_CACHE_FILE",
-                        str(tmp_path / "places_detalles.json"), raising=False)
+                        str(tmp_path / "places_detalles.json"))
