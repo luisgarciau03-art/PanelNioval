@@ -218,6 +218,60 @@ Es opcional y es decisión del owner: sin el volumen el panel funciona igual.
 viejos), basta con eliminar el archivo: se reconstruye sola en la siguiente
 corrida, pagando los detalles una vez.
 
+### Medidor de gasto y tope de corrida
+
+Bajo la barra de progreso, y en el aviso de Telegram, aparece qué le costó la
+corrida a la cuenta de Google:
+
+```
+Llamadas a Google: 13 búsquedas + 24 detalles · 56 evitadas
+```
+
+Las **evitadas** son las que el prefiltro y la caché se ahorraron. Ese número es
+el ahorro, medido, de esta corrida.
+
+#### Variables de entorno
+
+Ninguna tiene valor por defecto, **a propósito**. Google cambia sus tarifas, y un
+número escrito en el código empieza siendo correcto y acaba mintiendo sin que
+nadie lo toque.
+
+| Variable | Para qué | Si no se define |
+|---|---|---|
+| `PLACES_COSTO_TEXT_SEARCH` | Costo de una búsqueda de texto | No se muestra importe |
+| `PLACES_COSTO_DETAILS` | Costo de un Place Details | No se muestra importe |
+| `PLACES_PRESUPUESTO_CORRIDA` | Tope en dinero por corrida | Sin tope de dinero |
+| `PLACES_MAX_LLAMADAS_CORRIDA` | Tope en número de llamadas | Sin tope de llamadas |
+| `PLACES_CACHE_FILE` | Dónde vive la caché de detalles | Temp del sistema |
+
+**Sin tarifas configuradas no se publica ningún importe.** Un `0.00` se leería
+como *"esta corrida salió gratis"*, que es una afirmación falsa; no saber el
+precio no es lo mismo que saber que fue cero.
+
+**El tope de llamadas funciona sin tarifas**, y es el único utilizable mientras no
+haya acceso a la consola de facturación. Es el recomendado para empezar.
+
+Las variables se leen **al arrancar el proceso**: cambiarlas exige reiniciar el
+contenedor.
+
+#### Qué pasa al tocar el tope
+
+La corrida se detiene y queda en estado **`presupuesto_agotado`**, con su propio
+mensaje en la pantalla y en Telegram. **No es un error**: es un límite que se
+respetó, y lo que ya se guardó en la hoja es válido.
+
+Volver a correr la misma ciudad **continúa desde donde quedó** sin repetir lo
+pagado: el prefiltro salta lo que ya está en la hoja y la caché sirve los
+detalles ya consultados.
+
+### ⚠️ Pendiente del owner
+
+Estas cinco variables **no están en `.env.example`**: el entorno de trabajo tiene
+bloqueada la escritura de archivos `.env*`, así que hay que añadirlas a mano
+(solo los nombres, sin valores).
+
+---
+
 ### ¿Por qué 30 días y no 90?
 
 Lo que se cachea incluye el teléfono que el operador va a marcar. Un negocio que
