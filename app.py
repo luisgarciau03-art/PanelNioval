@@ -4425,9 +4425,9 @@ def _nuevo_import_job(ciudad='', status='idle'):
         'nuevos_en_sheet': 0,  # filas REALMENTE escritas en la hoja
         'duplicados':      0,  # ya estaban en LISTA DE CONTACTOS
         'descartados':     0,  # rechazados por resenas, calificacion o sin telefono
-        'resultados': [],
         'log':        [],
         'error':      '',
+        'cancelado':  False,
     }
 
 
@@ -4777,14 +4777,15 @@ def _exportar_a_sheets(resultados, categoria, ciudad):
     return len(nuevos)
 
 
-def _enviar_telegram_importador(ciudad, resumen, desglose, tiempo_min, error=None):
+def _enviar_telegram_importador(ciudad, resumen, desglose, tiempo_min,
+                                error=None, cancelado=False):
     try:
         token   = os.environ.get('TELEGRAM_TOKEN')
         chat_id = os.environ.get('TELEGRAM_CHAT_ID')
         if not token or not chat_id:
             return
         msg = (
-            f"<b>{'❌ Importador FALLÓ' if error else '📥 Importador Completado'}</b>\n\n"
+            f"<b>{'❌ Importador FALLÓ' if error else ('⏹ Importador DETENIDO' if cancelado else '📥 Importador Completado')}</b>\n\n"
             f"<b>Ciudad:</b> {ciudad}\n"
             + (f"<b>Causa:</b> {error}\n" if error else "")
             + f"<b>Nuevos en la hoja:</b> {resumen['nuevos']}\n"
@@ -4851,7 +4852,17 @@ def _worker_importador(ciudad, gmaps_api_key):
             with _import_lock:
                 _avanzar_progreso(_import_job, fase=fase)
 
+        corte_por_cancelacion = False
         for i, cat in enumerate(CATEGORIAS_IMPORTADOR):
+            with _import_lock:
+                cancelado = _import_job.get('cancelado')
+            if cancelado:
+                # Solo cuenta como detenida si quedaba algo por hacer. Pedir
+                # Detener mientras la ultima categoria ya escribia no convierte
+                # una corrida entera en una parcial.
+                corte_por_cancelacion = True
+                break
+
             with _import_lock:
                 _import_job['categoria'] = cat
                 _import_job['progreso']  = i
@@ -4898,7 +4909,6 @@ def _worker_importador(ciudad, gmaps_api_key):
                 _import_job['nuevos_en_sheet'] += nuevos
                 _import_job['duplicados']      += len(resultados) - nuevos
                 _import_job['descartados']     += desc
-                _import_job['resultados']   = todos[:]
                 perdidos = incidencias['detalles_fallidos'] + incidencias['paginas_fallidas']
                 aviso = f' · ⚠ {perdidos} se perdieron por errores de Places' if perdidos else ''
                 solape = incidencias['ya_vistos_otra_cat']
@@ -4918,23 +4928,39 @@ def _worker_importador(ciudad, gmaps_api_key):
 
         tiempo = (time.time() - inicio) / 60
         with _import_lock:
+            fue_cancelada = corte_por_cancelacion
             resumen = {
                 'nuevos':      _import_job['nuevos_en_sheet'],
                 'encontrados': _import_job['encontrados'],
                 'duplicados':  _import_job['duplicados'],
                 'descartados': _import_job['descartados'],
             }
-        _enviar_telegram_importador(ciudad, resumen, desglose, tiempo)
+        _enviar_telegram_importador(ciudad, resumen, desglose, tiempo,
+                                    cancelado=fue_cancelada)
 
         with _import_lock:
-            _import_job['status']   = 'done'
-            _import_job['progreso'] = len(CATEGORIAS_IMPORTADOR)
-            _avanzar_progreso(_import_job, hechos=pasos_total, total=pasos_total,
-                              fase='Completado')  # cierra en 100 % exacto
+            # Una corrida cancelada NO es una corrida completada: lo escrito
+            # antes del corte es valido, pero decir 'done' seria afirmar que se
+            # recorrio todo.
+            _import_job['status'] = 'cancelado' if fue_cancelada else 'done'
+            if fue_cancelada:
+                # `desglose` solo tiene las categorias que llegaron a escribir.
+                completadas = len(desglose)
+                _import_job['progreso'] = completadas
+                _avanzar_progreso(_import_job, fase=(
+                    f'Detenida tras {completadas} de '
+                    f'{len(CATEGORIAS_IMPORTADOR)} categorías'))
+            else:
+                _import_job['progreso'] = len(CATEGORIAS_IMPORTADOR)
+                _avanzar_progreso(_import_job, hechos=pasos_total,
+                                  total=pasos_total, fase='Completado')
             copia_estado = dict(_import_job)
+            cierre = ('⏹ Cancelada a los' if fue_cancelada
+                      else '✅ Completado en')
             _import_job['log'].append(
-                f"✅ Completado en {tiempo:.1f} min — "
-                f"{resumen['nuevos']} nuevos en la hoja de {resumen['encontrados']} encontrados"
+                f"{cierre} {tiempo:.1f} min — "
+                f"{resumen['nuevos']} nuevos en la hoja de "
+                f"{resumen['encontrados']} encontrados"
             )
         _guardar_estado_importador(copia_estado)
 
@@ -4989,6 +5015,26 @@ def importador_iniciar():
 
     t = threading.Thread(target=_worker_importador, args=(ciudad, gmaps_api_key), daemon=True)
     t.start()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/importador/cancelar', methods=['POST'])
+def importador_cancelar():
+    """Marca la corrida para que el worker salga limpio.
+
+    No mata el hilo: le pone una bandera que el worker comprueba ENTRE pasos,
+    nunca a mitad de un append_rows. Lo que ya se escribio en la hoja es valido
+    y el dedup impide duplicarlo si se vuelve a correr la ciudad.
+    """
+    with _import_lock:
+        if _import_job['status'] != 'running':
+            # No se puede cancelar lo que no esta corriendo, y decir que si
+            # seria otra respuesta que no corresponde a la realidad.
+            return jsonify({'ok': False, 'error': 'No hay ninguna búsqueda en curso'})
+        _import_job['cancelado'] = True
+        _import_job['log'].append('⏹ Cancelación pedida; terminando el paso en curso…')
+        copia_estado = dict(_import_job)
+    _guardar_estado_importador(copia_estado)
     return jsonify({'ok': True})
 
 
@@ -5119,6 +5165,8 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399
     <div class="input-row">
       <input type="text" id="input-ciudad" placeholder="O escribe una ciudad manualmente..." onkeydown="if(event.key==='Enter') iniciar()">
       <button class="btn btn-blue" id="btn-iniciar" onclick="iniciar()">🔍 Buscar</button>
+      <button class="btn" id="btn-cancelar" onclick="cancelar()"
+        style="display:none;background:#f3f4f6;border:1px solid #dde;color:#666">⏹ Detener</button>
     </div>
 
     <!-- PROGRESO -->
@@ -5159,7 +5207,6 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399
 <script>
 const CATS = ["Ferreterías","Distribuidoras Ferreterías"];
 let polling = null;
-let ciudadSeleccionada = '';
 
 // Render categoria badges
 document.getElementById('cats-list').innerHTML = CATS.map((c,i) =>
@@ -5255,129 +5302,301 @@ async function cargarCiudades() {
 
     // Fusionar: panel (con datos) + estáticas (sin datos)
     todasCiudades = [...conDatos, ...sinDatos];
+    todasCiudades.forEach((c, i) => { c.rank = i + 1; });
 
     document.getElementById('ciudades-count').textContent = `(${todasCiudades.length})`;
     renderChips(todasCiudades);
   } catch(e) {
     // Fallback: solo estáticas
-    todasCiudades = [...new Set(CIUDADES_MX)].map(c => ({
-      ciudad: c, total: 0, llamados: 0, aprobados: 0, interes_pct: 0, relevancia: 0
+    todasCiudades = [...new Set(CIUDADES_MX)].map((c, i) => ({
+      ciudad: c, total: 0, llamados: 0, aprobados: 0, interes_pct: 0, relevancia: 0,
+      rank: i + 1
     }));
     document.getElementById('ciudades-count').textContent = `(${todasCiudades.length})`;
     renderChips(todasCiudades);
   }
 }
 
+// El nombre de la ciudad viene de LISTA DE CONTACTOS, escrito a mano, y antes
+// de eso lo tecleo un operador en el campo de texto sin validacion. Se
+// interpolaba crudo en DOS sitios de la misma linea: dentro del atributo
+// onclick y como texto del chip. Una ciudad llamada O'Brien rompia el handler
+// y dejaba el chip muerto; una con <img onerror=...> ejecutaba.
+// El dashboard ya cerraba este mismo agujero (app.py:2064).
+function escaparHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function renderChips(lista) {
   const cont = document.getElementById('ciudades-chips');
   if (!lista.length) { cont.innerHTML = '<div style="color:#aaa;font-size:.82em">Sin resultados</div>'; return; }
 
-  cont.innerHTML = lista.map((c, i) => {
-    const rank   = i + 1;
+  cont.innerHTML = lista.map((c) => {
+    // El rango es el del catalogo completo, no el de la lista filtrada: antes
+    // se calculaba sobre el indice recibido, asi que al escribir en el filtro
+    // la ciudad numero 47 aparecia con medalla de oro.
+    const rank   = (c.rank != null) ? c.rank : 0;
     const medal  = rank === 1 ? '🥇 ' : rank === 2 ? '🥈 ' : rank === 3 ? '🥉 ' : `${rank}. `;
-    const isTop  = rank <= 3;
+    const isTop  = rank >= 1 && rank <= 3;
     const hasInt = c.interes_pct > 0;
     const badge  = hasInt
       ? `<span style="background:rgba(0,204,71,.2);color:#155724;padding:1px 5px;border-radius:8px;font-size:.85em">${c.interes_pct}%</span>`
       : `<span style="opacity:.55;font-size:.85em">${c.total}</span>`;
-    return `<span class="chip ${isTop?'top':''}" onclick="seleccionarCiudad('${c.ciudad}',this)">${medal}${c.ciudad} ${badge}</span>`;
+    const nombre = escaparHtml(c.ciudad);
+    return `<span class="chip ${isTop?'top':''}" data-ciudad="${nombre}">${medal}${nombre} ${badge}</span>`;
   }).join('');
 }
+
+// Listener delegado: el nombre viaja por dataset, nunca dentro de un atributo
+// de codigo. Se registra una sola vez sobre el contenedor, asi que sobrevive a
+// cada re-render de los chips.
+document.getElementById('ciudades-chips').addEventListener('click', (ev) => {
+  const chip = ev.target.closest('.chip');
+  if (!chip) return;
+  document.getElementById('input-ciudad').value = chip.dataset.ciudad || '';
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+});
 
 function filtrarCiudades() {
   const q = document.getElementById('ciudad-filter').value.toLowerCase().trim();
   renderChips(q ? todasCiudades.filter(c => c.ciudad.toLowerCase().includes(q)) : todasCiudades);
 }
 
-function seleccionarCiudad(ciudad, el) {
-  document.getElementById('input-ciudad').value = ciudad;
-  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
-}
-
 cargarCiudades();
 
-async function iniciar() {
-  const ciudad = document.getElementById('input-ciudad').value.trim();
-  if (!ciudad) { alert('Ingresa una ciudad'); return; }
+// ── Sondeo ────────────────────────────────────────────────────────────────
+// Antes: setInterval fijo de 3 s que solo paraba en 'done' o 'error'. Si el
+// contenedor se reiniciaba, el estado llegaba 'idle' para siempre y el sondeo
+// seguia latiendo indefinidamente contra un trabajo que ya no existia.
+let intervaloSondeo = 3000;
+let ciclosIdle = 0;          // el panel responde, pero dice que no hay trabajo
+let ciclosSinRespuesta = 0;  // el panel no responde
+const MAX_CICLOS_IDLE = 5;
+const MAX_CICLOS_SIN_RESPUESTA = 5;
 
-  const btn = document.getElementById('btn-iniciar');
-  btn.disabled = true;
-  btn.textContent = '⏳ Buscando...';
+function arrancarSondeo(ms) {
+  clearInterval(polling);          // sin esto quedaban dos intervalos vivos
+  intervaloSondeo = ms || 3000;
+  polling = setInterval(actualizarEstado, intervaloSondeo);
+}
 
+function pararSondeo() {
+  clearInterval(polling);
+  polling = null;
+}
+
+function limpiarPantalla() {
+  // La corrida anterior dejaba sus numeros y sus insignias puestos: la segunda
+  // busqueda de la sesion arrancaba con todo marcado como completado.
+  ['s-nuevos','s-encontrados','s-duplicados','s-descartados'].forEach(id => {
+    document.getElementById(id).textContent = '0';
+  });
+  document.getElementById('s-progreso').textContent = '0/0';
+  document.getElementById('prog-fill').style.width = '0%';
+  document.getElementById('prog-pct').textContent = '0%';
+  document.getElementById('log-box').innerHTML = '';
+  CATS.forEach((_, i) => document.getElementById('cat-'+i).className = 'cat-badge');
+  ciclosIdle = 0;
+  ciclosSinRespuesta = 0;
+}
+
+function mostrarPaneles() {
   document.getElementById('progress-box').style.display = 'block';
   document.getElementById('stats-row').style.display = 'grid';
   document.getElementById('progreso-row').style.display = 'grid';
   document.getElementById('log-box').style.display = 'block';
   document.getElementById('result-box').style.display = 'none';
-
-  const r = await fetch('/api/importador/iniciar', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ciudad})
-  });
-  const d = await r.json();
-  if (!d.ok) { alert('Error: ' + d.error); btn.disabled=false; btn.textContent='🔍 Buscar'; return; }
-
-  polling = setInterval(actualizarEstado, 3000);
-  actualizarEstado();
 }
 
-async function actualizarEstado() {
-  const r = await fetch('/api/importador/estado');
-  const d = await r.json();
+function ponerEnMarcha(enMarcha) {
+  const btn = document.getElementById('btn-iniciar');
+  btn.disabled = enMarcha;
+  btn.textContent = enMarcha ? '⏳ Buscando...' : '🔍 Buscar';
+  // El campo nunca se deshabilitaba, asi que pulsar Enter a media corrida
+  // relanzaba iniciar() y podia arrancar una SEGUNDA importacion.
+  document.getElementById('input-ciudad').disabled = enMarcha;
+  document.getElementById('btn-cancelar').style.display = enMarcha ? 'inline-flex' : 'none';
+}
 
-  // Progreso: la fraccion viene ya calculada y es monotona. Calcularla aqui
-  // desde progreso/total daria otra vez 0/50/100.
+async function iniciar() {
+  const ciudad = document.getElementById('input-ciudad').value.trim();
+  if (!ciudad) { alert('Ingresa una ciudad'); return; }
+
+  ponerEnMarcha(true);
+  limpiarPantalla();
+  mostrarPaneles();
+
+  try {
+    const r = await fetch('/api/importador/iniciar', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ciudad})
+    });
+    const d = await r.json();
+    if (!d.ok) {
+      alert('Error: ' + d.error);
+      ponerEnMarcha(false);
+      return;
+    }
+    arrancarSondeo(3000);
+    actualizarEstado();
+  } catch (e) {
+    // Sin este catch la promesa reventaba y el boton se quedaba en
+    // "Buscando..." deshabilitado para siempre: hacia falta recargar.
+    document.getElementById('prog-label').textContent =
+      '❌ No se pudo contactar con el panel: ' + e;
+    ponerEnMarcha(false);
+  }
+}
+
+async function cancelar() {
+  if (!confirm('¿Detener la búsqueda? Lo que ya se guardó en la hoja se queda.')) return;
+  try {
+    const r = await fetch('/api/importador/cancelar', {method: 'POST'});
+    const d = await r.json();
+    if (!d.ok) alert(d.error || 'No se pudo cancelar');
+  } catch (e) {
+    alert('No se pudo contactar con el panel: ' + e);
+  }
+}
+
+async function restaurarEstado() {
+  // Al abrir la pagina se pregunta si hay algo corriendo. Antes solo iniciar()
+  // arrancaba el sondeo, asi que recargar a media corrida dejaba la pantalla
+  // inerte y el operador encerrado fuera de su propio trabajo.
+  try {
+    const d = await (await fetch('/api/importador/estado')).json();
+    if (d.status === 'running') {
+      mostrarPaneles();
+      ponerEnMarcha(true);
+      pintarEstado(d);
+      arrancarSondeo(3000);
+    } else if (d.status !== 'idle') {
+      // done, error, cancelado e interrumpido: la corrida anterior sigue en
+      // memoria y el operador tiene derecho a verla al volver a la pagina.
+      // Antes solo se contemplaban 'running' e 'interrumpido', asi que recargar
+      // tras un fallo dejaba la pantalla en blanco, sin rastro del error.
+      mostrarPaneles();
+      pintarEstado(d);
+      rematar(d);
+    }
+  } catch (e) {
+    // Que falle la restauracion no puede impedir usar la pagina.
+    console.warn('No se pudo restaurar el estado del importador:', e);
+  }
+}
+
+function pintarEstado(d) {
   const pct = d.fraccion || 0;
   document.getElementById('prog-fill').style.width  = pct + '%';
   document.getElementById('prog-pct').textContent   = pct + '%';
   document.getElementById('prog-label').textContent =
     d.fase || (d.categoria ? `Buscando: ${d.categoria}...` : 'Procesando...');
 
-  // Stats
   document.getElementById('s-nuevos').textContent      = d.nuevos_en_sheet;
   document.getElementById('s-encontrados').textContent = d.encontrados;
   document.getElementById('s-duplicados').textContent  = d.duplicados;
   document.getElementById('s-descartados').textContent = d.descartados;
   document.getElementById('s-progreso').textContent    = `${d.progreso}/${d.total}`;
 
-  // Cat badges
   CATS.forEach((c, i) => {
     const el = document.getElementById('cat-'+i);
     if (i < d.progreso) el.className = 'cat-badge done';
     else if (d.categoria === c) el.className = 'cat-badge active';
+    else el.className = 'cat-badge';       // sin esta rama se quedaban rancias
   });
 
-  // Log
   const logEl = document.getElementById('log-box');
-  logEl.innerHTML = d.log.map(l => `<div class="entry">> ${l}</div>`).join('');
+  logEl.innerHTML = (d.log || []).map(l => `<div class="entry">> ${escaparHtml(l)}</div>`).join('');
   logEl.scrollTop = logEl.scrollHeight;
+}
 
-  if (d.status === 'done') {
-    clearInterval(polling);
-    document.getElementById('prog-fill').style.width = '100%';
-    document.getElementById('prog-pct').textContent = '100%';
-    document.getElementById('prog-label').textContent = '¡Completado!';
-    CATS.forEach((_,i) => document.getElementById('cat-'+i).className = 'cat-badge done');
-    document.getElementById('result-box').style.display = 'block';
-    document.getElementById('result-titulo').textContent =
-      `✅ ${d.nuevos_en_sheet} contactos nuevos en la hoja — ${d.ciudad}`;
-    document.getElementById('result-desc').textContent =
-      `De ${d.encontrados + d.descartados} candidatos de Google, ${d.encontrados} pasaron los ` +
-      `filtros de calidad: ${d.nuevos_en_sheet} se guardaron y ${d.duplicados} ya estaban en la lista. ` +
-      `Los otros ${d.descartados} se descartaron por reseñas, calificación o falta de teléfono.`;
+async function actualizarEstado() {
+  let d;
+  try {
+    const r = await fetch('/api/importador/estado');
+    d = await r.json();
+  } catch (e) {
+    // Un corte de red no puede dejar el sondeo latiendo a ciegas: se espacia y,
+    // si no vuelve, se para solo.
+    ciclosSinRespuesta++;
+    if (ciclosSinRespuesta >= MAX_CICLOS_SIN_RESPUESTA) {
+      pararSondeo();
+      document.getElementById('prog-label').textContent =
+        '❌ Se perdió el contacto con el panel. Recarga la página.';
+      ponerEnMarcha(false);
+    } else if (intervaloSondeo < 15000) {
+      arrancarSondeo(intervaloSondeo * 2);
+    }
+    return;
+  }
+
+  if (d.status === 'idle') {
+    // El contenedor se reinicio a media corrida: el trabajo ya no existe.
+    ciclosIdle++;
+    if (ciclosIdle >= MAX_CICLOS_IDLE) {
+      pararSondeo();
+      document.getElementById('prog-label').textContent =
+        '⚠ La corrida ya no está en curso (el panel se reinició).';
+      ponerEnMarcha(false);
+    }
+    return;
+  }
+  ciclosIdle = 0;
+  ciclosSinRespuesta = 0;
+
+  pintarEstado(d);
+
+  // El sondeo se espacia si la corrida se alarga, en vez de 3 s eternos.
+  if (intervaloSondeo < 10000 && (d.fraccion || 0) > 0 && (d.fraccion || 0) < 90) {
+    const deseado = Math.min(10000, intervaloSondeo + 1000);
+    if (deseado !== intervaloSondeo) arrancarSondeo(deseado);
+  }
+
+  if (d.status !== 'running') rematar(d);
+}
+
+function rematar(d) {
+  if (d.status === 'done' || d.status === 'cancelado' || d.status === 'interrumpido') {
+    pararSondeo();
+    ponerEnMarcha(false);
     document.getElementById('btn-iniciar').textContent = '🔍 Nueva Búsqueda';
-    document.getElementById('btn-iniciar').disabled = false;
+    document.getElementById('result-box').style.display = 'block';
+
+    if (d.status === 'done') {
+      document.getElementById('prog-label').textContent = '¡Completado!';
+      document.getElementById('result-titulo').textContent =
+        `✅ ${d.nuevos_en_sheet} contactos nuevos en la hoja — ${d.ciudad}`;
+      document.getElementById('result-desc').textContent =
+        `De ${d.encontrados + d.descartados} candidatos de Google, ${d.encontrados} pasaron los ` +
+        `filtros de calidad: ${d.nuevos_en_sheet} se guardaron y ${d.duplicados} ya estaban en la lista. ` +
+        `Los otros ${d.descartados} se descartaron por reseñas, calificación o falta de teléfono.`;
+    } else {
+      document.getElementById('result-titulo').textContent =
+        (d.status === 'cancelado' ? '⏹ Búsqueda detenida — ' : '⚠ Búsqueda interrumpida — ') + d.ciudad;
+      document.getElementById('result-desc').textContent =
+        `Se alcanzaron a guardar ${d.nuevos_en_sheet} contactos nuevos, y siguen en la hoja. ` +
+        `Volver a correr la misma ciudad no los duplica.`;
+    }
   }
 
   if (d.status === 'error') {
-    clearInterval(polling);
+    pararSondeo();
+    ponerEnMarcha(false);
     document.getElementById('prog-label').textContent = '❌ Error: ' + d.error;
-    document.getElementById('btn-iniciar').disabled = false;
     document.getElementById('btn-iniciar').textContent = '🔍 Reintentar';
+    document.getElementById('result-box').style.display = 'block';
+    document.getElementById('result-titulo').textContent = '❌ La búsqueda falló — ' + d.ciudad;
+    document.getElementById('result-desc').textContent =
+      (d.error || '') + ` Se alcanzaron a guardar ${d.nuevos_en_sheet} contactos nuevos.`;
   }
 }
+
+restaurarEstado();
+
 </script>
 </body>
 </html>"""
