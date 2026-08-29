@@ -342,6 +342,48 @@ descartadas: `docs/adr/2026-08-27-estado-compartido-importador.md`.
 
 ---
 
+### Revertir el recorte de búsquedas sin desplegar código
+
+El importador deja de consultar variaciones y páginas que no están aportando
+negocios nuevos. Eso ahorra 5 búsquedas de texto por corrida y, medido contra
+respuestas grabadas, **no pierde ni un prospecto**.
+
+Si alguna vez una corrida real diera menos prospectos de los esperados, el
+recorte se desactiva **cambiando dos variables del módulo**, sin tocar la lógica
+y sin desplegar una versión nueva:
+
+```python
+MAX_VARIACIONES_SIN_APORTE = 99     # deja de cortar variaciones
+CORTAR_PAGINAS_SIN_APORTE  = False  # deja de cortar paginas
+```
+
+Con eso el importador vuelve a consultar las 3 variaciones y todas las páginas,
+como antes del Plan 2. El resto de optimizaciones —los `fields` explícitos, la
+caché y la deduplicación contra la hoja— siguen activas y **no afectan a qué
+negocios se encuentran**, solo a cuánto se paga por encontrarlos.
+
+### Ojo al medir el ahorro: la caché contamina la medición
+
+`tools/medir_llamadas_places.py` cuenta las llamadas que hace una corrida. Si se
+usa para comparar antes y después, **la caché tiene que estar aislada**.
+
+La caché vive por defecto en el temp del sistema, así que **sobrevive entre
+ejecuciones del script**. Una medición de esta tanda arrastró 108 entradas de
+corridas anteriores y reportó 0 Details en escenarios donde el código sí habría
+pagado — con un «pagados y tirados: **-18**» que delató el problema, porque un
+negativo ahí es imposible.
+
+El script ya estrena una caché desechable por escenario. Si se mide a mano,
+apuntar `PLACES_CACHE_FILE` a un archivo nuevo antes de cada corrida:
+
+```bash
+PLACES_CACHE_FILE=$(mktemp -d)/c.json python tools/medir_llamadas_places.py
+```
+
+Un ahorro que en realidad es una caché heredada se lee igual que un ahorro real,
+y no lo es.
+
+
 ## Gates del owner pendientes (seguridad)
 
 - **Rotar** `TELEGRAM_TOKEN` (bot `8404009072`, expuesto en ~14 copias del historial) y la **Google Places key**; cargarlas en `/srv/panel/secretos/.env` y `/srv/bruce/secretos/.env` en el VPS (ya no en Railway).

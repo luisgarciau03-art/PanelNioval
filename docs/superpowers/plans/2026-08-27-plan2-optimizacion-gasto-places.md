@@ -501,7 +501,29 @@ prospección en frío sobre Google Places. No aplica, y esta es la constancia po
 | T2.4 | Cortar variaciones y páginas sin aporte | **HECHA** | `ba18bd9` · 335 passed · **Text Search 18 → 13** · 3 cortes, todos por aporte MEDIDO de cero · gates python-reviewer (1 HIGH corregido, verificado en las dos direcciones) + code-reviewer APPROVE · ⚠️ **CE7 sin verificar** (necesita corrida real: gate del owner); los dos cortes con riesgo se desactivan con una constante | 2026-08-28 |
 | T2.5 | Caché persistente `place_id` → detalle | **HECHA** | `031f0f5` · 344 passed · **2ª corrida de la misma ciudad: 80 → 0 Place Details** · ahorra sobre todo a los RECHAZADOS sin teléfono, que nunca llegan a la hoja y se repagaban indefinidamente · TTL 30 d · gate security-reviewer: 0 CRITICAL/HIGH, 2 correcciones (poda real en disco, 0600 + O_EXCL) | 2026-08-28 |
 | T2.6 | Medidor de costo y tope de presupuesto | **HECHA** | `887a29e` · 357 passed · 4 contadores en UI + Telegram · tarifas por entorno **sin valor por defecto** (sin tarifa no se publica importe) · dos topes: llamadas (funciona sin tarifas) y dinero · gates python-reviewer + **silent-failure-hunter**: 2 CRITICAL, 1 HIGH y 4 menores corregidos | 2026-08-28 |
-| T2.7 | Verificación: medición A/B + diff de calidad | PENDIENTE | | |
-| T2.8 | Cierre: docs, PR, handoff | PENDIENTE | | |
+| T2.7 | Verificación: medición A/B + diff de calidad | ✅ HECHA | `docs/investigacion/2026-08-28-costo-places-despues.md`. Baseline **388 passed, 1 skipped**. **CE7 cumplido**: 80 aprobados con y sin recorte, diff vacío — y el chequeo se probó capaz de detectar pérdida (con `MAX_VARIACIONES_SIN_APORTE=0` marca 80 perdidos), así que el cero es un resultado y no un artefacto. Medidor exacto en las dos direcciones: 2.ª corrida = 0 Details facturados y 80 cache hits | 2026-08-28 |
+| T2.8 | Cierre: docs, PR, handoff | ✅ HECHA | `docs/RUNBOOK.md` gana cómo revertir el recorte sin desplegar y la trampa de medición de la caché. `CLAUDE.md` ya traía las variables. `.env.example` queda como **gate 5 del owner** (el entorno de Claude no escribe archivos `.env*`) | 2026-08-28 |
 
-**Avance del plan: 7 / 9 tareas (78 %)** · T2.0 bloqueada en su mitad monetaria
+**Avance del plan: 9 / 9 tareas (100 %)** · T2.0 sigue bloqueada en su mitad monetaria
+
+### Hallazgo de T2.7 que no estaba en el diseño
+
+**El instrumento de medición estaba mintiendo.** `tools/medir_llamadas_places.py` no
+aislaba `PLACES_CACHE_FILE`, que vive en el temp del sistema y sobrevive entre
+invocaciones: arrastraba **108 entradas** de corridas anteriores y reportaba 0 Details
+donde el código sí habría pagado. Lo delató un «pagados y tirados: **-18**», porque un
+negativo ahí es imposible. Además los tres escenarios compartían caché entre sí, así que
+sumaban en un solo número el ahorro de la caché y el de deduplicar contra la hoja sin
+poder atribuir cuál hizo qué.
+
+Corregido: `medir()` estrena caché desechable por escenario y admite una ruta explícita
+para encadenar dos corridas. Se añadió el escenario **«segunda corrida, misma ciudad»**,
+el único que aísla el efecto del cacheo. Sin este arreglo, el Plan 2 habría cerrado con
+una cifra de ahorro inventada.
+
+**CE6 no llega al 60 % en el peor escenario, y se dice.** En llamadas: **−5 %** en ciudad
+nueva, **−26 %** a medio trabajar, **−87 %** en ciudad ya trabajada o segunda corrida. En
+una ciudad nueva el gasto **es el producto**: los 80 Details compran 80 prospectos. Lo que
+el plan elimina es el gasto que no compraba nada. A eso se suma una reducción de precio
+unitario que el conteo no captura: cada Details factura ahora **un** grupo de campos en vez
+de tres.

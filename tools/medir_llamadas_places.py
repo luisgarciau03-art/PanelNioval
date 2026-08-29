@@ -25,6 +25,7 @@ import json
 import os
 import pathlib
 import sys
+import tempfile
 
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
@@ -109,9 +110,29 @@ class WorksheetContador:
         self.filas.extend(filas)
 
 
-def medir(ya_en_hoja=0, negocios=20, paginas=3, solape=0.5):
-    """Corre el importador con dobles instrumentados y devuelve los conteos."""
+def medir(ya_en_hoja=0, negocios=20, paginas=3, solape=0.5, cache=None):
+    """Corre el importador con dobles instrumentados y devuelve los conteos.
+
+    `cache` es la ruta del archivo de cache de Place Details:
+
+    - `None` (por defecto) estrena una cache VACIA y desechable. Es lo
+      correcto para medir un escenario aislado.
+    - una ruta concreta encadena dos corridas sobre la MISMA cache, que es
+      como se mide el efecto del cacheo: la segunda corrida de una ciudad.
+
+    Sin este aislamiento la medicion miente, y ya lo hizo. La cache vive por
+    defecto en el temp del SISTEMA, asi que sobrevive entre invocaciones del
+    script: una medicion arrastraba 108 entradas de corridas anteriores y
+    reportaba 0 Details en escenarios donde el codigo si habria pagado. Con
+    eso, el ahorro de la cache y el de deduplicar contra la hoja quedaban
+    sumados en un solo numero y no habia forma de atribuir cual hizo que.
+    """
     import app
+
+    if cache is None:
+        cache = os.path.join(tempfile.mkdtemp(prefix="medicion_places_"),
+                             "places_detalles.json")
+    app.PLACES_CACHE_FILE = cache
 
     gmaps = GmapsContador(negocios, paginas, solape)
     # Una ciudad ya trabajada: parte de lo que Places devuelve ya esta en la hoja.
@@ -152,6 +173,16 @@ ESCENARIOS = [
 
 def main():
     filas = [(nombre, medir(**kw)) for nombre, kw in ESCENARIOS]
+
+    # La segunda corrida de la MISMA ciudad, compartiendo cache con la
+    # primera. Es el unico escenario que aisla el efecto del cacheo: los
+    # otros tres estrenan cache, asi que miden solo la deduplicacion contra
+    # la hoja. Mezclarlos fue lo que produjo la medicion falsa anterior.
+    compartida = os.path.join(tempfile.mkdtemp(prefix="medicion_2a_"),
+                              "places_detalles.json")
+    medir(ya_en_hoja=0, cache=compartida)
+    filas.append(("segunda corrida, misma ciudad (cache caliente)",
+                  medir(ya_en_hoja=0, cache=compartida)))
 
     if "--json" in sys.argv:
         print(json.dumps({n: r for n, r in filas}, indent=2, ensure_ascii=False))
