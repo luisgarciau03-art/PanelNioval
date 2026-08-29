@@ -289,12 +289,34 @@ entorno).
 
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
-| T0.0 | Tarea Cero: rama, respaldo y baseline | PENDIENTE | | |
-| T0.1 | Workflow de tests en cada PR (CE2 en las dos direcciones) | PENDIENTE | | |
-| T0.2 | Barrido de secretos y datos personales sobre el diff | PENDIENTE | | |
-| T0.3 | Cierre: cobertura medida, docs y PR | PENDIENTE | | |
+| T0.0 | Tarea Cero: rama, respaldo y baseline | ✅ HECHA | Rama `ci/pytest-en-cada-pr` desde `main` (`393c511`). Respaldo `docs/auditoria/respaldos/2026-08-28/` con 5 XLSX + `huellas.json`, todos > 0. Baseline **314 passed** en `main`. `ls -d .github` fallaba: el plan sigue siendo "crear" | 2026-08-28 |
+| T0.1 | Workflow de tests en cada PR (CE2 en las dos direcciones) | ✅ HECHA | `eedf1c8`. **CE2 probado en las dos direcciones sobre corridas reales**: PR #39 con un `assert 1 == 2` dejó el check en **ROJO** (run `33225189306`, `1 failed, 345 passed in 1.87s`); el PR real quedó en **VERDE**. CE3: el número sale en el log. CE6: **22 s**, muy por debajo de los 5 min | 2026-08-28 |
+| T0.2 | Barrido de secretos y datos personales sobre el diff | ✅ HECHA | `eedf1c8` + `fe678a3`. `tools/barrer_secretos.py` con **31 tests** (cobertura 98 %). CE4 cumplido: cada regla se verificó desactivándola y su test se pone en rojo sin ella. Ruido medido sobre 15 commits reales: **11 dan cero hallazgos** | 2026-08-28 |
+| T0.3 | Cierre: cobertura medida, docs y PR | ✅ HECHA | Cobertura **69 %** global (`app.py` 52 %, barrido 98 %): se reporta y **no** bloquea. `CLAUDE.md` y `docs/RUNBOOK.md` § *Cuando el check de CI sale en rojo*. PR #40 | 2026-08-28 |
 
-**Avance del plan: 0 / 4 tareas (0 %)**
+**Avance del plan: 4 / 4 tareas (100 %)**
+
+### Hallazgos de la ejecución que no estaban en el diseño
+
+1. **El baseline de 357 no era el de `main`.** Los documentos de la tanda lo daban como
+   número absoluto; `main` tiene **314** y los 357 son de `perf/gasto-places-importador`,
+   que añade 43 tests. Un gate escrito «≥ 357 passed» era **inalcanzable** desde cualquier
+   rama basada en `main`. Corregido en `CLAUDE.md`, en este documento y en el índice: el
+   baseline es **por rama**.
+2. **El diseño original del workflow tenía un fallo que lo habría dejado inútil.**
+   `pytest | tee` devuelve el código de salida de `tee`, que siempre es 0: sin `pipefail`
+   el check habría salido **verde con la suite en rojo**. Es justo lo que CE2 existe para
+   detectar, y se detectó antes de la primera corrida.
+3. **Cuatro falsos negativos del barrido, encontrados en revisión.** El peor: el filtro de
+   imágenes miraba la línea entera, así que un secreto que compartiera línea con un
+   data-URI desaparecía del informe — el barrido tenía su propio modo de invisibilidad.
+   Los otros tres: un corte por largo de 200 se tragaba los tokens de Meta largos, el
+   patrón hexadecimal era solo minúsculas, y el teléfono con lada pegada (`52` + 10
+   dígitos, el formato de WhatsApp) no lo veía ningún patrón. Los cuatro llevan test que
+   **falla contra el código anterior**, comprobado.
+4. **El gate gritó sobre su propio PR.** La primera corrida real reportó 4 hallazgos sobre
+   el archivo de tests del propio barrido. Corregido en `fe678a3`; sin eso, el mecanismo
+   habría empezado su vida enseñando a ignorarlo.
 
 **Gate del owner asociado:** activar la protección de rama en `main` (requiere permisos de
 administrador del repositorio). Sin ella, el check informa pero no impide el merge.

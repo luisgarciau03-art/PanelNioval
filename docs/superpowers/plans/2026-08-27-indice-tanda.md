@@ -289,13 +289,13 @@ archivo" sino "añadirle cinco nombres"; el bloque exacto está en §7.
 | Plan | Tareas | Estado | Avance |
 |---|---|---|---|
 | Plan 3 — Bug de conteo y pantallas de carga | 10 | ✅ **COMPLETADO** | **10 / 10** |
+| Plan 0 — Integración continua ⭐ | 4 | ✅ **COMPLETADO** | **4 / 4** |
 | Plan 2 — Optimización del gasto de Places | 9 | 🟡 EN CURSO | **7 / 9** |
-| Plan 0 — Integración continua ⭐ | 4 | PENDIENTE | 0 / 4 |
 | Plan 1 — Relevancia de ciudades nacional | 10 | PENDIENTE | 0 / 10 |
 | Plan 4 — Rediseño profesional del panel | 12 | PENDIENTE | 0 / 12 |
 | Plan 5 — Endurecimiento del panel ⭐ | 8 | PENDIENTE | 0 / 8 |
 
-**PROGRESO GLOBAL: 17 / 53 tareas (32 %) · 1 de 6 planes completados**
+**PROGRESO GLOBAL: 21 / 53 tareas (40 %) · 2 de 6 planes completados**
 
 > Sobre el alcance original de 4 planes (41 tareas), el avance es **17 / 41 (41 %)**. El
 > denominador subió porque se redactaron dos planes que el §4 recomendaba y nadie había
@@ -311,8 +311,15 @@ archivo" sino "añadirle cinco nombres"; el bloque exacto está en §7.
 Salen de `CLAUDE.md` del proyecto y de las reglas globales del entorno. No son opcionales.
 
 1. **Nunca trabajar en `main`.** Railway y Vultr despliegan desde ahí. Una rama por plan.
-2. **Baseline oficial:** `python -m pytest tests/` → **357 passed, 1 skipped** (verificado el
-   2026-08-28). **Sin `-q`.** Nada se mergea con la suite en rojo.
+2. **Baseline oficial, y es POR RAMA.** `python -m pytest tests/`, **sin `-q`**. Medido el
+   2026-08-28: `main` → **314 passed**; `perf/gasto-places-importador` (Plan 2) → **357
+   passed, 1 skipped**, porque añade 43 tests suyos; tras el Plan 0, `main` → **345
+   passed**. El «357» que este índice daba como número absoluto era el de la rama del
+   Plan 2, y un gate escrito «≥ 357» resultaba **inalcanzable** desde cualquier rama
+   basada en `main` hasta que el Plan 2 mergeara. **Comparar contra el baseline de la
+   rama base del PR, nunca contra un número fijo.** Nada se mergea con la suite en rojo.
+   Desde el 2026-08-28 esto ya no depende de que alguien se acuerde: lo comprueba
+   `.github/workflows/tests.yml` en cada PR.
 3. **Respaldo antes del cambio, no después.** `python tools/respaldar_hojas.py docs/auditoria/respaldos/<fecha>`,
    y se confirma que el archivo existe **en disco, con tamaño > 0**, antes de seguir.
 4. **Nada se borra: se aparta** al respaldo fechado. Vale para archivos, configuración y cruft.

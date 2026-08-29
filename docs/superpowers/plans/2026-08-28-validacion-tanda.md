@@ -30,6 +30,7 @@ nuevo.
 | # | Afirmación del plan | Realidad medida hoy | |
 |---|---|---|---|
 | V1 | Baseline `230 passed` (citado ~14 veces en los 4 planes) | `python -m pytest tests/` → **357 passed, 1 skipped**, exit 0, 9.69 s | 🔧 |
+| V1b ⚠️ | *(corregido el 2026-08-28 durante el Plan 0)* Los 357 de V1 se midieron con el árbol en `perf/gasto-places-importador`, **no en `main`**. El baseline **es por rama**: `main` daba **314 passed** y el Plan 2 añade 43 tests. Los gates que este documento dejó escritos como «≥ 357 passed» eran **inalcanzables** desde cualquier rama basada en `main`. Corregido en `CLAUDE.md`, en el índice §7 y en el Plan 0 | 🔧 |
 | V2 | El comando es `pytest tests/ -q` | **`pytest tests/` sin `-q`**: `pytest.ini` ya trae `addopts = -q` y el segundo lo vuelve `-qq`, que suprime el resumen | 🔧 |
 | V3 | `app.py` tiene 4,948 líneas | **6,098** | 🔧 |
 | V4 | Las tres superficies son "~3,000 líneas" | **5,067**: dashboard 2,651 · formulario 1,852 · importador 564. Python real: **1,031** | 🔧 |
