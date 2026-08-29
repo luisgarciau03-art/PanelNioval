@@ -318,5 +318,21 @@ entorno).
    el archivo de tests del propio barrido. Corregido en `fe678a3`; sin eso, el mecanismo
    habría empezado su vida enseñando a ignorarlo.
 
+### Decisiones del owner sobre este plan (2026-08-28)
+
+**E1 · El barrido pasa a `--estricto` tras 2-3 semanas sin falsos positivos, no antes.**
+Hoy avisa y no bloquea. Revisar el **2026-09-18**. Medido sobre 15 commits reales: 11 dan
+cero hallazgos y los 4 restantes son justo los que tocan manejo de teléfonos. **Antes de
+activarlo hay que endurecer `barrido-ok`**: con el job bloqueando, esa marca deja de
+silenciar un aviso y pasa a saltarse un gate (`security-reviewer`, MEDIUM). Ya exige motivo
+escrito; faltaría restringirla a `tests/` o pedir segunda aprobación.
+
+**E2 · La cobertura se reporta y no bloquea.** Medida: **69 %** global, `app.py` 52 %,
+`tools/barrer_secretos.py` 98 %. Se descartó el trinquete al 69 % porque congelaría `app.py`
+justo cuando el **Plan 4 · T4.3** va a sacar 5,067 líneas de HTML: el porcentaje va a saltar
+por reestructuración, no por tests nuevos, y un trinquete lo leería como mérito.
+Reconsiderar **después** del Plan 4.
+
+
 **Gate del owner asociado:** activar la protección de rama en `main` (requiere permisos de
 administrador del repositorio). Sin ella, el check informa pero no impide el merge.
