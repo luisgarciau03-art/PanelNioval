@@ -1,5 +1,9 @@
 *.json
 !package.json
+# El catalogo de ciudades del Plan 1 SI se versiona: es dato publico del
+# INEGI, no una credencial. Sin esta excepcion el *.json de arriba lo deja
+# fuera del repo en silencio y el panel arranca sin catalogo en produccion.
+!datos/ciudades_mx.json
 __pycache__/
 *.pyc
 .env
