@@ -545,15 +545,15 @@ sujeto del plan.
 
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
-| T1.0 | Tarea Cero: rama y respaldo | PENDIENTE | | |
-| T1.1 | Contexto histórico del importador | PENDIENTE | | |
-| T1.2 | Investigación: relevancia ferretera en México | PENDIENTE | | |
-| T1.3 | Diseño del modelo de puntuación (ADR) | PENDIENTE | | |
-| T1.4 | Catálogo canónico `datos/ciudades_mx.json` | PENDIENTE | | |
-| T1.5 | Endpoint `/api/importador/ciudades` | PENDIENTE | | |
-| T1.6 | Nuevo cálculo en `/api/prospectos/ciudades` | PENDIENTE | | |
-| T1.7 | UI: filtro por macro-región y transparencia | PENDIENTE | | |
-| T1.8 | Verificación integral + gate humano del owner | PENDIENTE | | |
-| T1.9 | Cierre: docs, PR, handoff | PENDIENTE | | |
+| T1.0 | Tarea Cero: rama y respaldo | HECHA | rama `feat/relevancia-ciudades-nacional`; respaldo de 5 hojas (65 con huella) en `docs/auditoria/respaldos/2026-08-28-plan1/`; baseline 388 passed, 1 skipped | 2026-08-28 |
+| T1.1 | Contexto histórico del importador | HECHA | `docs/investigacion/2026-08-28-contexto-previo-importador.md` — 8 observaciones con ID · `d587cb8` | 2026-08-28 |
+| T1.2 | Investigación: relevancia ferretera en México | HECHA | `docs/investigacion/2026-08-28-relevancia-ferretera-mexico.md` — 5 indicadores, 4 descargas comprobadas · `d587cb8` | 2026-08-28 |
+| T1.3 | Diseño del modelo de puntuación (ADR) | HECHA | `docs/adr/2026-08-28-modelo-relevancia-ciudades.md` — consejo de 4 voces · `71abc35` | 2026-08-28 |
+| T1.4 | Catálogo canónico `datos/ciudades_mx.json` | HECHA | `datos/ciudades_mx.json` (606 ciudades) + `tools/generar_catalogo_ciudades.py` + 16 tests · `b9a6993` | 2026-08-28 |
+| T1.5 | Endpoint `/api/importador/ciudades` | HECHA | `/api/importador/ciudades` + 20 tests, y 11 de caracterizacion que faltaban · `7abe5cc` | 2026-08-28 |
+| T1.6 | Nuevo cálculo en `/api/prospectos/ciudades` | HECHA | prioridad en `/api/prospectos/ciudades` y 3 columnas nuevas; `relevancia` intacta · `14fff35` | 2026-08-28 |
+| T1.7 | UI: filtro por macro-región y transparencia | HECHA | filtro por region, array estatico retirado, B9/B11 fijados con 6 tests · `01ea2b0` | 2026-08-28 |
+| T1.8 | Verificación integral + gate humano del owner | HECHA | CE1-CE9 verificados en `docs/investigacion/2026-08-29-verificacion-plan1.md`; 15 defectos comprobados en las dos direcciones. **CE10 = gate del owner** | 2026-08-29 |
+| T1.9 | Cierre: docs, PR, handoff | HECHA | CLAUDE.md, RUNBOOK, marcador global e índice al día; 3 gates de review con 1 CRITICAL y 2 HIGH corregidos (`a6797ac`) | 2026-08-29 |
 
-**Avance del plan: 0 / 10 tareas (0 %)**
+**Avance del plan: 10 / 10 tareas (100 %)**
