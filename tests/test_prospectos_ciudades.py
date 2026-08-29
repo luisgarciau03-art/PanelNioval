@@ -124,5 +124,64 @@ class TestOrdenDeLaRespuesta:
         sin que nadie toque una linea de JavaScript."""
         payload = client.get("/api/prospectos/ciudades").get_json()
         clave = "prioridad" if "prioridad" in payload[0] else "relevancia"
-        valores = [c[clave] for c in payload]
-        assert valores == sorted(valores, reverse=True)
+        # T1.6 introduce el nulo para las ciudades fuera del catalogo, asi que el
+        # contrato pasa a ser: los que tienen valor van de mayor a menor, y los
+        # nulos al final. Es la unica linea de caracterizacion que cambia, y
+        # cambia porque el contrato cambio a proposito, no para tapar un fallo.
+        con_valor = [c[clave] for c in payload if c[clave] is not None]
+        assert con_valor == sorted(con_valor, reverse=True)
+        nulos = [c[clave] is None for c in payload]
+        assert nulos == sorted(nulos)
+
+
+class TestCamposNuevosDelPlan1:
+    """T1.6 anade el modelo de dos factores SIN quitar relevancia. El dashboard
+    ordena hoy por relevancia, y cambiarle el significado al campo sin avisar
+    rompe la lectura del owner aunque el importador quede perfecto."""
+
+    def test_el_payload_trae_los_tres_campos_nuevos(self, client, hoja):
+        for c in client.get("/api/prospectos/ciudades").get_json():
+            assert {"potencial_mercado", "desempeno_nioval", "prioridad"} <= set(c)
+
+    def test_una_ciudad_del_catalogo_trae_potencial(self, client, hoja):
+        d = por_ciudad(client.get("/api/prospectos/ciudades").get_json())
+        assert d["Guadalajara"]["potencial_mercado"] > 0
+        assert d["Guadalajara"]["prioridad"] > 0
+
+    def test_una_ciudad_fuera_del_catalogo_no_revienta_y_queda_en_nulo(self, client, hoja):
+        """'Sin ciudad' no esta ni puede estar en el catalogo. Antes que inventarle
+        un potencial, se dice que no hay: un numero inventado se lee igual que uno
+        medido."""
+        d = por_ciudad(client.get("/api/prospectos/ciudades").get_json())
+        assert d["Sin ciudad"]["potencial_mercado"] is None
+        assert d["Sin ciudad"]["prioridad"] is None
+
+    def test_las_ciudades_sin_catalogo_van_al_final(self, client, hoja):
+        payload = client.get("/api/prospectos/ciudades").get_json()
+        con_prioridad = [c["prioridad"] is not None for c in payload]
+        assert con_prioridad == sorted(con_prioridad, reverse=True)
+
+    def test_relevancia_sigue_intacta_junto_a_los_campos_nuevos(self, client, hoja):
+        d = por_ciudad(client.get("/api/prospectos/ciudades").get_json())
+        gdl = d["Guadalajara"]
+        assert gdl["relevancia"] == round(
+            gdl["interes_pct"] * 1.5 + (gdl["total"] / 2) * 40 + min(gdl["llamados"] * 2, 20), 1
+        )
+
+
+class TestElDashboardLeeLosCamposNuevos:
+    def test_la_tabla_ordena_por_prioridad_por_defecto(self):
+        assert "let ciudadesSortCol = 'prioridad'" in app_modulo.HTML
+
+    def test_relevancia_queda_marcada_como_obsoleta_con_fecha(self):
+        """Un campo que se conserva por compatibilidad y no dice hasta cuando se
+        queda ahi para siempre."""
+        assert "OBSOLETO" in app_modulo.HTML or "OBSOLETO" in _fuente_api_ciudades()
+
+    def test_la_tabla_muestra_la_columna_de_prioridad(self):
+        assert "'prioridad'" in app_modulo.HTML
+
+
+def _fuente_api_ciudades():
+    import inspect
+    return inspect.getsource(app_modulo.api_ciudades)
