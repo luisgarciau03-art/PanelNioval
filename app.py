@@ -5864,11 +5864,18 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399
     <!-- CIUDADES -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;margin-bottom:8px">
       <div style="font-size:.78em;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.8px">
-        Ciudades <span id="ciudades-count" style="color:var(--blue)"></span> — <span style="color:var(--green)">ordenadas por relevancia</span>
+        Ciudades <span id="ciudades-count" style="color:var(--blue)"></span> — <span style="color:var(--green)">ordenadas por prioridad</span>
       </div>
-      <input type="text" id="ciudad-filter" placeholder="🔍 Filtrar..." oninput="filtrarCiudades()"
-        style="padding:5px 10px;border:1px solid #dde6ff;border-radius:8px;font-size:.8em;outline:none;width:140px">
+      <div style="display:flex;gap:6px">
+        <select id="region-filter" onchange="filtrarCiudades()"
+          style="padding:5px 8px;border:1px solid #dde6ff;border-radius:8px;font-size:.8em;outline:none;max-width:190px">
+          <option value="">Todas</option>
+        </select>
+        <input type="text" id="ciudad-filter" placeholder="🔍 Filtrar..." oninput="filtrarCiudades()"
+          style="padding:5px 10px;border:1px solid #dde6ff;border-radius:8px;font-size:.8em;outline:none;width:140px">
+      </div>
     </div>
+    <div id="sin-clasificar"></div>
     <div id="ciudades-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;max-height:220px;overflow-y:auto;padding:4px 2px">
       <div style="color:#aaa;font-size:.82em;padding:6px">Cargando ciudades...</div>
     </div>
@@ -5929,116 +5936,75 @@ document.getElementById('cats-list').innerHTML = CATS.map((c,i) =>
   `<div class="cat-badge" id="cat-${i}">${c}</div>`
 ).join('');
 
-// Lista completa de ciudades de México (200+)
-const CIUDADES_MX = [
-  // Zona Metropolitana / Grandes ciudades
-  'Ciudad de México','Guadalajara','Monterrey','Puebla','Toluca',
-  'Tijuana','Juárez','León','Zapopan','Nezahualcóyotl',
-  'Chihuahua','Naucalpan','Ecatepec','Mérida','Querétaro',
-  'San Luis Potosí','Aguascalientes','Mexicali','Hermosillo','Saltillo',
-  'Morelia','Torreón','Culiacán','Veracruz','Acapulco',
-  'Cancún','Tampico','Reynosa','San Nicolás de los Garza','Durango',
-  'Tlalnepantla','Chimalhuacán','Oaxaca','Tuxtla Gutiérrez','Irapuato',
-  'Ciudad López Mateos','Celaya','Tultitlán','Mazatlán','Xalapa',
-  'Nuevo Laredo','Ensenada','Matamoros','Monclova','Tepic',
-  'Ciudad Obregón','Los Mochis','Villahermosa','Cuernavaca','Colima',
-  'Pachuca','Chilpancingo','Tlaxcala','Campeche','La Paz',
-  // Estados y municipios importantes
-  'Apodaca','San Pedro Garza García','Guadalupe','Escobedo',
-  'Zapotlanejo','Tlaquepaque','Tonalá','El Salto','Tlajomulco',
-  'Soledad de Graciano Sánchez','Matehuala','Rioverde',
-  'Fresnillo','Zacatecas','Jerez','Guadalupe Zacatecas',
-  'Tepic','Santiago','Bahía de Banderas','Puerto Vallarta',
-  'Mazatlán','Culiacán','Los Mochis','Guasave','Guamúchil',
-  'Navojoa','Cajeme','Nogales','San Luis Río Colorado','Caborca',
-  'Delicias','Parral','Cuauhtémoc Chih','Guachochi',
-  'Monclova','Piedras Negras','Acuña','Sabinas','Múzquiz',
-  'Linares','Cadereyta','Allende NL','Galeana',
-  'Altamira','Ciudad Madero','Río Bravo','Valle Hermoso',
-  'Mante','Victoria','Tula Tamps','Jaumave',
-  'Tuxpan','Poza Rica','Coatzacoalcos','Minatitlán','Córdoba',
-  'Orizaba','Martínez de la Torre','Papantla','Tantoyuca',
-  'Cosamaloapan','San Andrés Tuxtla','Acayucan',
-  'Tehuacán','Atlixco','Teziutlán','Huauchinango','Cholula',
-  'San Martín Texmelucan','Izúcar de Matamoros','Tehuacan',
-  'Zamora','Uruapan','Lázaro Cárdenas','Apatzingán','Zitácuaro',
-  'Pátzcuaro','Sahuayo','La Piedad','Jacona','Jiquilpan',
-  'Colima','Manzanillo','Tecomán','Villa de Álvarez',
-  'Guadalajara','Zapopan','Tlaquepaque','Tonalá','Tlajomulco',
-  'Lagos de Moreno','Tepatitlán','Ocotlán','Ameca','Autlán',
-  'Puerto Vallarta','Chapala','Sayula','Ciudad Guzmán',
-  'Guanajuato','Irapuato','Celaya','León','Salamanca',
-  'Silao','Pénjamo','Dolores Hidalgo','San Miguel de Allende',
-  'Acámbaro','Moroleón','Uriangato','Cortazar','Valle de Santiago',
-  'Pachuca','Tulancingo','Tula de Allende','Ixmiquilpan',
-  'Actopan','Tizayuca','Cuautitlán Izcalli','Coacalco','Ecatepec',
-  'Tlalnepantla','Naucalpan','Atizapán','Nicolás Romero','Cuautitlán',
-  'Texcoco','Chalco','Valle de Chalco','Amecameca','Tultepec',
-  'Metepec','Zinacantepec','Lerma','Santiago Tianguistenco',
-  'Cuernavaca','Jiutepec','Temixco','Cuautla','Jojutla','Zacatepec',
-  'Oaxaca','Juchitán','Salina Cruz','Tehuantepec','Tuxtepec',
-  'Puerto Escondido','Huatulco','Miahuatlán','Ejutla',
-  'Chilpancingo','Acapulco','Iguala','Taxco','Zihuatanejo',
-  'Tlapa','Ometepec','Ayutla','Cruz Grande',
-  'Tapachula','San Cristóbal de las Casas','Comitán','Tonalá Chis',
-  'Pichucalco','Ocosingo','Palenque','Villaflores',
-  'Villahermosa','Cárdenas','Macuspana','Comalcalco',
-  'Campeche','Ciudad del Carmen','Calkiní','Hopelchén',
-  'Mérida','Cancún','Valladolid','Tizimín','Ticul','Izamal',
-  'Chetumal','Playa del Carmen','Cozumel','Felipe Carrillo Puerto',
-  'La Paz BCS','Cabo San Lucas','San José del Cabo','Loreto',
-  'Ensenada','Tijuana','Mexicali','Tecate','Rosarito',
-  'Hermosillo','Ciudad Obregón','Navojoa','Guaymas','Nogales',
-  'Los Mochis','Culiacán','Mazatlán','Guasave','Mochis',
-  'Durango','Gómez Palacio','Lerdo','Victoria de Durango',
-  'Zacatecas','Fresnillo','Jerez','Loreto Zac','Pinos',
-  'Aguascalientes','Calvillo','Rincón de Romos','San Francisco de los Romo',
-  'Tepic','Xalisco','Ixtlán','Santiago Ixc',
-  'San Luis Potosí','Matehuala','Ciudad Valles','Rioverde','Tamazunchale',
-  'Saltillo','Torreón','Monclova','Piedras Negras','Acuña',
-  'Monterrey','Guadalupe NL','Apodaca','San Nicolás','Escobedo','Juárez NL',
-];
-
+// Aqui vivia el array estatico: 293 entradas escritas a mano, 50 nombres
+// duplicados y 9 con la abreviatura del estado pegada, que viajaba literal a
+// Google Places ("Ferreterias en Santiago Ixc"). Lo sustituye el catalogo
+// nacional de datos/ciudades_mx.json, que sirve /api/importador/ciudades ya
+// ordenado y con la explicacion de cada posicion armada en el servidor.
 let todasCiudades = [];
+let sinClasificar = [];
 
 async function cargarCiudades() {
+  const cont = document.getElementById('ciudades-chips');
   try {
-    const r    = await fetch('/api/prospectos/ciudades');
-    const panelData = await r.json();
+    const r = await fetch('/api/importador/ciudades');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
 
-    // Ciudades del panel con datos reales (con relevancia calculada)
-    const conDatos = panelData.filter(c => c.ciudad && c.ciudad !== 'Sin ciudad');
-    const enPanel  = new Set(conDatos.map(c => c.ciudad.toLowerCase()));
+    todasCiudades = d.ciudades || [];
+    sinClasificar = d.sin_clasificar || [];
 
-    // Ciudades de la lista estática que NO están en el panel
-    const unicasMX = [...new Set(CIUDADES_MX)];
-    const sinDatos = unicasMX
-      .filter(c => !enPanel.has(c.toLowerCase()))
-      .map(c => ({ ciudad: c, total: 0, llamados: 0, aprobados: 0, interes_pct: 0, relevancia: 0 }));
-
-    // Fusionar: panel (con datos) + estáticas (sin datos)
-    todasCiudades = [...conDatos, ...sinDatos];
+    // El rango se fija UNA vez sobre el catalogo completo. Si se calculara en
+    // renderChips sobre la lista recibida, al escribir en el filtro la ciudad
+    // numero 47 apareceria con medalla de oro.
     todasCiudades.forEach((c, i) => { c.rank = i + 1; });
 
+    pintarRegiones(d.regiones || []);
     document.getElementById('ciudades-count').textContent = `(${todasCiudades.length})`;
     renderChips(todasCiudades);
-  } catch(e) {
-    // Fallback: solo estáticas
-    todasCiudades = [...new Set(CIUDADES_MX)].map((c, i) => ({
-      ciudad: c, total: 0, llamados: 0, aprobados: 0, interes_pct: 0, relevancia: 0,
-      rank: i + 1
-    }));
-    document.getElementById('ciudades-count').textContent = `(${todasCiudades.length})`;
-    renderChips(todasCiudades);
+    pintarSinClasificar();
+  } catch (e) {
+    // Sin catalogo NO se inventa una lista: se dice que no se pudo cargar y se
+    // deja el campo de texto, que sigue aceptando cualquier ciudad. Un fallback
+    // silencioso a una lista vieja seria peor que no tener lista.
+    todasCiudades = [];
+    document.getElementById('ciudades-count').textContent = '';
+    cont.innerHTML = '<div style="color:#c0392b;font-size:.82em;padding:6px">'
+      + 'No se pudo cargar el catalogo de ciudades. Escribe la ciudad a mano.</div>';
   }
 }
 
-// El nombre de la ciudad viene de LISTA DE CONTACTOS, escrito a mano, y antes
-// de eso lo tecleo un operador en el campo de texto sin validacion. Se
-// interpolaba crudo en DOS sitios de la misma linea: dentro del atributo
-// onclick y como texto del chip. Una ciudad llamada O'Brien rompia el handler
-// y dejaba el chip muerto; una con <img onerror=...> ejecutaba.
-// El dashboard ya cerraba este mismo agujero (app.py:2064).
+function pintarRegiones(regiones) {
+  const sel = document.getElementById('region-filter');
+  const total = regiones.reduce((s, r) => s + r.total, 0);
+  // El conteo va en cada opcion a proposito: sin el, una region vacia y un
+  // filtro roto se ven exactamente igual.
+  sel.innerHTML = `<option value="">Todas (${total})</option>`
+    + regiones.map(r =>
+        `<option value="${escaparHtml(r.region)}">${escaparHtml(r.region)} (${r.total})</option>`
+      ).join('');
+}
+
+function pintarSinClasificar() {
+  const caja = document.getElementById('sin-clasificar');
+  if (!sinClasificar.length) { caja.innerHTML = ''; return; }
+  const n = sinClasificar.reduce((s, c) => s + c.total, 0);
+  const nombres = sinClasificar.slice(0, 12).map(c => escaparHtml(c.ciudad)).join(', ');
+  const resto = sinClasificar.length > 12 ? ` y ${sinClasificar.length - 12} mas` : '';
+  // Visible a proposito: son contactos reales de la hoja cuya ciudad no casa con
+  // ninguna del catalogo. Esconderlos los haria desaparecer del ranking sin que
+  // nadie se entere.
+  caja.innerHTML = `<div style="font-size:.75em;color:#8a6d3b;background:#fcf8e3;`
+    + `border:1px solid #faebcc;border-radius:8px;padding:6px 9px;margin-bottom:10px">`
+    + `⚠ ${n} contactos en ${sinClasificar.length} ciudades que no estan en el catalogo: `
+    + `${nombres}${resto}.</div>`;
+}
+
+// El nombre de la ciudad viene de LISTA DE CONTACTOS, escrito a mano, y antes de
+// eso lo tecleo un operador en el campo de texto sin validacion. Se interpolaba
+// crudo en DOS sitios de la misma linea: dentro del atributo onclick y como
+// texto del chip. Una ciudad llamada O'Brien rompia el handler y dejaba el chip
+// muerto; una con <img onerror=...> ejecutaba.
 function escaparHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -6050,24 +6016,24 @@ function renderChips(lista) {
   if (!lista.length) { cont.innerHTML = '<div style="color:#aaa;font-size:.82em">Sin resultados</div>'; return; }
 
   cont.innerHTML = lista.map((c) => {
-    // El rango es el del catalogo completo, no el de la lista filtrada: antes
-    // se calculaba sobre el indice recibido, asi que al escribir en el filtro
-    // la ciudad numero 47 aparecia con medalla de oro.
     const rank   = (c.rank != null) ? c.rank : 0;
     const medal  = rank === 1 ? '🥇 ' : rank === 2 ? '🥈 ' : rank === 3 ? '🥉 ' : `${rank}. `;
     const isTop  = rank >= 1 && rank <= 3;
-    const hasInt = c.interes_pct > 0;
-    const badge  = hasInt
+    // El conteo CRUDO de ferreterias, no el puntaje. El puntaje va en escala
+    // logaritmica y comprime: un 86.7 frente a un 89.8 no significa lo que el
+    // operador leeria que significa. El conteo si es interpretable y auditable.
+    const badge  = c.interes_pct > 0
       ? `<span style="background:rgba(0,204,71,.2);color:#155724;padding:1px 5px;border-radius:8px;font-size:.85em">${c.interes_pct}%</span>`
-      : `<span style="opacity:.55;font-size:.85em">${c.total}</span>`;
+      : `<span style="opacity:.55;font-size:.85em">${c.unidades_ferreteras}</span>`;
     const nombre = escaparHtml(c.ciudad);
-    return `<span class="chip ${isTop?'top':''}" data-ciudad="${nombre}">${medal}${nombre} ${badge}</span>`;
+    const porque = escaparHtml(c.explicacion || '');
+    return `<span class="chip ${isTop?'top':''}" data-ciudad="${nombre}" title="${porque}">${medal}${nombre} ${badge}</span>`;
   }).join('');
 }
 
-// Listener delegado: el nombre viaja por dataset, nunca dentro de un atributo
-// de codigo. Se registra una sola vez sobre el contenedor, asi que sobrevive a
-// cada re-render de los chips.
+// Listener delegado: el nombre viaja por dataset, nunca dentro de un atributo de
+// codigo. Se registra una sola vez sobre el contenedor, asi que sobrevive a cada
+// re-render de los chips.
 document.getElementById('ciudades-chips').addEventListener('click', (ev) => {
   const chip = ev.target.closest('.chip');
   if (!chip) return;
@@ -6078,7 +6044,13 @@ document.getElementById('ciudades-chips').addEventListener('click', (ev) => {
 
 function filtrarCiudades() {
   const q = document.getElementById('ciudad-filter').value.toLowerCase().trim();
-  renderChips(q ? todasCiudades.filter(c => c.ciudad.toLowerCase().includes(q)) : todasCiudades);
+  const region = document.getElementById('region-filter').value;
+  // Los dos filtros se COMBINAN. Aplicar solo el ultimo que se toco haria que
+  // escribir en el buscador ignorara la region elegida, y al reves.
+  let lista = todasCiudades;
+  if (region) lista = lista.filter(c => c.region === region);
+  if (q)      lista = lista.filter(c => c.ciudad.toLowerCase().includes(q));
+  renderChips(lista);
 }
 
 cargarCiudades();
