@@ -185,3 +185,23 @@ class TestElDashboardLeeLosCamposNuevos:
 def _fuente_api_ciudades():
     import inspect
     return inspect.getsource(app_modulo.api_ciudades)
+
+
+class TestLaTablaDelDashboardEscapaElNombreDeCiudad:
+    """El nombre de ciudad sale de la columna CIUDAD de LISTA DE CONTACTOS, que
+    teclea un operador sin validacion, y esta tabla lo mete en innerHTML. Una
+    ciudad llamada <img src=x onerror=...> ejecutaba en el navegador de cualquiera
+    que abriera la pestana. El importador ya lo tenia cerrado en sus chips; la
+    tabla usa otra funcion de render y se habia quedado fuera.
+    """
+
+    def test_existe_el_escapador_en_la_plantilla_del_dashboard(self):
+        assert "function escCiudad" in app_modulo.HTML
+
+    def test_la_columna_ciudad_pasa_por_el_escapador(self):
+        i = app_modulo.HTML.find("label: 'Ciudad'")
+        assert i > 0
+        assert "escCiudad(v)" in app_modulo.HTML[i:i + 200]
+
+    def test_no_queda_interpolacion_cruda_del_nombre_en_esa_columna(self):
+        assert "`<strong>${v}</strong>`" not in app_modulo.HTML

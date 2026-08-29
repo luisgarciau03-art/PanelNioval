@@ -217,3 +217,103 @@ class TestNoFiltraDatosPersonales:
         """No es sensible, pero tampoco lo usa la UI: cuanto menos viaje, mejor.
         Si algun dia hace falta, se anade a proposito y con su motivo."""
         assert all("clave_inegi" not in c for c in pedir(client)["ciudades"])
+
+
+@pytest.fixture
+def hoja_con_ciudad_vacia(monkeypatch):
+    """Un contacto con la celda CIUDAD vacia. Es un estado normal de una hoja
+    mantenida a mano, y hacia desaparecer al contacto de las DOS listas."""
+    contactos = [
+        {"CIUDAD": "", "TIENDA": "Ferre Sin Ciudad"},
+        {"CIUDAD": None, "TIENDA": "Ferre Nula"},
+        {"CIUDAD": "Guadalajara", "TIENDA": "Ferre Tapatia"},
+    ]
+    monkeypatch.setattr(app_modulo, "get_data", lambda *a, **k: contactos)
+    monkeypatch.setattr(app_modulo, "get_all_respuestas", lambda *a, **k: [])
+
+
+class TestNingunContactoDesaparece:
+    def test_los_contactos_sin_ciudad_aparecen_en_sin_clasificar(self, client, hoja_con_ciudad_vacia):
+        d = pedir(client)
+        nombres = {c["ciudad"] for c in d["sin_clasificar"]}
+        assert "Sin ciudad" in nombres
+
+    def test_la_suma_de_las_dos_listas_cuadra_con_la_hoja(self, client, hoja_con_ciudad_vacia):
+        """El test equivalente de mas arriba no podia cazar este fallo: su fixture
+        no tenia ni un contacto con la celda vacia, asi que sumaba correcto por no
+        ejercitar el camino roto."""
+        d = pedir(client)
+        total = sum(c["total"] for c in d["ciudades"])
+        total += sum(c["total"] for c in d["sin_clasificar"])
+        assert total == 3
+
+
+class TestDegradacionSinCatalogo:
+    """Si el archivo del catalogo falta o esta roto, el panel sigue sirviendo. Pero
+    el operador tiene que poder distinguirlo de "ninguna ciudad caso"."""
+
+    @pytest.fixture
+    def catalogo_roto(self, monkeypatch, tmp_path):
+        falso = tmp_path / "no_existe.json"
+        monkeypatch.setattr(app_modulo, "CATALOGO_CIUDADES_FILE", str(falso))
+        # monkeypatch restaura el valor previo al salir, asi que la cache buena
+        # vuelve sola: no hace falta limpiarla a mano despues del yield.
+        monkeypatch.setattr(app_modulo, "_estado_catalogo", None)
+
+    def test_responde_200_y_no_revienta(self, client, catalogo_roto, hoja):
+        d = pedir(client)
+        assert d["ciudades"] == []
+
+    def test_lo_dice_en_el_payload(self, client, catalogo_roto, hoja):
+        assert pedir(client)["catalogo_cargado"] is False
+
+    def test_con_catalogo_bueno_la_bandera_es_verdadera(self, client, hoja):
+        assert pedir(client)["catalogo_cargado"] is True
+
+    def test_los_contactos_no_se_pierden_aunque_no_haya_catalogo(self, client, catalogo_roto, hoja):
+        """Sin catalogo, TODO cae a sin_clasificar. Ninguno al limbo."""
+        d = pedir(client)
+        assert sum(c["total"] for c in d["sin_clasificar"]) == 28
+
+
+class TestFactoresPuros:
+    """Las dos funciones del modelo, llamadas directamente y con datos sucios.
+    La hoja no garantiza consistencia: es una hoja de calculo editada a mano."""
+
+    def test_sin_llamadas_el_desempeno_es_exactamente_neutro(self):
+        assert app_modulo._factor_desempeno(0, 0, 0.30) == 1.0
+
+    def test_aprobados_mayores_que_llamados_no_revienta(self):
+        v = app_modulo._factor_desempeno(1, 5, 0.30)
+        assert isinstance(v, float)
+
+    def test_una_referencia_de_cero_no_divide_entre_cero(self):
+        assert app_modulo._factor_desempeno(10, 5, 0.0) is not None
+
+    def test_el_desempeno_nunca_sale_de_su_rango(self):
+        for llamados, aprobados, ref in [(1, 1, 0.01), (1000, 1000, 0.01),
+                                         (1000, 0, 0.99), (5, 5, 0.5)]:
+            v = app_modulo._factor_desempeno(llamados, aprobados, ref)
+            assert 0.75 <= v <= 1.25, (llamados, aprobados, ref, v)
+
+    def test_sin_ferreterias_la_saturacion_es_neutra(self):
+        assert app_modulo._factor_saturacion(50, 0) == 1.0
+
+    def test_mas_contactos_que_ferreterias_topa_en_el_descuento_maximo(self):
+        """Puede pasar de verdad: la hoja lleva contactos que ya no existen en el
+        DENUE, o de otro municipio mal etiquetado."""
+        v = app_modulo._factor_saturacion(10_000, 10)
+        assert v == pytest.approx(1 - app_modulo.DESCUENTO_MAX_SATURACION)
+
+    def test_una_plaza_virgen_no_se_descuenta(self):
+        assert app_modulo._factor_saturacion(0, 500) == 1.0
+
+    def test_el_factor_combinado_respeta_los_limites(self):
+        extremos = [
+            {"llamados": 0, "aprobados": 0, "total": 0},
+            {"llamados": 1000, "aprobados": 1000, "total": 0},
+            {"llamados": 1000, "aprobados": 0, "total": 100_000},
+        ]
+        for m in extremos:
+            v = app_modulo._calcular_factor_nioval(m, 100, 0.30)
+            assert app_modulo.FACTOR_MIN <= v <= app_modulo.FACTOR_MAX, (m, v)

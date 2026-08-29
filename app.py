@@ -857,8 +857,11 @@ CATALOGO_CIUDADES_FILE = os.environ.get(
 )
 
 # Se lee una vez y se cachea: son ~600 registros que no cambian en caliente.
-_catalogo_ciudades = None
-_indice_ciudades = None
+# Va en UNA sola variable a proposito. Con dos, publicarlas son dos STORE_GLOBAL
+# separados y un thread podia ver el catalogo ya puesto y el indice todavia en None
+# —gunicorn corre 4 threads y el dashboard y el importador piden a la vez al
+# cargar—, y el segundo se llevaba un AttributeError en indice.get().
+_estado_catalogo = None
 
 # Tasa de interes de referencia cuando la hoja no da para calcularla. No es una
 # constante inventada: en cuanto hay llamadas se sustituye por la tasa real.
@@ -889,9 +892,9 @@ def _cargar_catalogo_ciudades():
     vacio y el endpoint responde con lo que haya. El panel sirve para trabajar;
     quedarse sin ranking degrada, quedarse sin panel no.
     """
-    global _catalogo_ciudades, _indice_ciudades
-    if _catalogo_ciudades is not None:
-        return _catalogo_ciudades, _indice_ciudades
+    global _estado_catalogo
+    if _estado_catalogo is not None:
+        return _estado_catalogo
     try:
         with open(CATALOGO_CIUDADES_FILE, encoding='utf-8') as f:
             catalogo = json.load(f)
@@ -903,8 +906,8 @@ def _cargar_catalogo_ciudades():
         indice.setdefault(_normalizar_ciudad(c['nombre']), c)
         for a in c.get('alias', []):
             indice.setdefault(_normalizar_ciudad(a), c)
-    _catalogo_ciudades, _indice_ciudades = catalogo, indice
-    return catalogo, indice
+    _estado_catalogo = (catalogo, indice)
+    return _estado_catalogo
 
 
 def _factor_desempeno(llamados: int, aprobados: int, interes_referencia: float) -> float:
@@ -933,6 +936,19 @@ def _factor_saturacion(contactos: int, unidades_ferreteras: int) -> float:
     if unidades_ferreteras <= 0:
         return 1.0
     return 1 - DESCUENTO_MAX_SATURACION * min(1.0, contactos / unidades_ferreteras)
+
+
+# Limites del factor. Nombrados porque el mismo recorte lo aplican las dos rutas:
+# como literales, cambiar el ADR obligaba a acordarse de tocar los dos sitios.
+FACTOR_MIN = 0.60
+FACTOR_MAX = 1.25
+
+
+def _calcular_factor_nioval(metricas: dict, unidades: int, referencia: float) -> float:
+    """desempeno x saturacion, recortado. UNICO sitio donde se combinan."""
+    bruto = (_factor_desempeno(metricas['llamados'], metricas['aprobados'], referencia)
+             * _factor_saturacion(metricas['total'], unidades))
+    return round(max(FACTOR_MIN, min(FACTOR_MAX, bruto)), 3)
 
 
 def _explicar_ciudad(reg: dict, metricas: dict, saturacion: float) -> str:
@@ -973,9 +989,11 @@ def api_importador_ciudades():
 
     por_clave, sin_clasificar = {}, []
     for m in metricas_hoja:
-        if m['ciudad'] == 'Sin ciudad':
-            continue
-        reg = indice.get(_normalizar_ciudad(m['ciudad']))
+        # 'Sin ciudad' NO se salta: es un contacto real con la celda CIUDAD vacia,
+        # y saltarlo lo hacia desaparecer de las dos listas a la vez. Cae por el
+        # mismo camino que cualquier otro valor que no case, que es donde el
+        # operador puede verlo.
+        reg = None if m['ciudad'] == 'Sin ciudad' else indice.get(_normalizar_ciudad(m['ciudad']))
         if reg is None:
             # Nada se descarta en silencio: la hoja trae 116 valores distintos y
             # algunos son estados ("Chiapas", "Guerrero"), no ciudades.
@@ -1003,8 +1021,7 @@ def api_importador_ciudades():
         m = por_clave.get(reg['clave_inegi'], vacio)
         unidades = reg['indicadores']['unidades_ferreteras']
         saturacion = _factor_saturacion(m['total'], unidades)
-        desempeno = _factor_desempeno(m['llamados'], m['aprobados'], referencia)
-        factor = round(max(0.60, min(1.25, desempeno * saturacion)), 3)
+        factor = _calcular_factor_nioval(m, unidades, referencia)
         ciudades.append({
             'ciudad': reg['nombre'],
             'estado': reg['estado'],
@@ -1034,9 +1051,13 @@ def api_importador_ciudades():
         'ciudades': ciudades,
         'sin_clasificar': sin_clasificar,
         'regiones': regiones,
+        # Sin esto, "el archivo del catalogo no carga" y "ninguna ciudad de la hoja
+        # caso" se ven identicos desde el navegador: lista vacia y todo en
+        # sin_clasificar. Son dos problemas distintos con dos arreglos distintos.
+        'catalogo_cargado': bool(catalogo),
     })
 
-def _agregar_por_ciudad(contactos, respuestas):
+def _agregar_por_ciudad(contactos: list, respuestas: list) -> list:
     """Agrega contactos y respuestas por ciudad. Devuelve una lista de dicts.
 
     Extraida de api_ciudades para que /api/importador/ciudades use exactamente
@@ -1146,9 +1167,7 @@ def api_ciudades():
             r['prioridad'] = None
             continue
         unidades = reg['indicadores']['unidades_ferreteras']
-        factor = round(max(0.60, min(1.25,
-            _factor_desempeno(r['llamados'], r['aprobados'], referencia)
-            * _factor_saturacion(r['total'], unidades))), 3)
+        factor = _calcular_factor_nioval(r, unidades, referencia)
         r['potencial_mercado'] = reg['potencial_mercado']
         r['desempeno_nioval'] = factor
         r['prioridad'] = round(reg['potencial_mercado'] * factor, 1)
@@ -2439,6 +2458,16 @@ async function loadPendientes() {
 }
 
 // ─── CIUDADES ───────────────────────────────────────────────────────────────
+// El nombre de ciudad viene de la columna CIUDAD de LISTA DE CONTACTOS, que
+// teclea un operador sin ninguna validacion, y esta tabla lo mete en innerHTML.
+// Una ciudad llamada <img src=x onerror=...> ejecutaba en el navegador de
+// cualquiera que abriera la pestana. El importador ya lo tenia cerrado en sus
+// chips; esta tabla usa otra funcion de render y se habia quedado fuera.
+function escCiudad(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 let ciudadesData = [];
 let ciudadesSortCol = 'prioridad';   // antes 'relevancia', 100 % historial propio (Plan 1)
 let ciudadesSortAsc = false;
@@ -2485,7 +2514,7 @@ function renderCiudades(data) {
   const maxAprob = Math.max(...data.map(c => c.aprobados), 1);
 
   const cols = [
-    { key: 'ciudad',        label: 'Ciudad',        fmt: (v,c) => `<strong>${v}</strong>` },
+    { key: 'ciudad',        label: 'Ciudad',        fmt: (v,c) => `<strong>${escCiudad(v)}</strong>` },
     { key: 'prioridad',     label: '★ Prioridad',    fmt: v => v == null
         ? '<span style="opacity:.45" title="No esta en el catalogo nacional">sin catalogo</span>'
         : `<strong style="color:var(--blue)">${v}</strong>` },
@@ -5950,9 +5979,24 @@ async function cargarCiudades() {
     const r = await fetch('/api/importador/ciudades');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
+    // Un 200 con JSON valido pero SIN las claves esperadas —una pagina de error
+    // del proxy inverso, o un cambio futuro del backend— no lanza nada, y con
+    // `|| []` acababa en dos listas vacias indistinguibles de "no hay resultados".
+    // Es el estado mas silencioso de los tres, porque no dispara ni el catch ni
+    // el aviso de sin_clasificar.
+    if (!Array.isArray(d.ciudades)) throw new Error('respuesta inesperada del catalogo');
 
-    todasCiudades = d.ciudades || [];
-    sinClasificar = d.sin_clasificar || [];
+    todasCiudades = d.ciudades;
+    sinClasificar = Array.isArray(d.sin_clasificar) ? d.sin_clasificar : [];
+    if (d.catalogo_cargado === false) {
+      // El catalogo no se pudo leer en el servidor. Sin este aviso, el operador
+      // ve el mismo listado vacio que si simplemente no hubiera casado nada.
+      document.getElementById('sin-clasificar').innerHTML =
+        '<div style="font-size:.75em;color:#a94442;background:#f2dede;border:1px solid #ebccd1;'
+        + 'border-radius:8px;padding:6px 9px;margin-bottom:10px">'
+        + '⚠ El servidor no pudo leer el catalogo de ciudades. Escribe la ciudad a mano.</div>';
+      todasCiudades = [];
+    }
 
     // El rango se fija UNA vez sobre el catalogo completo. Si se calculara en
     // renderChips sobre la lista recibida, al escribir en el filtro la ciudad

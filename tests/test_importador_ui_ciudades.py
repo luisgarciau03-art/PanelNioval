@@ -149,3 +149,27 @@ def _funcion(html: str, nombre: str) -> str:
     k = html.find("\nasync function ", i + 10)
     fines = [x for x in (j, k) if x > 0]
     return html[i:min(fines)] if fines else html[i:]
+
+
+class TestElJsNoSeTragaUnaRespuestaMalformada:
+    """El catch solo salta con fallo de red, status no-2xx o JSON invalido. Un 200
+    con JSON valido pero SIN las claves esperadas —una pagina de error del proxy
+    inverso, o un cambio futuro del backend— no lanzaba nada y acababa en dos
+    listas vacias indistinguibles de "no hay resultados". Es el estado mas
+    silencioso de los tres porque no dispara ni el catch ni el aviso amarillo.
+    """
+
+    def test_valida_la_forma_de_la_respuesta_antes_de_usarla(self, html):
+        fn = _funcion(html, "cargarCiudades")
+        assert "Array.isArray(d.ciudades)" in fn
+        assert "throw" in fn
+
+    def test_ya_no_cae_a_lista_vacia_con_el_operador_or(self, html):
+        fn = _funcion(html, "cargarCiudades")
+        assert "d.ciudades || []" not in fn
+
+    def test_avisa_cuando_el_servidor_no_pudo_leer_el_catalogo(self, html):
+        """Sin esto, "el archivo no carga" y "ninguna ciudad caso" se ven igual
+        desde el navegador. Son dos problemas con dos arreglos distintos."""
+        fn = _funcion(html, "cargarCiudades")
+        assert "catalogo_cargado" in fn

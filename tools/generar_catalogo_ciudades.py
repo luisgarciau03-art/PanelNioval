@@ -24,10 +24,16 @@ import json
 import math
 import pathlib
 import re
+import socket
 import sys
 import unicodedata
 import urllib.request
 import zipfile
+
+# Sin timeout, una descarga que se cuelga a mitad deja el script esperando para
+# siempre y sin un solo mensaje. Son archivos de 15-60 MB desde un servidor
+# publico: 120 s de inactividad es se colgo, no es que vaya lento.
+socket.setdefaulttimeout(120)
 
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
 SALIDA_POR_DEFECTO = RAIZ / "datos" / "ciudades_mx.json"
@@ -205,13 +211,14 @@ def descargar(url: str, destino: pathlib.Path, minimo: int) -> pathlib.Path:
 
 def _filas_denue(ruta: pathlib.Path):
     """DENUE va en latin-1. Leerlo como utf-8 rompe los acentos de municipio."""
-    z = zipfile.ZipFile(ruta)
-    interno = next(n for n in z.namelist() if n.startswith("conjunto_de_datos/"))
-    with z.open(interno) as f:
-        yield from csv.DictReader(io.TextIOWrapper(f, encoding="latin-1", newline=""))
+    with zipfile.ZipFile(ruta) as z:
+        interno = next(n for n in z.namelist() if n.startswith("conjunto_de_datos/"))
+        with z.open(interno) as f:
+            yield from csv.DictReader(io.TextIOWrapper(f, encoding="latin-1", newline=""))
 
 
 def agregar_por_municipio(cache: pathlib.Path) -> dict:
+    avisos = collections.Counter()
     mun = collections.defaultdict(
         lambda: {"ferreterias": 0, "ocupados": 0, "mayoreo": 0,
                  "construccion": 0, "poblacion": 0, "nombre": "", "estado": ""}
@@ -233,14 +240,20 @@ def agregar_por_municipio(cache: pathlib.Path) -> dict:
             d["nombre"] = fila["municipio"]
             d["estado"] = fila["entidad"]
             if campo == "ferreterias":
-                d["ocupados"] += PUNTO_MEDIO_OCUPADOS.get(fila["per_ocu"], 3)
+                estrato = fila["per_ocu"]
+                if estrato not in PUNTO_MEDIO_OCUPADOS:
+                    # Si el DENUE cambia el texto del estrato, todos caerian al
+                    # minimo en silencio y el tamano medio quedaria sesgado sin
+                    # que nadie lo notara hasta comparar contra una corrida vieja.
+                    avisos[f"estrato desconocido: {estrato!r}"] += 1
+                d["ocupados"] += PUNTO_MEDIO_OCUPADOS.get(estrato, 3)
 
     print("Leyendo poblacion del Censo 2020...")
     url, minimo = FUENTES["poblacion"]
     ruta = descargar(url, cache / url.rsplit("/", 1)[-1], minimo)
-    z = zipfile.ZipFile(ruta)
-    interno = next(n for n in z.namelist() if "conjunto_de_datos/" in n and n.endswith(".csv"))
-    with z.open(interno) as f:
+    zp = zipfile.ZipFile(ruta)
+    interno = next(n for n in zp.namelist() if "conjunto_de_datos/" in n and n.endswith(".csv"))
+    with zp, zp.open(interno) as f:
         # El ITER va en utf-8 CON BOM. Sin utf-8-sig la primera columna se llama
         # "﻿ENTIDAD" y el KeyError llega en tiempo de ejecucion.
         for fila in csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig", newline="")):
@@ -251,7 +264,10 @@ def agregar_por_municipio(cache: pathlib.Path) -> dict:
                 try:
                     mun[clave]["poblacion"] = int(fila["POBTOT"])
                 except (ValueError, TypeError):
-                    pass
+                    avisos["POBTOT no parseable"] += 1
+
+    for motivo, n in avisos.most_common():
+        print(f"  AVISO: {n:,} registros con {motivo}")
     return {k: v for k, v in mun.items() if v["nombre"]}
 
 
@@ -461,9 +477,14 @@ def construir_catalogo(municipios: dict, potencial: dict, minimo_ferreterias: in
                 dueno[n] = c
     nombres = {normalizar(c["nombre"]): c["clave_inegi"] for c in catalogo}
     for c in catalogo:
-        c["alias"] = sorted(
-            a for a in c["alias"] if nombres.get(normalizar(a), c["clave_inegi"]) == c["clave_inegi"]
-        )
+        # La pasada de arriba si avisaba y esta no: un alias que pisa el NOMBRE de
+        # otra ciudad se caia sin dejar rastro. Solo se detecta despues si venia
+        # del array viejo; uno de ALIAS_EXTRA desaparecia sin senal ninguna.
+        quitados = [a for a in c["alias"]
+                    if nombres.get(normalizar(a), c["clave_inegi"]) != c["clave_inegi"]]
+        for a in quitados:
+            print(f"  alias '{a}' de {c['nombre']} pisa el nombre de otra ciudad: se quita")
+        c["alias"] = sorted(a for a in c["alias"] if a not in quitados)
 
     # Desempate del ADR: potencial, luego ferreterias, luego clave INEGI. Es
     # determinista: la misma entrada da el mismo orden en cualquier maquina.
