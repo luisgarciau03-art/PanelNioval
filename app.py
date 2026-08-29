@@ -18,6 +18,7 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import os, json, time, io, base64, re, hmac, tempfile, subprocess, requests as req_lib
+import unicodedata  # normalizar nombres de ciudad (Plan 1)
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
@@ -840,10 +841,230 @@ def api_ventas_dashboard():
     })
 
 
-@app.route('/api/prospectos/ciudades')
-def api_ciudades():
-    contactos  = get_data('contactos')
-    respuestas = get_all_respuestas()
+# ══════════════════════════════════════════════════════════════════════════════
+#  CATALOGO DE CIUDADES  (Plan 1 - T1.5)
+# ══════════════════════════════════════════════════════════════════════════════
+# Sustituye al array JS CIUDADES_MX que vivia dentro de IMPORTADOR_HTML y que el
+# navegador fusionaba a mano con /api/prospectos/ciudades. Esa fusion se hace
+# aqui, que es donde puede probarse.
+#
+# Modelo: docs/adr/2026-08-28-modelo-relevancia-ciudades.md
+# Generador del catalogo: tools/generar_catalogo_ciudades.py
+
+CATALOGO_CIUDADES_FILE = os.environ.get(
+    'CATALOGO_CIUDADES_FILE',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'datos', 'ciudades_mx.json'),
+)
+
+# Se lee una vez y se cachea: son ~600 registros que no cambian en caliente.
+# Va en UNA sola variable a proposito. Con dos, publicarlas son dos STORE_GLOBAL
+# separados y un thread podia ver el catalogo ya puesto y el indice todavia en None
+# —gunicorn corre 4 threads y el dashboard y el importador piden a la vez al
+# cargar—, y el segundo se llevaba un AttributeError en indice.get().
+_estado_catalogo = None
+
+# Tasa de interes de referencia cuando la hoja no da para calcularla. No es una
+# constante inventada: en cuanto hay llamadas se sustituye por la tasa real.
+INTERES_REFERENCIA = 0.30
+# Pseudo-observaciones del encogimiento. Con 20, una ciudad de 1 llamada apenas
+# mueve el factor y una de 100 lo mueve casi del todo. Es lo que impide que
+# "1 aprobado de 1 llamada = 100 %" mande al pueblo por delante de Guadalajara.
+LLAMADAS_PARA_CONFIAR = 20
+AJUSTE_MAX_DESEMPENO = 0.25       # +-25 % por desempeno propio
+DESCUENTO_MAX_SATURACION = 0.35   # hasta -35 % por plaza ya cosechada
+
+
+def _normalizar_ciudad(nombre) -> str:
+    """Minusculas, sin acentos, sin puntuacion y sin espacios repetidos.
+
+    Los espacios se colapsan a proposito: "Guadalupe, Zacatecas" deja dos
+    seguidos al quitar la coma y dejaria de casar con "Guadalupe Zacatecas".
+    """
+    s = unicodedata.normalize('NFD', str(nombre or '').lower())
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+    return re.sub(r'\s+', ' ', re.sub(r'[^a-z0-9 ]', ' ', s)).strip()
+
+
+def _cargar_catalogo_ciudades():
+    """Devuelve (catalogo, indice_por_nombre_normalizado).
+
+    Si el archivo falta o esta roto NO se revienta la ruta: se devuelve catalogo
+    vacio y el endpoint responde con lo que haya. El panel sirve para trabajar;
+    quedarse sin ranking degrada, quedarse sin panel no.
+    """
+    global _estado_catalogo
+    if _estado_catalogo is not None:
+        return _estado_catalogo
+    try:
+        with open(CATALOGO_CIUDADES_FILE, encoding='utf-8') as f:
+            catalogo = json.load(f)
+    except (OSError, ValueError) as e:
+        print(f"[catalogo] no se pudo leer {CATALOGO_CIUDADES_FILE}: {e}")
+        catalogo = []
+    indice = {}
+    for c in catalogo:
+        indice.setdefault(_normalizar_ciudad(c['nombre']), c)
+        for a in c.get('alias', []):
+            indice.setdefault(_normalizar_ciudad(a), c)
+    _estado_catalogo = (catalogo, indice)
+    return _estado_catalogo
+
+
+def _factor_desempeno(llamados: int, aprobados: int, interes_referencia: float) -> float:
+    """Cuanto ajusta el historial propio de NIOVAL. Neutro en 1.0.
+
+    Encogido por tamano de muestra: sin llamadas vale exactamente 1.0, o sea que
+    NO se penaliza no haber ido nunca. Ese es el defecto que este plan corrige.
+    """
+    if llamados <= 0:
+        return 1.0
+    tasa = aprobados / llamados
+    confianza = llamados / (llamados + LLAMADAS_PARA_CONFIAR)
+    ref = max(interes_referencia, 0.01)
+    bruto = 1 + AJUSTE_MAX_DESEMPENO * confianza * (tasa - ref) / ref
+    return max(1 - AJUSTE_MAX_DESEMPENO, min(1 + AJUSTE_MAX_DESEMPENO, bruto))
+
+
+def _factor_saturacion(contactos: int, unidades_ferreteras: int) -> float:
+    """Lo ya cosechado deja de ser oportunidad.
+
+    Google Places rinde del orden de 60 resultados por corrida, asi que una plaza
+    ya trabajada devuelve duplicados y seguiria siendo la primera para siempre.
+    Chihuahua tiene 448 contactos en la hoja y 651 ferreterias en el DENUE: dos
+    tercios cosechados. El potencial util es lo que QUEDA por cosechar.
+    """
+    if unidades_ferreteras <= 0:
+        return 1.0
+    return 1 - DESCUENTO_MAX_SATURACION * min(1.0, contactos / unidades_ferreteras)
+
+
+# Limites del factor. Nombrados porque el mismo recorte lo aplican las dos rutas:
+# como literales, cambiar el ADR obligaba a acordarse de tocar los dos sitios.
+FACTOR_MIN = 0.60
+FACTOR_MAX = 1.25
+
+
+def _calcular_factor_nioval(metricas: dict, unidades: int, referencia: float) -> float:
+    """desempeno x saturacion, recortado. UNICO sitio donde se combinan."""
+    bruto = (_factor_desempeno(metricas['llamados'], metricas['aprobados'], referencia)
+             * _factor_saturacion(metricas['total'], unidades))
+    return round(max(FACTOR_MIN, min(FACTOR_MAX, bruto)), 3)
+
+
+def _explicar_ciudad(reg: dict, metricas: dict, saturacion: float) -> str:
+    """Texto ya armado en el servidor, para que la UI no reconstruya el
+    razonamiento y para que cada posicion sea auditable.
+
+    Lleva el CONTEO CRUDO de ferreterias a proposito: el puntaje va en escala
+    logaritmica y comprime, asi que un 86.7 frente a un 89.8 no significa lo que
+    el operador leeria que significa (ADR 4.3).
+    """
+    partes = [f"{reg['indicadores']['unidades_ferreteras']} ferreterias en el DENUE"]
+    if metricas['total']:
+        partes.append(f"{metricas['total']} contactos ya en la hoja")
+    else:
+        partes.append('plaza sin trabajar')
+    if metricas['llamados']:
+        partes.append(f"{metricas['interes_pct']}% de interes en {metricas['llamados']} llamadas")
+    if saturacion < 0.9:
+        cosechada = round((1 - saturacion) / DESCUENTO_MAX_SATURACION * 100)
+        partes.append(f"{cosechada}% ya cosechada")
+    return ' - '.join(partes)
+
+
+@app.route('/api/importador/ciudades')
+def api_importador_ciudades():
+    """Catalogo nacional + metricas de la hoja, ordenado por prioridad.
+
+    Devuelve SOLO agregados por ciudad. Ningun telefono ni nombre de contacto
+    sale de aqui, aunque el origen sea la hoja de clientes.
+    """
+    catalogo, indice = _cargar_catalogo_ciudades()
+    metricas_hoja = _agregar_por_ciudad(get_data('contactos'), get_all_respuestas())
+
+    # Tasa de referencia calculada de los propios datos, no una constante fija.
+    total_llamados = sum(m['llamados'] for m in metricas_hoja)
+    total_aprobados = sum(m['aprobados'] for m in metricas_hoja)
+    referencia = (total_aprobados / total_llamados) if total_llamados else INTERES_REFERENCIA
+
+    por_clave, sin_clasificar = {}, []
+    for m in metricas_hoja:
+        # 'Sin ciudad' NO se salta: es un contacto real con la celda CIUDAD vacia,
+        # y saltarlo lo hacia desaparecer de las dos listas a la vez. Cae por el
+        # mismo camino que cualquier otro valor que no case, que es donde el
+        # operador puede verlo.
+        reg = None if m['ciudad'] == 'Sin ciudad' else indice.get(_normalizar_ciudad(m['ciudad']))
+        if reg is None:
+            # Nada se descarta en silencio: la hoja trae 116 valores distintos y
+            # algunos son estados ("Chiapas", "Guerrero"), no ciudades.
+            sin_clasificar.append({
+                'ciudad': m['ciudad'], 'total': m['total'],
+                'llamados': m['llamados'], 'aprobados': m['aprobados'],
+                'interes_pct': m['interes_pct'],
+            })
+            continue
+        acum = por_clave.setdefault(
+            reg['clave_inegi'],
+            {'total': 0, 'llamados': 0, 'aprobados': 0, 'interes_pct': 0},
+        )
+        for campo in ('total', 'llamados', 'aprobados'):
+            acum[campo] += m[campo]
+
+    for acum in por_clave.values():
+        acum['interes_pct'] = (
+            round(acum['aprobados'] / acum['llamados'] * 100, 1) if acum['llamados'] else 0
+        )
+
+    vacio = {'total': 0, 'llamados': 0, 'aprobados': 0, 'interes_pct': 0}
+    ciudades = []
+    for reg in catalogo:
+        m = por_clave.get(reg['clave_inegi'], vacio)
+        unidades = reg['indicadores']['unidades_ferreteras']
+        saturacion = _factor_saturacion(m['total'], unidades)
+        factor = _calcular_factor_nioval(m, unidades, referencia)
+        ciudades.append({
+            'ciudad': reg['nombre'],
+            'estado': reg['estado'],
+            'region': reg['region'],
+            'potencial_mercado': reg['potencial_mercado'],
+            'desempeno_nioval': factor,
+            'prioridad': round(reg['potencial_mercado'] * factor, 1),
+            'unidades_ferreteras': unidades,
+            'explicacion': _explicar_ciudad(reg, m, saturacion),
+            'total': m['total'],
+            'llamados': m['llamados'],
+            'aprobados': m['aprobados'],
+            'interes_pct': m['interes_pct'],
+        })
+
+    # Desempate del ADR: prioridad, luego ferreterias, luego nombre. Determinista:
+    # dos peticiones sobre los mismos datos devuelven el mismo orden.
+    ciudades.sort(key=lambda c: (-c['prioridad'], -c['unidades_ferreteras'], c['ciudad']))
+    sin_clasificar.sort(key=lambda c: -c['total'])
+
+    conteo = Counter(c['region'] for c in ciudades)
+    regiones = sorted(
+        ({'region': r, 'total': n} for r, n in conteo.items()),
+        key=lambda x: -x['total'],
+    )
+    return jsonify({
+        'ciudades': ciudades,
+        'sin_clasificar': sin_clasificar,
+        'regiones': regiones,
+        # Sin esto, "el archivo del catalogo no carga" y "ninguna ciudad de la hoja
+        # caso" se ven identicos desde el navegador: lista vacia y todo en
+        # sin_clasificar. Son dos problemas distintos con dos arreglos distintos.
+        'catalogo_cargado': bool(catalogo),
+    })
+
+def _agregar_por_ciudad(contactos: list, respuestas: list) -> list:
+    """Agrega contactos y respuestas por ciudad. Devuelve una lista de dicts.
+
+    Extraida de api_ciudades para que /api/importador/ciudades use exactamente
+    la misma cuenta. Dos agregaciones paralelas sobre la misma hoja se separan
+    en cuanto alguien toque una: el importador diria 37 contactos donde el
+    dashboard dice 38, y nadie sabria cual de las dos miente.
+    """
 
     # Agrupar TODAS las respuestas por tienda (puede haber varias por contacto)
     resp_por_tienda: dict = defaultdict(list)
@@ -908,6 +1129,19 @@ def api_ciudades():
         interes = round(m['aprobados'] / m['llamados'] * 100, 1) if m['llamados'] > 0 else 0
         result.append({'ciudad': ciudad, **m, 'interes_pct': interes})
 
+    return result
+
+
+@app.route('/api/prospectos/ciudades')
+def api_ciudades():
+    result = _agregar_por_ciudad(get_data('contactos'), get_all_respuestas())
+
+    # OBSOLETO desde 2026-08-28 (Plan 1, T1.6). Retirar cuando el dashboard deje
+    # de leerlo, no antes del 2026-12-01. Sus TRES terminos son endogenos —salen
+    # del historial propio de NIOVAL—, asi que una ciudad donde nunca se trabajo
+    # puntua 0 haga lo que haga el mercado. Se conserva porque el dashboard
+    # ordenaba por el y cambiarle el significado sin avisar rompe la lectura del
+    # owner. Lo que hay que mirar ahora es `prioridad`.
     max_total = max((r['total'] for r in result), default=1)
     for r in result:
         r['relevancia'] = round(
@@ -916,7 +1150,36 @@ def api_ciudades():
             min(r['llamados'] * 2, 20), 1
         )
 
-    result.sort(key=lambda x: x['relevancia'], reverse=True)
+    # Modelo de dos factores: docs/adr/2026-08-28-modelo-relevancia-ciudades.md
+    _, indice = _cargar_catalogo_ciudades()
+    total_llamados = sum(r['llamados'] for r in result)
+    total_aprobados = sum(r['aprobados'] for r in result)
+    referencia = (total_aprobados / total_llamados) if total_llamados else INTERES_REFERENCIA
+
+    for r in result:
+        reg = indice.get(_normalizar_ciudad(r['ciudad']))
+        if reg is None:
+            # 'Sin ciudad' y los valores sucios de la hoja no tienen potencial que
+            # medir. Se dice que no hay en vez de inventar un cero: un cero se lee
+            # como "mercado nulo", que es una afirmacion, no una ausencia de dato.
+            r['potencial_mercado'] = None
+            r['desempeno_nioval'] = None
+            r['prioridad'] = None
+            continue
+        unidades = reg['indicadores']['unidades_ferreteras']
+        factor = _calcular_factor_nioval(r, unidades, referencia)
+        r['potencial_mercado'] = reg['potencial_mercado']
+        r['desempeno_nioval'] = factor
+        r['prioridad'] = round(reg['potencial_mercado'] * factor, 1)
+
+    # Las ciudades sin catalogo van al final en vez de mezclarse en la mitad de la
+    # tabla con una prioridad inventada. El desempate replica el del ADR.
+    result.sort(key=lambda x: (
+        x['prioridad'] is None,
+        -(x['prioridad'] or 0),
+        -x['relevancia'],
+        x['ciudad'],
+    ))
     return jsonify(result)
 
 
@@ -2195,8 +2458,18 @@ async function loadPendientes() {
 }
 
 // ─── CIUDADES ───────────────────────────────────────────────────────────────
+// El nombre de ciudad viene de la columna CIUDAD de LISTA DE CONTACTOS, que
+// teclea un operador sin ninguna validacion, y esta tabla lo mete en innerHTML.
+// Una ciudad llamada <img src=x onerror=...> ejecutaba en el navegador de
+// cualquiera que abriera la pestana. El importador ya lo tenia cerrado en sus
+// chips; esta tabla usa otra funcion de render y se habia quedado fuera.
+function escCiudad(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 let ciudadesData = [];
-let ciudadesSortCol = 'relevancia';
+let ciudadesSortCol = 'prioridad';   // antes 'relevancia', 100 % historial propio (Plan 1)
 let ciudadesSortAsc = false;
 
 async function loadCiudades() {
@@ -2213,6 +2486,11 @@ function filterCiudades() {
 function getSortedCiudades(data) {
   const d = (data || ciudadesData).slice();
   d.sort((a, b) => {
+    // Las ciudades fuera del catalogo traen null en los campos del Plan 1.
+    // Con `?? 0` se colaban en mitad de la tabla como si valieran cero, que es
+    // una afirmacion; van al final, que es lo que "no hay dato" significa.
+    const na = a[ciudadesSortCol] == null, nb = b[ciudadesSortCol] == null;
+    if (na !== nb) return na ? 1 : -1;
     const va = a[ciudadesSortCol] ?? 0;
     const vb = b[ciudadesSortCol] ?? 0;
     return ciudadesSortAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
@@ -2236,7 +2514,12 @@ function renderCiudades(data) {
   const maxAprob = Math.max(...data.map(c => c.aprobados), 1);
 
   const cols = [
-    { key: 'ciudad',        label: 'Ciudad',        fmt: (v,c) => `<strong>${v}</strong>` },
+    { key: 'ciudad',        label: 'Ciudad',        fmt: (v,c) => `<strong>${escCiudad(v)}</strong>` },
+    { key: 'prioridad',     label: '★ Prioridad',    fmt: v => v == null
+        ? '<span style="opacity:.45" title="No esta en el catalogo nacional">sin catalogo</span>'
+        : `<strong style="color:var(--blue)">${v}</strong>` },
+    { key: 'potencial_mercado', label: 'Mercado',    fmt: v => v == null ? '—' : v },
+    { key: 'desempeno_nioval',  label: 'Ajuste',     fmt: v => v == null ? '—' : `x${v}` },
     { key: 'total',         label: 'En Lista',       fmt: v => v },
     { key: 'llamados',      label: 'Llamados',       fmt: v => v },
     { key: 'respondio',     label: '📞 Respondió',   fmt: v => v || 0 },
@@ -5610,11 +5893,18 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#003399
     <!-- CIUDADES -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;margin-bottom:8px">
       <div style="font-size:.78em;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.8px">
-        Ciudades <span id="ciudades-count" style="color:var(--blue)"></span> — <span style="color:var(--green)">ordenadas por relevancia</span>
+        Ciudades <span id="ciudades-count" style="color:var(--blue)"></span> — <span style="color:var(--green)">ordenadas por prioridad</span>
       </div>
-      <input type="text" id="ciudad-filter" placeholder="🔍 Filtrar..." oninput="filtrarCiudades()"
-        style="padding:5px 10px;border:1px solid #dde6ff;border-radius:8px;font-size:.8em;outline:none;width:140px">
+      <div style="display:flex;gap:6px">
+        <select id="region-filter" onchange="filtrarCiudades()"
+          style="padding:5px 8px;border:1px solid #dde6ff;border-radius:8px;font-size:.8em;outline:none;max-width:190px">
+          <option value="">Todas</option>
+        </select>
+        <input type="text" id="ciudad-filter" placeholder="🔍 Filtrar..." oninput="filtrarCiudades()"
+          style="padding:5px 10px;border:1px solid #dde6ff;border-radius:8px;font-size:.8em;outline:none;width:140px">
+      </div>
     </div>
+    <div id="sin-clasificar"></div>
     <div id="ciudades-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;max-height:220px;overflow-y:auto;padding:4px 2px">
       <div style="color:#aaa;font-size:.82em;padding:6px">Cargando ciudades...</div>
     </div>
@@ -5675,116 +5965,90 @@ document.getElementById('cats-list').innerHTML = CATS.map((c,i) =>
   `<div class="cat-badge" id="cat-${i}">${c}</div>`
 ).join('');
 
-// Lista completa de ciudades de México (200+)
-const CIUDADES_MX = [
-  // Zona Metropolitana / Grandes ciudades
-  'Ciudad de México','Guadalajara','Monterrey','Puebla','Toluca',
-  'Tijuana','Juárez','León','Zapopan','Nezahualcóyotl',
-  'Chihuahua','Naucalpan','Ecatepec','Mérida','Querétaro',
-  'San Luis Potosí','Aguascalientes','Mexicali','Hermosillo','Saltillo',
-  'Morelia','Torreón','Culiacán','Veracruz','Acapulco',
-  'Cancún','Tampico','Reynosa','San Nicolás de los Garza','Durango',
-  'Tlalnepantla','Chimalhuacán','Oaxaca','Tuxtla Gutiérrez','Irapuato',
-  'Ciudad López Mateos','Celaya','Tultitlán','Mazatlán','Xalapa',
-  'Nuevo Laredo','Ensenada','Matamoros','Monclova','Tepic',
-  'Ciudad Obregón','Los Mochis','Villahermosa','Cuernavaca','Colima',
-  'Pachuca','Chilpancingo','Tlaxcala','Campeche','La Paz',
-  // Estados y municipios importantes
-  'Apodaca','San Pedro Garza García','Guadalupe','Escobedo',
-  'Zapotlanejo','Tlaquepaque','Tonalá','El Salto','Tlajomulco',
-  'Soledad de Graciano Sánchez','Matehuala','Rioverde',
-  'Fresnillo','Zacatecas','Jerez','Guadalupe Zacatecas',
-  'Tepic','Santiago','Bahía de Banderas','Puerto Vallarta',
-  'Mazatlán','Culiacán','Los Mochis','Guasave','Guamúchil',
-  'Navojoa','Cajeme','Nogales','San Luis Río Colorado','Caborca',
-  'Delicias','Parral','Cuauhtémoc Chih','Guachochi',
-  'Monclova','Piedras Negras','Acuña','Sabinas','Múzquiz',
-  'Linares','Cadereyta','Allende NL','Galeana',
-  'Altamira','Ciudad Madero','Río Bravo','Valle Hermoso',
-  'Mante','Victoria','Tula Tamps','Jaumave',
-  'Tuxpan','Poza Rica','Coatzacoalcos','Minatitlán','Córdoba',
-  'Orizaba','Martínez de la Torre','Papantla','Tantoyuca',
-  'Cosamaloapan','San Andrés Tuxtla','Acayucan',
-  'Tehuacán','Atlixco','Teziutlán','Huauchinango','Cholula',
-  'San Martín Texmelucan','Izúcar de Matamoros','Tehuacan',
-  'Zamora','Uruapan','Lázaro Cárdenas','Apatzingán','Zitácuaro',
-  'Pátzcuaro','Sahuayo','La Piedad','Jacona','Jiquilpan',
-  'Colima','Manzanillo','Tecomán','Villa de Álvarez',
-  'Guadalajara','Zapopan','Tlaquepaque','Tonalá','Tlajomulco',
-  'Lagos de Moreno','Tepatitlán','Ocotlán','Ameca','Autlán',
-  'Puerto Vallarta','Chapala','Sayula','Ciudad Guzmán',
-  'Guanajuato','Irapuato','Celaya','León','Salamanca',
-  'Silao','Pénjamo','Dolores Hidalgo','San Miguel de Allende',
-  'Acámbaro','Moroleón','Uriangato','Cortazar','Valle de Santiago',
-  'Pachuca','Tulancingo','Tula de Allende','Ixmiquilpan',
-  'Actopan','Tizayuca','Cuautitlán Izcalli','Coacalco','Ecatepec',
-  'Tlalnepantla','Naucalpan','Atizapán','Nicolás Romero','Cuautitlán',
-  'Texcoco','Chalco','Valle de Chalco','Amecameca','Tultepec',
-  'Metepec','Zinacantepec','Lerma','Santiago Tianguistenco',
-  'Cuernavaca','Jiutepec','Temixco','Cuautla','Jojutla','Zacatepec',
-  'Oaxaca','Juchitán','Salina Cruz','Tehuantepec','Tuxtepec',
-  'Puerto Escondido','Huatulco','Miahuatlán','Ejutla',
-  'Chilpancingo','Acapulco','Iguala','Taxco','Zihuatanejo',
-  'Tlapa','Ometepec','Ayutla','Cruz Grande',
-  'Tapachula','San Cristóbal de las Casas','Comitán','Tonalá Chis',
-  'Pichucalco','Ocosingo','Palenque','Villaflores',
-  'Villahermosa','Cárdenas','Macuspana','Comalcalco',
-  'Campeche','Ciudad del Carmen','Calkiní','Hopelchén',
-  'Mérida','Cancún','Valladolid','Tizimín','Ticul','Izamal',
-  'Chetumal','Playa del Carmen','Cozumel','Felipe Carrillo Puerto',
-  'La Paz BCS','Cabo San Lucas','San José del Cabo','Loreto',
-  'Ensenada','Tijuana','Mexicali','Tecate','Rosarito',
-  'Hermosillo','Ciudad Obregón','Navojoa','Guaymas','Nogales',
-  'Los Mochis','Culiacán','Mazatlán','Guasave','Mochis',
-  'Durango','Gómez Palacio','Lerdo','Victoria de Durango',
-  'Zacatecas','Fresnillo','Jerez','Loreto Zac','Pinos',
-  'Aguascalientes','Calvillo','Rincón de Romos','San Francisco de los Romo',
-  'Tepic','Xalisco','Ixtlán','Santiago Ixc',
-  'San Luis Potosí','Matehuala','Ciudad Valles','Rioverde','Tamazunchale',
-  'Saltillo','Torreón','Monclova','Piedras Negras','Acuña',
-  'Monterrey','Guadalupe NL','Apodaca','San Nicolás','Escobedo','Juárez NL',
-];
-
+// Aqui vivia el array estatico: 293 entradas escritas a mano, 50 nombres
+// duplicados y 9 con la abreviatura del estado pegada, que viajaba literal a
+// Google Places ("Ferreterias en Santiago Ixc"). Lo sustituye el catalogo
+// nacional de datos/ciudades_mx.json, que sirve /api/importador/ciudades ya
+// ordenado y con la explicacion de cada posicion armada en el servidor.
 let todasCiudades = [];
+let sinClasificar = [];
 
 async function cargarCiudades() {
+  const cont = document.getElementById('ciudades-chips');
   try {
-    const r    = await fetch('/api/prospectos/ciudades');
-    const panelData = await r.json();
+    const r = await fetch('/api/importador/ciudades');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    // Un 200 con JSON valido pero SIN las claves esperadas —una pagina de error
+    // del proxy inverso, o un cambio futuro del backend— no lanza nada, y con
+    // `|| []` acababa en dos listas vacias indistinguibles de "no hay resultados".
+    // Es el estado mas silencioso de los tres, porque no dispara ni el catch ni
+    // el aviso de sin_clasificar.
+    if (!Array.isArray(d.ciudades)) throw new Error('respuesta inesperada del catalogo');
 
-    // Ciudades del panel con datos reales (con relevancia calculada)
-    const conDatos = panelData.filter(c => c.ciudad && c.ciudad !== 'Sin ciudad');
-    const enPanel  = new Set(conDatos.map(c => c.ciudad.toLowerCase()));
+    todasCiudades = d.ciudades;
+    sinClasificar = Array.isArray(d.sin_clasificar) ? d.sin_clasificar : [];
+    if (d.catalogo_cargado === false) {
+      // El catalogo no se pudo leer en el servidor. Sin este aviso, el operador
+      // ve el mismo listado vacio que si simplemente no hubiera casado nada.
+      document.getElementById('sin-clasificar').innerHTML =
+        '<div style="font-size:.75em;color:#a94442;background:#f2dede;border:1px solid #ebccd1;'
+        + 'border-radius:8px;padding:6px 9px;margin-bottom:10px">'
+        + '⚠ El servidor no pudo leer el catalogo de ciudades. Escribe la ciudad a mano.</div>';
+      todasCiudades = [];
+    }
 
-    // Ciudades de la lista estática que NO están en el panel
-    const unicasMX = [...new Set(CIUDADES_MX)];
-    const sinDatos = unicasMX
-      .filter(c => !enPanel.has(c.toLowerCase()))
-      .map(c => ({ ciudad: c, total: 0, llamados: 0, aprobados: 0, interes_pct: 0, relevancia: 0 }));
-
-    // Fusionar: panel (con datos) + estáticas (sin datos)
-    todasCiudades = [...conDatos, ...sinDatos];
+    // El rango se fija UNA vez sobre el catalogo completo. Si se calculara en
+    // renderChips sobre la lista recibida, al escribir en el filtro la ciudad
+    // numero 47 apareceria con medalla de oro.
     todasCiudades.forEach((c, i) => { c.rank = i + 1; });
 
+    pintarRegiones(d.regiones || []);
     document.getElementById('ciudades-count').textContent = `(${todasCiudades.length})`;
     renderChips(todasCiudades);
-  } catch(e) {
-    // Fallback: solo estáticas
-    todasCiudades = [...new Set(CIUDADES_MX)].map((c, i) => ({
-      ciudad: c, total: 0, llamados: 0, aprobados: 0, interes_pct: 0, relevancia: 0,
-      rank: i + 1
-    }));
-    document.getElementById('ciudades-count').textContent = `(${todasCiudades.length})`;
-    renderChips(todasCiudades);
+    pintarSinClasificar();
+  } catch (e) {
+    // Sin catalogo NO se inventa una lista: se dice que no se pudo cargar y se
+    // deja el campo de texto, que sigue aceptando cualquier ciudad. Un fallback
+    // silencioso a una lista vieja seria peor que no tener lista.
+    todasCiudades = [];
+    document.getElementById('ciudades-count').textContent = '';
+    cont.innerHTML = '<div style="color:#c0392b;font-size:.82em;padding:6px">'
+      + 'No se pudo cargar el catalogo de ciudades. Escribe la ciudad a mano.</div>';
   }
 }
 
-// El nombre de la ciudad viene de LISTA DE CONTACTOS, escrito a mano, y antes
-// de eso lo tecleo un operador en el campo de texto sin validacion. Se
-// interpolaba crudo en DOS sitios de la misma linea: dentro del atributo
-// onclick y como texto del chip. Una ciudad llamada O'Brien rompia el handler
-// y dejaba el chip muerto; una con <img onerror=...> ejecutaba.
-// El dashboard ya cerraba este mismo agujero (app.py:2064).
+function pintarRegiones(regiones) {
+  const sel = document.getElementById('region-filter');
+  const total = regiones.reduce((s, r) => s + r.total, 0);
+  // El conteo va en cada opcion a proposito: sin el, una region vacia y un
+  // filtro roto se ven exactamente igual.
+  sel.innerHTML = `<option value="">Todas (${total})</option>`
+    + regiones.map(r =>
+        `<option value="${escaparHtml(r.region)}">${escaparHtml(r.region)} (${r.total})</option>`
+      ).join('');
+}
+
+function pintarSinClasificar() {
+  const caja = document.getElementById('sin-clasificar');
+  if (!sinClasificar.length) { caja.innerHTML = ''; return; }
+  const n = sinClasificar.reduce((s, c) => s + c.total, 0);
+  const nombres = sinClasificar.slice(0, 12).map(c => escaparHtml(c.ciudad)).join(', ');
+  const resto = sinClasificar.length > 12 ? ` y ${sinClasificar.length - 12} mas` : '';
+  // Visible a proposito: son contactos reales de la hoja cuya ciudad no casa con
+  // ninguna del catalogo. Esconderlos los haria desaparecer del ranking sin que
+  // nadie se entere.
+  caja.innerHTML = `<div style="font-size:.75em;color:#8a6d3b;background:#fcf8e3;`
+    + `border:1px solid #faebcc;border-radius:8px;padding:6px 9px;margin-bottom:10px">`
+    + `⚠ ${n} contactos en ${sinClasificar.length} ciudades que no estan en el catalogo: `
+    + `${nombres}${resto}.</div>`;
+}
+
+// El nombre de la ciudad viene de LISTA DE CONTACTOS, escrito a mano, y antes de
+// eso lo tecleo un operador en el campo de texto sin validacion. Se interpolaba
+// crudo en DOS sitios de la misma linea: dentro del atributo onclick y como
+// texto del chip. Una ciudad llamada O'Brien rompia el handler y dejaba el chip
+// muerto; una con <img onerror=...> ejecutaba.
 function escaparHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -5796,24 +6060,24 @@ function renderChips(lista) {
   if (!lista.length) { cont.innerHTML = '<div style="color:#aaa;font-size:.82em">Sin resultados</div>'; return; }
 
   cont.innerHTML = lista.map((c) => {
-    // El rango es el del catalogo completo, no el de la lista filtrada: antes
-    // se calculaba sobre el indice recibido, asi que al escribir en el filtro
-    // la ciudad numero 47 aparecia con medalla de oro.
     const rank   = (c.rank != null) ? c.rank : 0;
     const medal  = rank === 1 ? '🥇 ' : rank === 2 ? '🥈 ' : rank === 3 ? '🥉 ' : `${rank}. `;
     const isTop  = rank >= 1 && rank <= 3;
-    const hasInt = c.interes_pct > 0;
-    const badge  = hasInt
+    // El conteo CRUDO de ferreterias, no el puntaje. El puntaje va en escala
+    // logaritmica y comprime: un 86.7 frente a un 89.8 no significa lo que el
+    // operador leeria que significa. El conteo si es interpretable y auditable.
+    const badge  = c.interes_pct > 0
       ? `<span style="background:rgba(0,204,71,.2);color:#155724;padding:1px 5px;border-radius:8px;font-size:.85em">${c.interes_pct}%</span>`
-      : `<span style="opacity:.55;font-size:.85em">${c.total}</span>`;
+      : `<span style="opacity:.55;font-size:.85em">${c.unidades_ferreteras}</span>`;
     const nombre = escaparHtml(c.ciudad);
-    return `<span class="chip ${isTop?'top':''}" data-ciudad="${nombre}">${medal}${nombre} ${badge}</span>`;
+    const porque = escaparHtml(c.explicacion || '');
+    return `<span class="chip ${isTop?'top':''}" data-ciudad="${nombre}" title="${porque}">${medal}${nombre} ${badge}</span>`;
   }).join('');
 }
 
-// Listener delegado: el nombre viaja por dataset, nunca dentro de un atributo
-// de codigo. Se registra una sola vez sobre el contenedor, asi que sobrevive a
-// cada re-render de los chips.
+// Listener delegado: el nombre viaja por dataset, nunca dentro de un atributo de
+// codigo. Se registra una sola vez sobre el contenedor, asi que sobrevive a cada
+// re-render de los chips.
 document.getElementById('ciudades-chips').addEventListener('click', (ev) => {
   const chip = ev.target.closest('.chip');
   if (!chip) return;
@@ -5824,7 +6088,13 @@ document.getElementById('ciudades-chips').addEventListener('click', (ev) => {
 
 function filtrarCiudades() {
   const q = document.getElementById('ciudad-filter').value.toLowerCase().trim();
-  renderChips(q ? todasCiudades.filter(c => c.ciudad.toLowerCase().includes(q)) : todasCiudades);
+  const region = document.getElementById('region-filter').value;
+  // Los dos filtros se COMBINAN. Aplicar solo el ultimo que se toco haria que
+  // escribir en el buscador ignorara la region elegida, y al reves.
+  let lista = todasCiudades;
+  if (region) lista = lista.filter(c => c.region === region);
+  if (q)      lista = lista.filter(c => c.ciudad.toLowerCase().includes(q));
+  renderChips(lista);
 }
 
 cargarCiudades();
