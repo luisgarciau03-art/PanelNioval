@@ -376,6 +376,24 @@ PLACES_CACHE_FILE=
 
 ---
 
+## 7.2 DECISIONES RESUELTAS POR EL OWNER (2026-08-28)
+
+Surgieron al ejecutar los planes 0 y 2. Todas contestadas el 2026-08-28.
+
+| # | Anclada a | Decisión | Qué implica |
+|---|---|---|---|
+| **E1** | Plan 0 · T0.2 | **A) El barrido pasa a `--estricto` tras 2-3 semanas sin falsos positivos**, no antes | Hoy **avisa y no bloquea**. Revisar el **2026-09-18**: si el ruido acumulado sigue siendo el de fixtures y commits de teléfonos, añadir `--estricto` al paso `Barrer las lineas anadidas` de `tests.yml`. **Antes de activarlo hay que endurecer `barrido-ok`**: con el job bloqueando, esa marca pasa de silenciar un aviso a saltarse un gate (señalado por `security-reviewer`, MEDIUM). Ya exige motivo escrito; faltaría restringirla a `tests/` o pedir segunda aprobación |
+| **E2** | Plan 0 · T0.3 | **A) La cobertura se reporta y no bloquea** | Medida: **69 %** global, `app.py` **52 %**, `tools/barrer_secretos.py` 98 %. Se descartó B (gate duro al 69 % con trinquete) porque congelaría `app.py` justo cuando el **Plan 4 · T4.3** va a mover 5,067 líneas de HTML fuera: el porcentaje va a saltar por reestructuración, no por tests nuevos, y un trinquete lo interpretaría como mérito. Reconsiderar **después** del Plan 4 |
+| **E3** | Plan 2 · T2.7 | **A) El Plan 2 cierra con el −5 % de ciudad nueva** | No se abre plan para atacar los 80 Details de una ciudad nueva: **ese gasto compra prospectos**, y recortarlo sería recortar producto. El importe en pesos se calcula aplicando la tarifa sobre los conteos ya medidos cuando el owner traiga el gate 1 |
+| **E4** | Plan 1 | **A) El Plan 1 arranca en sesión nueva** | Son 10 tareas. Mensaje de arranque listo en [`2026-08-28-handoff-plan1.md`](2026-08-28-handoff-plan1.md) |
+
+Las cinco decisiones **D1–D5** del §8 siguen abiertas y los planes siguen asumiendo su
+opción A, salvo **D2** y **D4**, que quedaron resueltas por los hechos: el Plan 0 se ejecutó
+primero (D4·A) y el Plan 2 cerró evaluando CE6 en llamadas (D2·A).
+
+---
+
+
 ## 8. DECISIONES PENDIENTES
 
 Cinco. Todas cerradas, ancladas a una tarea, con opción recomendada e impacto declarado.

@@ -44,7 +44,7 @@ Panel web interno de NIOVAL (distribuidora mayorista de ferretería/plomería) p
 
 ## Planes activos
 
-**Tanda 2026-08-27, validada y ampliada el 2026-08-28** (6 planes, 53 tareas, **17 hechas**).
+**Tanda 2026-08-27, validada y ampliada el 2026-08-28** (6 planes, 53 tareas, **23 hechas**).
 Índice: `docs/superpowers/plans/2026-08-27-indice-tanda.md`.
 ⚠️ **Empieza por** `docs/superpowers/plans/2026-08-28-validacion-tanda.md`: los anclajes
 `archivo:línea` de los planes originales quedaron desplazados hasta 1,000 líneas cuando
@@ -56,9 +56,9 @@ Orden de ejecución **0 → 2 → 1 → 4 → 5** (el Plan 3 está cerrado, PR #
 
 | Plan | Estado | Qué resuelve |
 |---|---|---|
-| 0 — Integración continua | 0/4 | No hay CI: los 357 tests solo corren si alguien se acuerda |
-| 2 — Gasto de Google Places | **7/9** | `perf/gasto-places-importador`, PR #38 en borrador |
-| 1 — Relevancia de ciudades | 0/10 | El ranking mide el historial de NIOVAL, no el mercado |
+| 0 — Integración continua | **4/4 ✅** | CI en cada PR: suite + barrido de secretos. PR #40 `c10d063` |
+| 2 — Gasto de Google Places | **9/9 ✅** | Places optimizado, medidor y tope. PR #38 `4e06e64` |
+| 1 — Relevancia de ciudades | 0/10 | **SIGUIENTE** — arranque en `docs/superpowers/plans/2026-08-28-handoff-plan1.md`. El ranking mide el historial de NIOVAL, no el mercado |
 | 4 — Rediseño del panel | 0/12 | Movimiento, presentación y estados de carga en las 3 superficies |
 | 5 — Endurecimiento | 0/8 | Rate limiting, escape de fórmulas, zona horaria, healthcheck |
 
