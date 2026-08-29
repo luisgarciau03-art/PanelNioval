@@ -29,3 +29,7 @@ importador_estado.json.*.tmp
 # alguien apunta PLACES_CACHE_FILE aqui dentro.
 places_detalles.json
 places_detalles.json.*.tmp
+# Artefactos de medicion de cobertura (pytest-cov). No se versionan.
+.coverage
+.coverage.*
+htmlcov/

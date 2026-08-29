@@ -124,6 +124,56 @@ python tools/inspeccionar_contactos.py   # confirma que la columna T está libre
 | Panel 401 en todo | `PANEL_DASHBOARD_TOKEN` activo | Acceder con `?token=<valor>` una vez (queda en la sesión) |
 | Envíos duplicados | Dos corridas del worker solapadas | El lock lo previene; no correr 2 instancias manuales a la vez |
 
+## Cuando el check de CI sale en rojo (desde 2026-08-28)
+
+`.github/workflows/tests.yml` corre en cada PR contra `main` y en cada push a `main`.
+Son dos jobs independientes y **fallan por motivos distintos**.
+
+### Job "Suite de pytest"
+
+Es el que bloquea. Si sale rojo, hay tests en rojo.
+
+1. Abre el resumen del PR: la linea con `N passed` / `N failed` esta ahi, no hace falta
+   entrar al log. Si en vez del numero dice *"la suite no llego a imprimir resumen"*, es
+   que pytest reventó antes de terminar — normalmente un error de coleccion, y entonces
+   si hay que abrir el paso "Correr la suite".
+2. Reproduce en local con **el mismo comando**: `python -m pytest tests/` — **sin `-q`**.
+   `pytest.ini` ya trae `addopts = -q`; el segundo lo vuelve `-qq` y **suprime la linea
+   del resumen**: verias los puntos y `exit 0`, nunca el numero.
+3. El baseline **es por rama**. En `main` son 345 passed; la rama del Plan 2 da 357
+   passed y 1 skipped porque trae 43 tests suyos. Compara contra la rama base del PR,
+   no contra un numero absoluto.
+4. Si falla **solo en CI y no en local**, mira primero estas dos: el runner es Linux y la
+   PC del owner es Windows (separadores de ruta, mayusculas en nombres de archivo), y el
+   runner no tiene **ninguna** variable de entorno de Google ni de Telegram. Si un test
+   necesita un secreto, el test esta mal aislado: se arregla el test, **no** se le dan
+   secretos al workflow.
+
+### Job "Barrido de secretos sobre el diff"
+
+**Avisa, no bloquea** en esta primera version: no puede poner el check en rojo por
+encontrar algo. Si sale rojo es porque el script **se rompio**, y eso si hay que mirarlo
+— un barrido que se traga su error devuelve cero hallazgos y parece un exito.
+
+Si el resumen lista hallazgos:
+
+| Lo que ves | Que significa | Que hacer |
+|---|---|---|
+| `[telegram]`, `[google_api_key]`, `[meta]`, `[openai]`, `[clave_privada]`, `[secreto_del_panel]` | Algo con forma de credencial entro en el diff | **Rotarlo en el proveedor.** Quitarlo del codigo NO lo rota: sigue vivo en el historial de git y sigue siendo valido |
+| `[telefono_mx]` | Un telefono de 10 digitos sin enmascarar | Enmascarar a `+52...XXXX`. Es la regla del proyecto para logs y commits |
+| `[hex_largo]` | Hexadecimal de 32-64 caracteres que no es un SHA de git | Comprobar si es una clave. Los SHA de 40 y 64 se excluyen a proposito |
+| `Barrido sin material: 0 lineas anadidas` | **No es un diff limpio.** El SHA base salio mal y no se examino nada | Revisar el paso "Barrer las lineas anadidas" |
+
+Si es un falso positivo —una fixture de test, un ejemplo en documentacion— se exceptua la
+linea con un comentario `barrido-ok: <motivo>`. **El motivo es obligatorio**: sin el, la
+marca no silencia nada. Se eligio una marca en linea y no excluir `tests/` entera porque
+una carpeta excluida esconde para siempre lo que caiga dentro, mientras que cada uso de la
+marca aparece en el diff y un revisor lo ve.
+
+⚠️ **Gate del owner pendiente:** sin la proteccion de rama en `main` (Settings → Branches →
+Require status checks), el check **informa pero no impide el merge**. Requiere permisos de
+administrador del repositorio.
+
 ## Importador de prospectos (desde 2026-08-27)
 
 ### Qué significa cada número
