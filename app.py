@@ -18,6 +18,7 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import os, json, time, io, base64, re, hmac, tempfile, subprocess, requests as req_lib
+import unicodedata  # normalizar nombres de ciudad (Plan 1)
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
@@ -840,10 +841,14 @@ def api_ventas_dashboard():
     })
 
 
-@app.route('/api/prospectos/ciudades')
-def api_ciudades():
-    contactos  = get_data('contactos')
-    respuestas = get_all_respuestas()
+def _agregar_por_ciudad(contactos, respuestas):
+    """Agrega contactos y respuestas por ciudad. Devuelve una lista de dicts.
+
+    Extraida de api_ciudades para que /api/importador/ciudades use exactamente
+    la misma cuenta. Dos agregaciones paralelas sobre la misma hoja se separan
+    en cuanto alguien toque una: el importador diria 37 contactos donde el
+    dashboard dice 38, y nadie sabria cual de las dos miente.
+    """
 
     # Agrupar TODAS las respuestas por tienda (puede haber varias por contacto)
     resp_por_tienda: dict = defaultdict(list)
@@ -907,6 +912,13 @@ def api_ciudades():
     for ciudad, m in ciudades.items():
         interes = round(m['aprobados'] / m['llamados'] * 100, 1) if m['llamados'] > 0 else 0
         result.append({'ciudad': ciudad, **m, 'interes_pct': interes})
+
+    return result
+
+
+@app.route('/api/prospectos/ciudades')
+def api_ciudades():
+    result = _agregar_por_ciudad(get_data('contactos'), get_all_respuestas())
 
     max_total = max((r['total'] for r in result), default=1)
     for r in result:
@@ -5530,6 +5542,201 @@ def importador_estado():
             snap['log'] = [snap['error']]
     return jsonify(snap)
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  CATALOGO DE CIUDADES  (Plan 1 - T1.5)
+# ══════════════════════════════════════════════════════════════════════════════
+# Sustituye al array JS CIUDADES_MX que vivia dentro de IMPORTADOR_HTML y que el
+# navegador fusionaba a mano con /api/prospectos/ciudades. Esa fusion se hace
+# aqui, que es donde puede probarse.
+#
+# Modelo: docs/adr/2026-08-28-modelo-relevancia-ciudades.md
+# Generador del catalogo: tools/generar_catalogo_ciudades.py
+
+CATALOGO_CIUDADES_FILE = os.environ.get(
+    'CATALOGO_CIUDADES_FILE',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'datos', 'ciudades_mx.json'),
+)
+
+# Se lee una vez y se cachea: son ~600 registros que no cambian en caliente.
+_catalogo_ciudades = None
+_indice_ciudades = None
+
+# Tasa de interes de referencia cuando la hoja no da para calcularla. No es una
+# constante inventada: en cuanto hay llamadas se sustituye por la tasa real.
+INTERES_REFERENCIA = 0.30
+# Pseudo-observaciones del encogimiento. Con 20, una ciudad de 1 llamada apenas
+# mueve el factor y una de 100 lo mueve casi del todo. Es lo que impide que
+# "1 aprobado de 1 llamada = 100 %" mande al pueblo por delante de Guadalajara.
+LLAMADAS_PARA_CONFIAR = 20
+AJUSTE_MAX_DESEMPENO = 0.25       # +-25 % por desempeno propio
+DESCUENTO_MAX_SATURACION = 0.35   # hasta -35 % por plaza ya cosechada
+
+
+def _normalizar_ciudad(nombre) -> str:
+    """Minusculas, sin acentos, sin puntuacion y sin espacios repetidos.
+
+    Los espacios se colapsan a proposito: "Guadalupe, Zacatecas" deja dos
+    seguidos al quitar la coma y dejaria de casar con "Guadalupe Zacatecas".
+    """
+    s = unicodedata.normalize('NFD', str(nombre or '').lower())
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+    return re.sub(r'\s+', ' ', re.sub(r'[^a-z0-9 ]', ' ', s)).strip()
+
+
+def _cargar_catalogo_ciudades():
+    """Devuelve (catalogo, indice_por_nombre_normalizado).
+
+    Si el archivo falta o esta roto NO se revienta la ruta: se devuelve catalogo
+    vacio y el endpoint responde con lo que haya. El panel sirve para trabajar;
+    quedarse sin ranking degrada, quedarse sin panel no.
+    """
+    global _catalogo_ciudades, _indice_ciudades
+    if _catalogo_ciudades is not None:
+        return _catalogo_ciudades, _indice_ciudades
+    try:
+        with open(CATALOGO_CIUDADES_FILE, encoding='utf-8') as f:
+            catalogo = json.load(f)
+    except (OSError, ValueError) as e:
+        print(f"[catalogo] no se pudo leer {CATALOGO_CIUDADES_FILE}: {e}")
+        catalogo = []
+    indice = {}
+    for c in catalogo:
+        indice.setdefault(_normalizar_ciudad(c['nombre']), c)
+        for a in c.get('alias', []):
+            indice.setdefault(_normalizar_ciudad(a), c)
+    _catalogo_ciudades, _indice_ciudades = catalogo, indice
+    return catalogo, indice
+
+
+def _factor_desempeno(llamados: int, aprobados: int, interes_referencia: float) -> float:
+    """Cuanto ajusta el historial propio de NIOVAL. Neutro en 1.0.
+
+    Encogido por tamano de muestra: sin llamadas vale exactamente 1.0, o sea que
+    NO se penaliza no haber ido nunca. Ese es el defecto que este plan corrige.
+    """
+    if llamados <= 0:
+        return 1.0
+    tasa = aprobados / llamados
+    confianza = llamados / (llamados + LLAMADAS_PARA_CONFIAR)
+    ref = max(interes_referencia, 0.01)
+    bruto = 1 + AJUSTE_MAX_DESEMPENO * confianza * (tasa - ref) / ref
+    return max(1 - AJUSTE_MAX_DESEMPENO, min(1 + AJUSTE_MAX_DESEMPENO, bruto))
+
+
+def _factor_saturacion(contactos: int, unidades_ferreteras: int) -> float:
+    """Lo ya cosechado deja de ser oportunidad.
+
+    Google Places rinde del orden de 60 resultados por corrida, asi que una plaza
+    ya trabajada devuelve duplicados y seguiria siendo la primera para siempre.
+    Chihuahua tiene 448 contactos en la hoja y 651 ferreterias en el DENUE: dos
+    tercios cosechados. El potencial util es lo que QUEDA por cosechar.
+    """
+    if unidades_ferreteras <= 0:
+        return 1.0
+    return 1 - DESCUENTO_MAX_SATURACION * min(1.0, contactos / unidades_ferreteras)
+
+
+def _explicar_ciudad(reg: dict, metricas: dict, saturacion: float) -> str:
+    """Texto ya armado en el servidor, para que la UI no reconstruya el
+    razonamiento y para que cada posicion sea auditable.
+
+    Lleva el CONTEO CRUDO de ferreterias a proposito: el puntaje va en escala
+    logaritmica y comprime, asi que un 86.7 frente a un 89.8 no significa lo que
+    el operador leeria que significa (ADR 4.3).
+    """
+    partes = [f"{reg['indicadores']['unidades_ferreteras']} ferreterias en el DENUE"]
+    if metricas['total']:
+        partes.append(f"{metricas['total']} contactos ya en la hoja")
+    else:
+        partes.append('plaza sin trabajar')
+    if metricas['llamados']:
+        partes.append(f"{metricas['interes_pct']}% de interes en {metricas['llamados']} llamadas")
+    if saturacion < 0.9:
+        cosechada = round((1 - saturacion) / DESCUENTO_MAX_SATURACION * 100)
+        partes.append(f"{cosechada}% ya cosechada")
+    return ' - '.join(partes)
+
+
+@app.route('/api/importador/ciudades')
+def api_importador_ciudades():
+    """Catalogo nacional + metricas de la hoja, ordenado por prioridad.
+
+    Devuelve SOLO agregados por ciudad. Ningun telefono ni nombre de contacto
+    sale de aqui, aunque el origen sea la hoja de clientes.
+    """
+    catalogo, indice = _cargar_catalogo_ciudades()
+    metricas_hoja = _agregar_por_ciudad(get_data('contactos'), get_all_respuestas())
+
+    # Tasa de referencia calculada de los propios datos, no una constante fija.
+    total_llamados = sum(m['llamados'] for m in metricas_hoja)
+    total_aprobados = sum(m['aprobados'] for m in metricas_hoja)
+    referencia = (total_aprobados / total_llamados) if total_llamados else INTERES_REFERENCIA
+
+    por_clave, sin_clasificar = {}, []
+    for m in metricas_hoja:
+        if m['ciudad'] == 'Sin ciudad':
+            continue
+        reg = indice.get(_normalizar_ciudad(m['ciudad']))
+        if reg is None:
+            # Nada se descarta en silencio: la hoja trae 116 valores distintos y
+            # algunos son estados ("Chiapas", "Guerrero"), no ciudades.
+            sin_clasificar.append({
+                'ciudad': m['ciudad'], 'total': m['total'],
+                'llamados': m['llamados'], 'aprobados': m['aprobados'],
+                'interes_pct': m['interes_pct'],
+            })
+            continue
+        acum = por_clave.setdefault(
+            reg['clave_inegi'],
+            {'total': 0, 'llamados': 0, 'aprobados': 0, 'interes_pct': 0},
+        )
+        for campo in ('total', 'llamados', 'aprobados'):
+            acum[campo] += m[campo]
+
+    for acum in por_clave.values():
+        acum['interes_pct'] = (
+            round(acum['aprobados'] / acum['llamados'] * 100, 1) if acum['llamados'] else 0
+        )
+
+    vacio = {'total': 0, 'llamados': 0, 'aprobados': 0, 'interes_pct': 0}
+    ciudades = []
+    for reg in catalogo:
+        m = por_clave.get(reg['clave_inegi'], vacio)
+        unidades = reg['indicadores']['unidades_ferreteras']
+        saturacion = _factor_saturacion(m['total'], unidades)
+        desempeno = _factor_desempeno(m['llamados'], m['aprobados'], referencia)
+        factor = round(max(0.60, min(1.25, desempeno * saturacion)), 3)
+        ciudades.append({
+            'ciudad': reg['nombre'],
+            'estado': reg['estado'],
+            'region': reg['region'],
+            'potencial_mercado': reg['potencial_mercado'],
+            'desempeno_nioval': factor,
+            'prioridad': round(reg['potencial_mercado'] * factor, 1),
+            'unidades_ferreteras': unidades,
+            'explicacion': _explicar_ciudad(reg, m, saturacion),
+            'total': m['total'],
+            'llamados': m['llamados'],
+            'aprobados': m['aprobados'],
+            'interes_pct': m['interes_pct'],
+        })
+
+    # Desempate del ADR: prioridad, luego ferreterias, luego nombre. Determinista:
+    # dos peticiones sobre los mismos datos devuelven el mismo orden.
+    ciudades.sort(key=lambda c: (-c['prioridad'], -c['unidades_ferreteras'], c['ciudad']))
+    sin_clasificar.sort(key=lambda c: -c['total'])
+
+    conteo = Counter(c['region'] for c in ciudades)
+    regiones = sorted(
+        ({'region': r, 'total': n} for r, n in conteo.items()),
+        key=lambda x: -x['total'],
+    )
+    return jsonify({
+        'ciudades': ciudades,
+        'sin_clasificar': sin_clasificar,
+        'regiones': regiones,
+    })
 
 IMPORTADOR_HTML = r"""<!DOCTYPE html>
 <html lang="es">
