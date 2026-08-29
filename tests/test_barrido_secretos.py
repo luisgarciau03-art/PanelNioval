@@ -275,7 +275,7 @@ class TestFalsosNegativosCorregidos:
     """
 
     def test_marca_un_telefono_con_lada_pegada(self):
-        """`525512345678`: lada 52 + 10 digitos, el formato de WhatsApp.
+        """Lada 52 pegada a los 10 digitos, el formato que usa WhatsApp.
 
         El patron de 10 digitos exige no-digitos a los lados, y dentro de una
         tirada de 12 ninguna ventana de 10 los tiene: el numero pasaba entero.
@@ -290,7 +290,7 @@ class TestFalsosNegativosCorregidos:
         No casaba entero (por la mayuscula) ni por su tramo en minuscula (que
         quedaba pegado a un caracter excluido por el lookaround).
         """
-        clave = "ABCDEF0123456789abcdef0123456789ABC"  # 35, ni 40 ni 64
+        clave = "ABCDEF0123456789abcdef0123456789ABC"  # barrido-ok: 35, ni 40 ni 64
 
         assert _tipos(barrer_texto(f"hmac = {clave}")) == ["hex_largo"]
 
@@ -335,13 +335,15 @@ class TestSecretosDelPropioPanel:
     """
 
     def test_marca_un_token_del_panel_asignado_en_codigo(self):
-        hallazgos = barrer_texto('PANEL_DASHBOARD_TOKEN = "valorLargoDePrueba123"')
+        linea = 'PANEL_DASHBOARD_TOKEN = "valorLargoDePrueba123"'  # barrido-ok: fixture
+        hallazgos = barrer_texto(linea)
 
         assert _tipos(hallazgos) == ["secreto_del_panel"]
 
     def test_enmascara_el_valor_pero_deja_leer_el_nombre(self):
         """El nombre es lo que hay que poder leer; el valor, lo que hay que tapar."""
-        hallazgo = barrer_texto('SECRET_KEY = "valorLargoDePrueba123"')[0]
+        linea = 'SECRET_KEY = "valorLargoDePrueba123"'  # barrido-ok: fixture
+        hallazgo = barrer_texto(linea)[0]
 
         assert "valorLargoDePrueba123" not in hallazgo.muestra
         assert hallazgo.muestra.startswith("valo")
