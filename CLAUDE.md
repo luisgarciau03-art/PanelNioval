@@ -34,7 +34,8 @@ Panel web interno de NIOVAL (distribuidora mayorista de ferretería/plomería) p
 
 ## Reglas del proyecto
 
-- **Baseline de verificación:** `python -m pytest tests/` → **314 passed** (al 2026-08-27, tras los 84 tests del Plan 3: 26 de frontend, 13 de progreso, 23 de estado compartido y 22 de conteo. **Ojo con el comando**: `pytest.ini` ya trae `addopts = -q`, así que añadir `-q` lo convierte en `-qq` y **suprime la línea del resumen** — se ven los puntos y `exit 0`, pero nunca el número. Por eso el comando oficial va sin `-q`. Antes: 230 al 2026-08-24, tras los 9 tests de rutas portables y archivos en Files/; 227 tras los 6 primeros; 221 tras los 2 del estado real en ya_encolado; 219 tras los 4 del cierre de Chrome huerfano; 215 tras los 10 del lock huerfano del worker; 205 tras los 5 de la lada de pais para WhatsApp; 200 tras los 13 de la columna CONTACTO y el formato de telefono; 187 tras los 16 del escape de formulas del importador; 171 tras los 6 del heartbeat compartido; 165 al 2026-08-17 tras la ronda final de correcciones de `feat/despliegue-vultr`; 164 justo antes; 155 al cierre del 2026-08-13; el 144 anterior era stale: PRs #6-#9 agregaron 11 tests a archivos existentes sin actualizar la documentación). Es el ÚNICO baseline oficial. Nada se mergea con la suite en rojo. Nota: importar `app.py` en frío tarda ~100s (`googleapiclient` + Defender); en caliente ~8s. **No es pandas**: medido con `sys.modules`, ni pandas ni numpy llegan a cargarse — pandas estaba en `requirements.txt` sin que nadie lo importara y se retiró. `pytest.ini` ancla el rootdir al proyecto.
+- **Integración continua (desde 2026-08-28):** `.github/workflows/tests.yml` corre la suite en cada PR contra `main` y en cada push a `main`, y barre secretos y teléfonos sobre el diff del PR con `tools/barrer_secretos.py`. El workflow **no recibe ningún secreto**: `tests/conftest.py` ya aísla los clientes externos. El barrido **avisa, no bloquea** en su primera versión; una línea se exceptúa con `barrido-ok: <motivo>`, que exige motivo escrito a propósito. Qué hacer cuando el check sale rojo: `docs/RUNBOOK.md` § Cuando el check de CI sale en rojo. ⚠️ **Falta el gate del owner**: sin la protección de rama en `main` (Settings → Branches), el check informa pero **no impide** el merge.
+- **Baseline de verificación:** `python -m pytest tests/` → **345 passed** (al 2026-08-28, tras los 31 tests del barrido de secretos del Plan 0). ⚠️ **El baseline es por rama.** En `main` eran **314**; la rama `perf/gasto-places-importador` del Plan 2 da **357 passed, 1 skipped** porque añade 43 tests suyos. Un gate escrito como «≥ 357» es inalcanzable desde una rama basada en `main` hasta que el Plan 2 mergee: comparar siempre contra el baseline de la rama base, no contra un número absoluto. (Al 2026-08-27, tras los 84 tests del Plan 3: 26 de frontend, 13 de progreso, 23 de estado compartido y 22 de conteo. **Ojo con el comando**: `pytest.ini` ya trae `addopts = -q`, así que añadir `-q` lo convierte en `-qq` y **suprime la línea del resumen** — se ven los puntos y `exit 0`, pero nunca el número. Por eso el comando oficial va sin `-q`. Antes: 230 al 2026-08-24, tras los 9 tests de rutas portables y archivos en Files/; 227 tras los 6 primeros; 221 tras los 2 del estado real en ya_encolado; 219 tras los 4 del cierre de Chrome huerfano; 215 tras los 10 del lock huerfano del worker; 205 tras los 5 de la lada de pais para WhatsApp; 200 tras los 13 de la columna CONTACTO y el formato de telefono; 187 tras los 16 del escape de formulas del importador; 171 tras los 6 del heartbeat compartido; 165 al 2026-08-17 tras la ronda final de correcciones de `feat/despliegue-vultr`; 164 justo antes; 155 al cierre del 2026-08-13; el 144 anterior era stale: PRs #6-#9 agregaron 11 tests a archivos existentes sin actualizar la documentación). Es el ÚNICO baseline oficial. Nada se mergea con la suite en rojo. Nota: importar `app.py` en frío tarda ~100s (`googleapiclient` + Defender); en caliente ~8s. **No es pandas**: medido con `sys.modules`, ni pandas ni numpy llegan a cargarse — pandas estaba en `requirements.txt` sin que nadie lo importara y se retiró. `pytest.ini` ancla el rootdir al proyecto.
 - **Datos personales:** teléfonos/nombres/correos de clientes **no** se commitean ni se vuelcan completos en logs; enmascarar (`+52...XXXX`). `.gitignore` cubre `*.json` (credenciales) y `debug_invalid_*`/`debug_timeout_*` (screenshots con PII de `envio_catalogo.py`).
 - **Secretos:** nada hardcodeado. `GOOGLE_CREDENTIALS_JSON`, `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` van por variables de entorno en Railway. **Pendiente owner:** rotar el token Telegram `8404009072` (expuesto en el historial git; ~14 copias).
 - **Ramas:** **nunca** trabajar directo en `main` (Railway auto-deploya). Una rama por plan; PRs con `gh pr create --base main`; merge `--squash` solo con baseline verde y reviews sin CRITICAL/HIGH abiertos.
@@ -42,7 +43,28 @@ Panel web interno de NIOVAL (distribuidora mayorista de ferretería/plomería) p
 
 ## Planes activos
 
-**Tanda 2026-08-13** (5 planes). Índice: `docs/superpowers/plans/2026-08-13-indice-tanda.md`.
+**Tanda 2026-08-27, validada y ampliada el 2026-08-28** (6 planes, 53 tareas, **17 hechas**).
+Índice: `docs/superpowers/plans/2026-08-27-indice-tanda.md`.
+⚠️ **Empieza por** `docs/superpowers/plans/2026-08-28-validacion-tanda.md`: los anclajes
+`archivo:línea` de los planes originales quedaron desplazados hasta 1,000 líneas cuando
+`app.py` creció de 4,948 a 6,098, y ese documento trae los corregidos, dice qué trabajo ya
+está hecho (B9 y B11 del Plan 1) y qué criterios cambiaron (CE1 del Plan 4, CE6 del Plan 2).
+Cada plan abre además con una §0 de validación que **manda** sobre el resto del documento.
+
+Orden de ejecución **0 → 2 → 1 → 4 → 5** (el Plan 3 está cerrado, PR #36 `ae0e1c9`):
+
+| Plan | Estado | Qué resuelve |
+|---|---|---|
+| 0 — Integración continua | 0/4 | No hay CI: los 357 tests solo corren si alguien se acuerda |
+| 2 — Gasto de Google Places | **7/9** | `perf/gasto-places-importador`, PR #38 en borrador |
+| 1 — Relevancia de ciudades | 0/10 | El ranking mide el historial de NIOVAL, no el mercado |
+| 4 — Rediseño del panel | 0/12 | Movimiento, presentación y estados de carga en las 3 superficies |
+| 5 — Endurecimiento | 0/8 | Rate limiting, escape de fórmulas, zona horaria, healthcheck |
+
+Las decisiones abiertas al owner están en el índice §8; los nueve gates del owner, en §7.1.
+
+**Tanda anterior 2026-08-13** (5 planes, histórica). Índice:
+`docs/superpowers/plans/2026-08-13-indice-tanda.md`.
 1. Evaluación `envio_catalogo.py` + baseline de tests + sanitización de secretos (**este plan**).
 2. Evaluación del formulario de llamadas + matriz de flujo.
 3. Integración catálogo + estados + corrección de número.

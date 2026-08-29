@@ -9,6 +9,56 @@
 
 ---
 
+## 0. VALIDACIÓN AL 2026-08-28 (revisión contra el código en disco)
+
+Este plan se diseñó el 2026-08-27 y se **validó contra el código en disco el 2026-08-28**,
+después de que el Plan 3 (10/10) y el Plan 2 (7/9) movieran `app.py` de 4,948 a 6,098
+líneas. Lo de abajo **manda** sobre cualquier número de línea del resto del documento.
+
+### 0.1 Anclajes corregidos
+
+| Lo que dice el plan | Realidad verificada el 2026-08-28 |
+|---|---|
+| Cálculo de `relevancia` en `app.py:848-855` | **`app.py:913-919`** |
+| `const CIUDADES_MX` en `app.py:4727` | **`app.py:5679`** |
+| Fusión JS catálogo + panel en `app.py:4795-4816` | **`app.py:5750-5779`** (`cargarCiudades`) |
+| Chips de ciudad en `app.py:4830-4843` | **`app.py:5795-5812`** (`renderChips`) |
+| `str_val(c.get('CIUDAD'...))` en `app.py:807` | **`app.py:870`** (hay otro en `app.py:597`) |
+| `getSortedCiudades()` en `app.py:2150-2157` | **`app.py:2213`** |
+| "array de ~250 entradas" | **293 entradas · 238 únicas · 50 duplicados exactos** (medido) |
+| Baseline `230 passed` | **357 passed, 1 skipped** (verificado en disco el 2026-08-28) |
+
+### 0.2 Dos puntos del plan que YA ESTÁN HECHOS — verificar, no reimplementar
+
+**T1.7 punto 5 (escapado del nombre de ciudad, defecto B9): HECHO.** `app.py:5810-5823` ya
+usa `escaparHtml(c.ciudad)`, mete el nombre en `data-ciudad` y engancha un **listener
+delegado** sobre el contenedor. No queda interpolación dentro de `onclick`. El plan pedía
+exactamente eso. **T1.7 lo verifica con un test y sigue adelante**; reimplementarlo es
+trabajo duplicado y riesgo de regresión.
+
+**B11 (el filtro renumeraba el ranking): HECHO.** `app.py:5767` fija `c.rank` una sola vez
+sobre el catálogo completo y `app.py:5802` lo lee con `(c.rank != null) ? c.rank : 0`.
+
+### 0.3 Corrección al diagnóstico
+
+El plan dice que `new Set` colapsa los duplicados. Es cierto pero incompleto: el
+`[...new Set(CIUDADES_MX)]` de `app.py:5759` colapsa por **cadena exacta**, mientras la
+comparación contra el panel de `app.py:5757` normaliza a minúsculas. Resultado: los 50
+duplicados exactos se colapsan, pero `Tehuacán`/`Tehuacan`, `Los Mochis`/`Mochis` o
+`La Paz`/`La Paz BCS` **siguen siendo dos entradas y dos consultas a Places**. El
+diagnóstico del plan se confirma; la cifra sube de "~250" a **293**.
+
+### 0.4 Supuestos vigentes
+
+`SUPUESTO: el catálogo objetivo es de 400-600 ciudades (los municipios ferreteros
+relevantes), no todo municipio con al menos una ferretería en DENUE (serían miles) — afecta
+Plan 1, Tareas T1.4 y T1.7.` Ver **D3** en DECISIONES PENDIENTES del índice.
+
+`SUPUESTO: el gate humano de T1.8 lo resuelve el owner sobre el top-20 escrito, sin
+herramienta intermedia — afecta Plan 1, Tarea T1.8.`
+
+---
+
 ## 1. EL PROBLEMA, CON EVIDENCIA
 
 ### 1.1 El orden actual mide a NIOVAL, no al mercado
@@ -115,7 +165,7 @@ completo.
 | CE6 | Ninguna ciudad virgen queda en 0 | Test: toda ciudad del catálogo tiene `potencial_mercado > 0` |
 | CE7 | El desempeño NIOVAL ajusta pero no domina | Test: una ciudad con `interes_pct=100` y `total=1` no supera a una de potencial alto sin historial |
 | CE8 | El dashboard no se rompe | Los tests existentes de `/api/prospectos/ciudades` siguen en verde **sin modificarse** |
-| CE9 | Baseline sin regresiones | `python -m pytest tests/ -q` ≥ 230 passed |
+| CE9 | Baseline sin regresiones | `python -m pytest tests/` ≥ 357 passed |
 | CE10 | El owner reconoce el top-20 | Gate humano: el owner valida la lista contra su conocimiento del mercado |
 
 ---
@@ -354,7 +404,7 @@ cientos de entradas: sin filtro por región queda inusable.
 **Depende de:** T1.4–T1.7.
 
 **Qué hacer.**
-1. `python -m pytest tests/ -q` → ≥ 230 passed, sin regresiones.
+1. `python -m pytest tests/` → ≥ 357 passed, sin regresiones.
 2. Verificación funcional en navegador: cargar `/importador`, confirmar que el filtro por
    región funciona, que no hay ciudades duplicadas visibles y que el chip #1 es defendible.
 3. **Comprobar el barrido en las dos direcciones**: buscar en la lista renderizada una
@@ -447,7 +497,7 @@ para el mínimo de diversidad. El plan cumple el mínimo sin ella.
 | T1.5 | ✅ TDD, 4 tests nuevos | python-reviewer | ✅ | ✅ datos de clientes | ✅ sin regresiones |
 | T1.6 | ✅ los existentes, sin tocar | python-reviewer | ✅ | — | ✅ sin regresiones |
 | T1.7 | ✅ webapp-testing | — | ✅ | ✅ interpolación en HTML | ✅ sin regresiones |
-| T1.8 | ✅ suite completa + gate humano del owner | ✅ | ✅ | ✅ | ✅ ≥230 passed |
+| T1.8 | ✅ suite completa + gate humano del owner | ✅ | ✅ | ✅ | ✅ ≥357 passed |
 | T1.9 | ✅ suite completa antes del merge | — | ✅ | — | ✅ verde para mergear |
 
 ---
