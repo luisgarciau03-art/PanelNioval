@@ -139,6 +139,12 @@ def medir(ya_en_hoja=0, negocios=20, paginas=3, solape=0.5, cache=None):
     pre = [("Negocio %d" % i, "Calle %d" % i) for i in range(ya_en_hoja)]
     ws = WorksheetContador(pre)
 
+    # Ojo con el alcance de estos parches: `app.time` y `app.googlemaps` son
+    # los objetos REALES de esos modulos, no atributos de `app`, asi que la
+    # asignacion vale para todo el interprete y no se restaura. Es inocuo
+    # aqui porque esto es un CLI de un solo disparo que termina en main(),
+    # pero si algun dia se importa `medir` desde un test, hay que envolverlo
+    # en `unittest.mock.patch` o el sleep real desaparecera de toda la suite.
     app.GMAPS_OK = True
     app.time.sleep = lambda _s: None
     app._enviar_telegram_importador = lambda *a, **k: None
