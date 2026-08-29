@@ -145,3 +145,101 @@ Ninguno se puede cerrar desde una sesión de Claude.
 El Plan 1 hereda además **B11** (filtrar ciudades renumeraba el ranking); ya está
 corregido en el cliente con `c.rank` fijado una sola vez sobre el catálogo
 completo — **verificar y no duplicar**.
+
+
+---
+
+# Actualización 2026-08-28 — Plan 2 va 5 de 9
+
+**PR #38 (borrador)**, rama `perf/gasto-places-importador`. **No mergeado**: el
+plan no está cerrado. Baseline **314 → 326 passed**.
+
+## Hecho
+
+| Tarea | Estado |
+|---|---|
+| T2.0 | 🚫 **BLOQUEADA** en su mitad monetaria · sustituida por conteo de llamadas |
+| T2.1 | ✅ ADR `docs/adr/2026-08-28-places-legacy-vs-new.md` |
+| T2.2 | ✅ `fields` explícitos en `place()` |
+| T2.3 | ✅ prefiltro antes de pagar Details |
+| T2.4 | ✅ cortes por aporte cero · ⚠️ CE7 sin verificar |
+
+**Ahorro medido** (`python tools/medir_llamadas_places.py`), Place Details por
+corrida: ciudad nueva 80→80, a medio trabajar 80→60, **ya trabajada 80→0**. Más,
+en las que quedan, se deja de facturar Basic (26 campos) y Atmosphere (18).
+
+## Lo que falta, y lo que ya no hace falta
+
+**T2.4 — cortar variaciones y páginas sin aporte.** Sigue pendiente y sigue
+valiendo la pena: son 18 Text Search por corrida, invariables en los tres
+escenarios. Ojo: el plan dice que `if lugares: break` corta variaciones. **No**:
+corta reintentos. Las tres variaciones corren siempre.
+
+El denominador de progreso ya es ajustable (Plan 3 · T3.6), así que recortar
+variaciones solo pide bajar `BASE_POR_CATEGORIA`; la barra se ajusta sola y no
+retrocede.
+
+**T2.5 — caché persistente `place_id` → detalle.** Ojo con dos cosas que el plan
+da por supuestas y ya no son ciertas:
+- Dice que gunicorn corre `--workers 2` y que por eso hace falta caché fuera del
+  proceso. **Ya no**: desde el Plan 3 corre `--workers 1 --threads 4`. La razón
+  para persistir sigue siendo sobrevivir al reinicio, no compartir entre workers.
+- El archivo llevaría **teléfonos de negocios**, que son datos personales. Va a
+  `.gitignore` y `.dockerignore` **en el mismo commit que lo crea**.
+
+**T2.6 — medidor de costo y tope.** Para reportar ahorro use
+`incidencias['detalles_evitados']`, **no** `ya_vistos_otra_cat`: el segundo
+incluye negocios rechazados por reseñas, que nunca costaron un `place()`.
+
+**T2.7 — verificación A/B.** `tools/medir_llamadas_places.py --json` da la salida
+comparable entre corridas.
+
+## Gate del owner que sigue abierto y bloquea el cierre
+
+Sin el **consumo por SKU de la consola de Google Cloud** (proyecto
+`bubbly-subject-412101`) no se puede expresar el ahorro en pesos. Los conteos ya
+están; falta solo el multiplicador.
+
+## Trampa que volví a pisar
+
+`git add docs/superpowers/plans/` arrastra otra vez los ocho archivos de la tanda
+`2026-08-15-*`, que son de otro proyecto. **Añadir siempre por ruta explícita.**
+Ya me pasó en el Plan 3 y volvió a pasar aquí.
+
+
+---
+
+## T2.4 cerrada — lo que la siguiente sesión tiene que saber
+
+**Text Search por corrida: 18 → 13.** Tres cortes, todos por aporte **medido** de
+cero, nunca por predicción. Cada uno se registra en el log con su motivo.
+
+**El riesgo abierto.** El corte de variaciones asume que si dos fraseologías casi
+idénticas se saturan, la tercera también. Es razonable y no está probado. El plan
+exige verificarlo corriendo la ciudad de referencia (CE7) y **esa corrida es gate
+del owner**. Se documenta como riesgo aceptado, no como resuelto.
+
+Si el owner corre la ciudad de referencia y falta algún negocio respecto de T2.0,
+el corte se desactiva **sin tocar código**:
+
+```python
+MAX_VARIACIONES_SIN_APORTE = 99     # desactiva el corte de variaciones
+CORTAR_PAGINAS_SIN_APORTE  = False  # desactiva el corte de páginas
+```
+
+**Dos lecciones de esta tanda que conviene no repetir:**
+
+- Escribir el test que documenta un riesgo **encontró un riesgo peor**: contar las
+  variaciones vacías como saturación dejaba que dos consultas sin resultados
+  cancelaran una tercera que sí funcionaba, perdiendo la categoría entera. Vacío
+  no es saturado.
+- Un test que pasa con y sin el arreglo no vale nada. El del HIGH de T2.4 se
+  comprobó reintroduciendo el bug a propósito: falla con él, pasa sin él.
+
+## Lo que queda del Plan 2
+
+**T2.5** caché persistente de detalles, **T2.6** medidor con tope de presupuesto,
+**T2.7** verificación A/B, **T2.8** cierre. Recordatorios ya anotados arriba:
+`--workers` ya es 1 (no 2), el archivo de caché lleva teléfonos y va a
+`.gitignore` y `.dockerignore` en el mismo commit, y para reportar ahorro se usa
+`detalles_evitados`, no `ya_vistos_otra_cat`.

@@ -229,6 +229,108 @@ existe, se marca como interrumpido y se sigue adelante.
 
 Antes, los dos primeros terminaban en ✅ con la hoja intacta.
 
+### Caché de detalles de Places (desde 2026-08-28)
+
+El importador guarda los detalles que pide a Google (teléfono, sitio web, horario)
+para no volver a pagarlos. **A quien más ahorra es al negocio rechazado**: uno que
+pasa reseñas y calificación pero no tiene teléfono se descarta y nunca llega a la
+hoja, así que sin caché se re-pagaba en cada corrida de esa ciudad, para siempre.
+
+Medido: segunda corrida de la misma ciudad, **80 → 0** llamadas de Place Details.
+
+| Dato | Valor |
+|---|---|
+| Archivo | `PLACES_CACHE_FILE`, por defecto el temp del sistema |
+| Vigencia | 30 días |
+| Contenido | `place_id` → teléfono, sitio web, horario, y marca de tiempo |
+
+**Lleva teléfonos de negocios, o sea datos personales.** Está en `.gitignore` y
+`.dockerignore`. No copiarlo fuera del servidor ni adjuntarlo a un reporte.
+
+**Por defecto NO sobrevive a un redespliegue** (vive en el temp del contenedor).
+Funciona igual — se pierde el ahorro, no el servicio. Para que persista, montarle
+un volumen en `/srv/panel/docker-compose.yml`:
+
+```yaml
+    environment:
+      - PLACES_CACHE_FILE=/datos/places_detalles.json
+    volumes:
+      - ./secretos/credentials.json:/app/credentials.json:ro
+      - panel-datos:/datos          # <-- añadir
+
+volumes:
+  panel-datos:                      # <-- añadir al final del archivo
+```
+
+Es opcional y es decisión del owner: sin el volumen el panel funciona igual.
+
+**Si hace falta borrarla** (por ejemplo, si se sospecha que tiene teléfonos
+viejos), basta con eliminar el archivo: se reconstruye sola en la siguiente
+corrida, pagando los detalles una vez.
+
+### Medidor de gasto y tope de corrida
+
+Bajo la barra de progreso, y en el aviso de Telegram, aparece qué le costó la
+corrida a la cuenta de Google:
+
+```
+Llamadas a Google: 13 búsquedas + 24 detalles · 56 evitadas
+```
+
+Las **evitadas** son las que el prefiltro y la caché se ahorraron. Ese número es
+el ahorro, medido, de esta corrida.
+
+#### Variables de entorno
+
+Ninguna tiene valor por defecto, **a propósito**. Google cambia sus tarifas, y un
+número escrito en el código empieza siendo correcto y acaba mintiendo sin que
+nadie lo toque.
+
+| Variable | Para qué | Si no se define |
+|---|---|---|
+| `PLACES_COSTO_TEXT_SEARCH` | Costo de una búsqueda de texto | No se muestra importe |
+| `PLACES_COSTO_DETAILS` | Costo de un Place Details | No se muestra importe |
+| `PLACES_PRESUPUESTO_CORRIDA` | Tope en dinero por corrida | Sin tope de dinero |
+| `PLACES_MAX_LLAMADAS_CORRIDA` | Tope en número de llamadas | Sin tope de llamadas |
+| `PLACES_CACHE_FILE` | Dónde vive la caché de detalles | Temp del sistema |
+
+**Sin tarifas configuradas no se publica ningún importe.** Un `0.00` se leería
+como *"esta corrida salió gratis"*, que es una afirmación falsa; no saber el
+precio no es lo mismo que saber que fue cero.
+
+**El tope de llamadas funciona sin tarifas**, y es el único utilizable mientras no
+haya acceso a la consola de facturación. Es el recomendado para empezar.
+
+Las variables se leen **al arrancar el proceso**: cambiarlas exige reiniciar el
+contenedor.
+
+#### Qué pasa al tocar el tope
+
+La corrida se detiene y queda en estado **`presupuesto_agotado`**, con su propio
+mensaje en la pantalla y en Telegram. **No es un error**: es un límite que se
+respetó, y lo que ya se guardó en la hoja es válido.
+
+Volver a correr la misma ciudad **continúa desde donde quedó** sin repetir lo
+pagado: el prefiltro salta lo que ya está en la hoja y la caché sirve los
+detalles ya consultados.
+
+### ⚠️ Pendiente del owner
+
+Estas cinco variables **no están en `.env.example`**: el entorno de trabajo tiene
+bloqueada la escritura de archivos `.env*`, así que hay que añadirlas a mano
+(solo los nombres, sin valores).
+
+---
+
+### ¿Por qué 30 días y no 90?
+
+Lo que se cachea incluye el teléfono que el operador va a marcar. Un negocio que
+añade teléfono a su ficha de Google es un prospecto nuevo, y no conviene tardar un
+trimestre en verlo. Con 30 días, quien recorre una ciudad cada semana o cada mes
+ya no paga nada por los rechazados.
+
+---
+
 ### Por qué un solo worker
 
 `--workers 1 --threads 4`. El estado del importador y la caché son globales de
@@ -239,6 +341,48 @@ descartadas: `docs/adr/2026-08-27-estado-compartido-importador.md`.
 **No subir `--workers` sin leer ese ADR.** Hay tres tests que fallan si se hace.
 
 ---
+
+### Revertir el recorte de búsquedas sin desplegar código
+
+El importador deja de consultar variaciones y páginas que no están aportando
+negocios nuevos. Eso ahorra 5 búsquedas de texto por corrida y, medido contra
+respuestas grabadas, **no pierde ni un prospecto**.
+
+Si alguna vez una corrida real diera menos prospectos de los esperados, el
+recorte se desactiva **cambiando dos variables del módulo**, sin tocar la lógica
+y sin desplegar una versión nueva:
+
+```python
+MAX_VARIACIONES_SIN_APORTE = 99     # deja de cortar variaciones
+CORTAR_PAGINAS_SIN_APORTE  = False  # deja de cortar paginas
+```
+
+Con eso el importador vuelve a consultar las 3 variaciones y todas las páginas,
+como antes del Plan 2. El resto de optimizaciones —los `fields` explícitos, la
+caché y la deduplicación contra la hoja— siguen activas y **no afectan a qué
+negocios se encuentran**, solo a cuánto se paga por encontrarlos.
+
+### Ojo al medir el ahorro: la caché contamina la medición
+
+`tools/medir_llamadas_places.py` cuenta las llamadas que hace una corrida. Si se
+usa para comparar antes y después, **la caché tiene que estar aislada**.
+
+La caché vive por defecto en el temp del sistema, así que **sobrevive entre
+ejecuciones del script**. Una medición de esta tanda arrastró 108 entradas de
+corridas anteriores y reportó 0 Details en escenarios donde el código sí habría
+pagado — con un «pagados y tirados: **-18**» que delató el problema, porque un
+negativo ahí es imposible.
+
+El script ya estrena una caché desechable por escenario. Si se mide a mano,
+apuntar `PLACES_CACHE_FILE` a un archivo nuevo antes de cada corrida:
+
+```bash
+PLACES_CACHE_FILE=$(mktemp -d)/c.json python tools/medir_llamadas_places.py
+```
+
+Un ahorro que en realidad es una caché heredada se lee igual que un ahorro real,
+y no lo es.
+
 
 ## Gates del owner pendientes (seguridad)
 

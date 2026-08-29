@@ -290,12 +290,12 @@ archivo" sino "añadirle cinco nombres"; el bloque exacto está en §7.
 |---|---|---|---|
 | Plan 3 — Bug de conteo y pantallas de carga | 10 | ✅ **COMPLETADO** | **10 / 10** |
 | Plan 0 — Integración continua ⭐ | 4 | ✅ **COMPLETADO** | **4 / 4** |
-| Plan 2 — Optimización del gasto de Places | 9 | 🟡 EN CURSO | **7 / 9** |
+| Plan 2 — Optimización del gasto de Places | 9 | ✅ **COMPLETADO** | **9 / 9** |
 | Plan 1 — Relevancia de ciudades nacional | 10 | PENDIENTE | 0 / 10 |
 | Plan 4 — Rediseño profesional del panel | 12 | PENDIENTE | 0 / 12 |
 | Plan 5 — Endurecimiento del panel ⭐ | 8 | PENDIENTE | 0 / 8 |
 
-**PROGRESO GLOBAL: 21 / 53 tareas (40 %) · 2 de 6 planes completados**
+**PROGRESO GLOBAL: 23 / 53 tareas (43 %) · 3 de 6 planes completados**
 
 > Sobre el alcance original de 4 planes (41 tareas), el avance es **17 / 41 (41 %)**. El
 > denominador subió porque se redactaron dos planes que el §4 recomendaba y nadie había

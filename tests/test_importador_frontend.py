@@ -147,8 +147,12 @@ class TestEntradaBloqueadaDuranteLaCorrida:
 class TestReinicioEntreCorridas:
     def test_las_insignias_vuelven_a_neutro(self, html):
         # El pintado del estado, no el de limpieza: es el que se quedaba rancio.
+        # Se recorta hasta la SIGUIENTE funcion, no un numero fijo de caracteres:
+        # con una ventana fija, anadir codigo a pintarEstado empuja lo que se
+        # quiere comprobar fuera del recorte y el test falla sin que nada se rompa.
         i = html.index("function pintarEstado")
-        cuerpo = html[i:i + 1400]
+        fin = html.index(chr(10) + "function ", i + 1)
+        cuerpo = html[i:fin]
         assert "CATS.forEach" in cuerpo, "pintarEstado ya no pinta las insignias"
         assert "else el.className = 'cat-badge'" in cuerpo, (
             "las insignias no tienen rama que las devuelva a neutro: la segunda "
