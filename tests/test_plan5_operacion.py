@@ -9,6 +9,7 @@ import pytest
 
 import app
 import nucleo_catalogo as nc
+from conftest import servir_superficie
 
 
 @pytest.fixture
@@ -64,7 +65,7 @@ class TestSeccionCatalogo:
     def test_dashboard_incluye_seccion_catalogo(self, client):
         r = client.get("/")
         assert r.status_code == 200
-        html = r.data.decode("utf-8", "ignore")
+        html = servir_superficie(client, "/", "dashboard")
         # Sección, nav, badge y funciones JS presentes.
         assert 'id="sec-catalogo"' in html
         assert "showSection('catalogo')" in html

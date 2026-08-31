@@ -12,6 +12,10 @@ ruptura de contrato y hay que justificarla, no ajustar el test.
 import pytest
 
 import app as app_modulo
+from conftest import leer_superficie
+
+# El dashboard vivia en `app.HTML` hasta el Plan 4; ahora es plantilla + estaticos.
+_DASHBOARD = leer_superficie("dashboard")
 
 
 @pytest.fixture
@@ -171,15 +175,15 @@ class TestCamposNuevosDelPlan1:
 
 class TestElDashboardLeeLosCamposNuevos:
     def test_la_tabla_ordena_por_prioridad_por_defecto(self):
-        assert "let ciudadesSortCol = 'prioridad'" in app_modulo.HTML
+        assert "let ciudadesSortCol = 'prioridad'" in _DASHBOARD
 
     def test_relevancia_queda_marcada_como_obsoleta_con_fecha(self):
         """Un campo que se conserva por compatibilidad y no dice hasta cuando se
         queda ahi para siempre."""
-        assert "OBSOLETO" in app_modulo.HTML or "OBSOLETO" in _fuente_api_ciudades()
+        assert "OBSOLETO" in _DASHBOARD or "OBSOLETO" in _fuente_api_ciudades()
 
     def test_la_tabla_muestra_la_columna_de_prioridad(self):
-        assert "'prioridad'" in app_modulo.HTML
+        assert "'prioridad'" in _DASHBOARD
 
 
 def _fuente_api_ciudades():
@@ -196,12 +200,12 @@ class TestLaTablaDelDashboardEscapaElNombreDeCiudad:
     """
 
     def test_existe_el_escapador_en_la_plantilla_del_dashboard(self):
-        assert "function escCiudad" in app_modulo.HTML
+        assert "function escCiudad" in _DASHBOARD
 
     def test_la_columna_ciudad_pasa_por_el_escapador(self):
-        i = app_modulo.HTML.find("label: 'Ciudad'")
+        i = _DASHBOARD.find("label: 'Ciudad'")
         assert i > 0
-        assert "escCiudad(v)" in app_modulo.HTML[i:i + 200]
+        assert "escCiudad(v)" in _DASHBOARD[i:i + 200]
 
     def test_no_queda_interpolacion_cruda_del_nombre_en_esa_columna(self):
-        assert "`<strong>${v}</strong>`" not in app_modulo.HTML
+        assert "`<strong>${v}</strong>`" not in _DASHBOARD

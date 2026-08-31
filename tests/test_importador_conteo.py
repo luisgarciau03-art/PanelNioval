@@ -17,6 +17,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import app
+from conftest import leer_superficie
 
 
 # ─────────────────────────── dobles de prueba ───────────────────────────
@@ -218,7 +219,7 @@ class TestMensajeFinal:
         Esa yuxtaposicion es la que hace leer "N guardados". El numero grande y
         el mensaje tienen que hablar de `nuevos_en_sheet`.
         """
-        html = app.IMPORTADOR_HTML
+        html = leer_superficie("importador")
         assert "contactos encontrados" not in html or "nuevos_en_sheet" in html, (
             "el mensaje final sigue presentando `encontrados` como guardados"
         )

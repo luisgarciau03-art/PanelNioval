@@ -1,8 +1,9 @@
 """Plan 1 - T1.7. UI de ciudades del importador.
 
 Siguiendo el patron de tests/test_importador_frontend.py, se afirma sobre el
-string de IMPORTADOR_HTML: es el unico modo de probar este JavaScript sin
-infraestructura de navegador, porque vive embebido en app.py.
+contenido servido de la superficie, que `leer_superficie()` reune desde
+templates/ y static/: es el unico modo de probar este JavaScript sin
+infraestructura de navegador.
 
 Los dos ultimos bloques VERIFICAN B9 y B11, que ya estaban hechos antes de este
 plan. No los reimplementan: los fijan para que nadie los deshaga sin enterarse.
@@ -11,7 +12,8 @@ import re
 
 import pytest
 
-import app as app_modulo
+import app as app_modulo  # noqa: F401  (la suite lo necesita importado)
+from conftest import leer_superficie
 
 REGIONES = [
     "Noroeste", "Noreste", "Occidente", "Centro-Norte",
@@ -21,7 +23,7 @@ REGIONES = [
 
 @pytest.fixture(scope="module")
 def html():
-    return app_modulo.IMPORTADOR_HTML
+    return leer_superficie("importador")
 
 
 class TestElArrayEstaticoDesaparecio:
