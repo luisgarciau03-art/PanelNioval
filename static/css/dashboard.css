@@ -22,7 +22,7 @@ body{font-family:'Segoe UI',sans-serif;background:var(--azul-tenue-2);display:fl
 #topbar .actions{display:flex;gap:10px;align-items:center}
 .btn-refresh{background:var(--blue3);border:1px solid var(--blue);color:var(--blue);padding:6px 16px;border-radius:8px;cursor:pointer;font-size:.82em;font-weight:600;transition:all .2s}
 .btn-refresh:hover{background:var(--blue);color:var(--texto-inverso)}
-.badge-cache{font-size:.72em;color:var(--texto-suave);background:var(--gris-100);padding:3px 10px;border-radius:20px}
+.badge-cache{font-size:.72em;color:var(--gris-600);background:var(--gris-100);padding:3px 10px;border-radius:20px}
 #content{padding:24px 28px;flex:1}
 
 /* SECTION */
@@ -82,7 +82,7 @@ tr:hover td{background:var(--blue3)}
 .tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.75em;font-weight:600}
 .tag.aprobado{background:var(--aprobado-banda);color:var(--aprobado-fuerte)}
 .tag.negado{background:var(--negado-banda);color:var(--negado-fuerte)}
-.tag.buzon{background:var(--superficie)3cd;color:var(--buzon-fuerte)}
+.tag.buzon{background:var(--buzon-banda);color:var(--buzon-fuerte)}
 .tag.no-compatible{background:var(--incompat-banda);color:var(--incompat-fuerte)}
 .tag.marca-unica{background:var(--marca-unica-banda);color:var(--marca-unica-fuerte)}
 .tag.tel-inc{background:var(--gris-100);color:var(--texto)}

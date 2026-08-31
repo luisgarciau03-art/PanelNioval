@@ -15,7 +15,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,var(--a
 .info-item.full{grid-column:1/-1}
 .section-title{font-size:.8em;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid var(--azul-tenue)}
 .btn-group{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
-.btn{padding:13px 20px;border:none;border-radius:12px;font-size:.92em;font-weight:700;cursor:pointer;transition:all .2s;flex:1;min-width:120px}
+.btn-group .btn{flex:1;min-width:120px}
 .btn:active{transform:scale(.97)}
 .btn-green{background:var(--green);color:var(--texto-inverso)}.btn-green:hover{filter:brightness(.88)}
 .btn-red{background:var(--red);color:var(--texto-inverso)}.btn-red:hover{filter:brightness(.88)}
@@ -39,4 +39,4 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,var(--a
 .fin h2{color:var(--blue);margin-bottom:8px}
 .fin p{color:var(--texto-suave);font-size:.9em}
 .stat-row{display:flex;justify-content:space-around;background:var(--azul-tenue-2);border-radius:12px;padding:14px;margin-top:16px}
-.stat{text-align:center}.stat .n{font-size:1.6em;font-weight:800;color:var(--blue)}.stat .l{font-size:.7em;color:var(--texto-suave);text-transform:uppercase}
+.resumen-stat{text-align:center}.resumen-stat .n{font-size:1.6em;font-weight:800;color:var(--blue)}.resumen-stat .l{font-size:.7em;color:var(--texto-suave);text-transform:uppercase}

@@ -79,13 +79,28 @@ code, pre, .consola {
    El panel tenia 0 `tabindex`, 0 `aria-*` y 15 `onclick` sobre `div`; el foco
    es lo primero que hay que poder ver. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: 3px solid var(--foco);
+  /* De dentro afuera: elemento, anillo claro de 2px, anillo oscuro de 3px.
+     Sobre un fondo claro se ve el oscuro; sobre uno oscuro, el claro. Con un
+     solo color el anillo desaparecia sobre la barra lateral azul y sobre la
+     consola, que es donde el operador mas navega con teclado. */
+  outline: 3px solid var(--foco-oscuro);
   outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--foco-claro);
   border-radius: var(--radio-sm);
 }
 
 /* Nada de quitar el outline sin sustituirlo. */
 :focus:not(:focus-visible) { outline: none; }
+
+/* Alto contraste de Windows: el sistema sustituye los colores del autor, y un
+   anillo hecho con box-shadow desaparece. `Highlight` es un color del sistema
+   y sobrevive. Es plausible que algun operador lo tenga activado. */
+@media (forced-colors: active) {
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px solid Highlight;
+    box-shadow: none;
+  }
+}
 
 /* --- Landmarks -----------------------------------------------------------
    El marcado no tenia ninguno. Estos estilos son neutros a proposito: existen

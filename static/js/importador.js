@@ -112,7 +112,7 @@ function renderChips(lista) {
       : `<span style="opacity:.55;font-size:.85em">${c.unidades_ferreteras}</span>`;
     const nombre = escaparHtml(c.ciudad);
     const porque = escaparHtml(c.explicacion || '');
-    return `<span class="chip ${isTop?'top':''}" data-ciudad="${nombre}" title="${porque}">${medal}${nombre} ${badge}</span>`;
+    return `<span class="chip-ciudad ${isTop?'top':''}" data-ciudad="${nombre}" title="${porque}">${medal}${nombre} ${badge}</span>`;
   }).join('');
 }
 
@@ -120,10 +120,10 @@ function renderChips(lista) {
 // codigo. Se registra una sola vez sobre el contenedor, asi que sobrevive a cada
 // re-render de los chips.
 document.getElementById('ciudades-chips').addEventListener('click', (ev) => {
-  const chip = ev.target.closest('.chip');
+  const chip = ev.target.closest('.chip-ciudad');
   if (!chip) return;
   document.getElementById('input-ciudad').value = chip.dataset.ciudad || '';
-  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.chip-ciudad').forEach(c => c.classList.remove('active'));
   chip.classList.add('active');
 });
 

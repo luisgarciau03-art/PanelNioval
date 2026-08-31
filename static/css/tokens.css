@@ -104,7 +104,15 @@
      adyacente porque delimita el campo. El #ccd anterior daba 1.4:1. */
   --borde-control: #8896aa;           /* 3.00:1 sobre blanco */
 
-  --foco:          var(--azul);       /* 7.57:1 -- el anillo tiene que verse */
+  /* Anillo de foco de DOS tonos. Un solo color no sirve: --azul da 7.57:1
+     sobre blanco pero 1.43:1 sobre el azul oscuro de la barra lateral y
+     2.36:1 sobre la consola, o sea invisible justo donde mas falta hace.
+     Con dos anillos concentricos basta con que uno pase 3:1 en cada fondo, y
+     este par pasa en los ocho fondos del sistema (blanco, gris-100, azul,
+     azul-oscuro, azul-cian, consola, exito y error). */
+  --foco-oscuro:   var(--gris-900);
+  --foco-claro:    var(--blanco);
+  --foco:          var(--foco-oscuro);   /* alias del anillo exterior */
 
   /* --- Tipografia ----------------------------------------------------------
      Decision del ADR: pila de sistema, sin fuente web. Es un panel interno que

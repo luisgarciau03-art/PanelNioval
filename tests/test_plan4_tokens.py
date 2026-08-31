@@ -121,6 +121,177 @@ class TestCE3SinColoresLiterales:
         )
 
 
+class TestLosParesQueDeVerdadSeUsan:
+    """Comprobar los tokens uno a uno no basta.
+
+    `--texto-suave` esta documentado como "el mas claro que aun pasa AA", y es
+    cierto **sobre blanco**: 4.76:1. Pero el badge de cache del dashboard lo
+    ponia sobre `--gris-100` y ahi baja a 4.34:1, por debajo de AA. El token
+    estaba bien; el par estaba mal.
+
+    Esto recorre las reglas de verdad y saca los pares `color` + `background`
+    que conviven en la misma regla.
+    """
+
+    EXENTOS = (":disabled", "[disabled]", "[aria-disabled")
+
+    def _tabla_de_color(self, texto_superficie: str) -> dict[str, str]:
+        crudo = dict(re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;]+);",
+                                TOKENS.read_text(encoding="utf-8")))
+
+        def resolver(valor, prof=0):
+            valor = valor.strip()
+            if prof > 5:
+                return None
+            m = RE_USO.match(valor)
+            if m:
+                return resolver(crudo.get(m.group(1), ""), prof + 1)
+            return valor if RE_HEX.fullmatch(valor) else None
+
+        tabla = {k: v for k, v in ((k, resolver(v)) for k, v in crudo.items()) if v}
+        # alias locales del :root de la superficie (--blue -> var(--azul) ...)
+        m = re.search(r":root\{([^}]*)\}", texto_superficie)
+        if m:
+            for nombre, valor in re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;}]+)", m.group(1)):
+                mm = RE_USO.match(valor.strip())
+                if mm and mm.group(1) in tabla:
+                    tabla[nombre] = tabla[mm.group(1)]
+        return tabla
+
+    @pytest.mark.parametrize("archivo", [
+        "base.css", "componentes.css", "dashboard.css", "formulario.css", "importador.css",
+    ])
+    def test_todo_par_color_fondo_pasa_aa(self, archivo):
+        texto = re.sub(r"/\*.*?\*/", "", (CSS / archivo).read_text(encoding="utf-8"), flags=re.S)
+        tabla = self._tabla_de_color(texto)
+        fallos = []
+        for m in re.finditer(r"([^{}]+)\{([^}]*)\}", texto):
+            selector, cuerpo = m.group(1).strip(), m.group(2)
+            # WCAG 1.4.11 excluye los componentes inactivos del requisito.
+            if any(x in selector for x in self.EXENTOS):
+                continue
+            c = re.search(r"(?:^|;)\s*color\s*:\s*var\(\s*(--[a-z0-9-]+)", cuerpo)
+            b = re.search(r"(?:^|;)\s*background(?:-color)?\s*:\s*var\(\s*(--[a-z0-9-]+)", cuerpo)
+            if not (c and b):
+                continue
+            hc, hb = tabla.get(c.group(1)), tabla.get(b.group(1))
+            if not (hc and hb):
+                continue
+            r = contraste(hc, hb)
+            if r < 4.5:
+                fallos.append(f"{selector[:50]}: {c.group(1)} sobre {b.group(1)} = {r:.2f}:1")
+        assert not fallos, f"{archivo}, pares por debajo de AA:\n  " + "\n  ".join(fallos)
+
+    def test_el_escaner_ve_el_caso_que_se_colo(self):
+        """Control positivo: el par exacto que fallaba en el badge de cache."""
+        assert contraste("#64748b", "#f1f5f9") < 4.5
+        assert contraste("#475569", "#f1f5f9") >= 4.5
+
+
+class TestElFocoSeVeSobreCualquierFondo:
+    """Un anillo de un solo color no vale. `--azul` daba 7.57:1 sobre blanco
+    pero 1.43:1 sobre el azul oscuro de la barra lateral, o sea invisible justo
+    donde el operador navega con teclado. Con dos anillos concentricos basta con
+    que uno pase 3:1 en cada fondo.
+    """
+
+    FONDOS = ["--blanco", "--gris-100", "--azul", "--azul-oscuro",
+              "--azul-cian", "--gris-900", "--exito", "--error"]
+
+    @pytest.mark.parametrize("fondo", FONDOS)
+    def test_uno_de_los_dos_anillos_se_ve(self, fondo):
+        t = _tokens()
+        oscuro, claro = t["--gris-900"], t["--blanco"]
+        f = t[fondo]
+        mejor = max(contraste(oscuro, f), contraste(claro, f))
+        assert mejor >= 3.0, f"el anillo de foco no se ve sobre {fondo}: {mejor:.2f}:1"
+
+    def test_un_anillo_de_un_solo_color_no_habria_bastado(self):
+        """Control en la otra direccion: si esto empezara a pasar, el test de
+        arriba no estaria demostrando que hacian falta dos anillos."""
+        t = _tokens()
+        assert contraste(t["--azul"], t["--azul-oscuro"]) < 3.0
+
+    def test_base_css_declara_los_dos_anillos(self):
+        base = (CSS / "base.css").read_text(encoding="utf-8")
+        assert "--foco-oscuro" in base and "--foco-claro" in base
+        assert "forced-colors" in base, "falta el modo de alto contraste de Windows"
+
+
+class TestNoQuedaCssRotoPorLaMigracion:
+    """La migracion a tokens se hizo con sustitucion de texto, y eso tiene una
+    trampa: `#fff` es PREFIJO de `#fff3cd`. Sustituir el primero dejo
+    `background:var(--superficie)3cd`, que no es un valor valido -- el parser
+    descarta la declaracion entera y la etiqueta se queda sin fondo.
+
+    No lo veia ningun test: `RE_HEX` solo busca literales que empiecen por `#`,
+    y en cuanto el reemplazo deja basura sin `#`, se vuelve invisible.
+    """
+
+    RE_RESTO = re.compile(r"var\(--[a-z0-9-]+\)[0-9a-fA-F]")
+
+    @pytest.mark.parametrize("archivo", [
+        "base.css", "componentes.css", "dashboard.css", "formulario.css",
+        "importador.css", "tokens.css",
+    ])
+    def test_ningun_var_pegado_a_restos_de_hex(self, archivo):
+        texto = (CSS / archivo).read_text(encoding="utf-8")
+        hallazgos = self.RE_RESTO.findall(texto)
+        assert not hallazgos, f"{archivo}: declaracion rota, {hallazgos}"
+
+    def test_tambien_en_plantillas_y_js(self):
+        problemas = []
+        for ruta in list((RAIZ / "templates").glob("*.html")) + list((CSS.parent / "js").glob("*.js")):
+            for n, linea in enumerate(ruta.read_text(encoding="utf-8").splitlines(), 1):
+                if self.RE_RESTO.search(linea):
+                    problemas.append(f"{ruta.name}:{n}")
+        assert not problemas, f"declaraciones rotas en {problemas}"
+
+    def test_el_patron_encuentra_el_caso_real(self):
+        """Control positivo con el defecto exacto que se colo."""
+        assert self.RE_RESTO.search("background:var(--superficie)3cd")
+        assert not self.RE_RESTO.search("background:var(--buzon-banda)")
+
+
+class TestSinColisionesConElSistema:
+    """Un componente compartido que una superficie redefine con el mismo nombre
+    deja de estar enlazado al sistema, y nadie se entera: no hay error, solo un
+    `.chip` que ignora los cambios del diseno. Peor todavia cuando el pisado es
+    PARCIAL -- `.stat` en el formulario solo redeclaraba `text-align`, asi que
+    heredaba fondo, borde y padding del componente y pintaba una tarjeta dentro
+    de otra.
+    """
+
+    @pytest.mark.parametrize("superficie", ["dashboard", "formulario", "importador"])
+    def test_ninguna_superficie_redefine_un_componente(self, superficie):
+        def clases_base(texto: str) -> set[str]:
+            """Clases cuyo selector es EXACTAMENTE `.nombre`.
+
+            Se compara el selector entero, no un fragmento: `.btn-group .btn`
+            es un override contextual (uso normal de la cascada) y
+            `.btn:active` una extension de estado. La colision danina es
+            redeclarar la base, porque hereda A MEDIAS del componente --
+            como `.stat{text-align:center}`, que solo pisaba una propiedad y
+            se quedaba con el fondo, el borde y el padding de la tarjeta,
+            pintando una tarjeta dentro de otra.
+            """
+            nombres = set()
+            for m in re.finditer(r"([^{}]+)\{[^}]*\}", texto):
+                for sel in m.group(1).split(","):
+                    sel = sel.strip()
+                    if re.fullmatch(r"\.[a-z][a-z0-9-]*", sel):
+                        nombres.add(sel[1:])
+            return nombres
+
+        del_sistema = clases_base((CSS / "componentes.css").read_text(encoding="utf-8"))
+        de_la_superficie = clases_base((CSS / f"{superficie}.css").read_text(encoding="utf-8"))
+        choques = sorted(del_sistema & de_la_superficie)
+        assert not choques, (
+            f"{superficie}.css redefine componentes del sistema: {choques}. "
+            "Dale nombre propio a lo local o consume el componente compartido."
+        )
+
+
 class TestNoHayTokensFantasma:
     def test_todo_var_usado_esta_definido(self):
         definidos = set(RE_DEF.findall(TOKENS.read_text(encoding="utf-8")))
