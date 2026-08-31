@@ -626,7 +626,7 @@ presupone cuentas de medios pagados, que este proyecto no tiene.
 | T4.0 | Tarea Cero: rama y evidencia del antes | ✅ HECHA | `b5ff47d` · 9 capturas sin PII · baseline 482 passed | 2026-08-31 |
 | T4.1 | Auditoría del estado actual y ADN de marca | ✅ HECHA | `b5ff47d` · `docs/diseno/2026-08-31-auditoria-y-adn-marca.md` + `brand-profile.json` | 2026-08-31 |
 | T4.2 | Dirección visual (ADR) | ✅ HECHA | `1c3665d` · `docs/adr/2026-08-31-direccion-visual-panel.md` (método: `council`) | 2026-08-31 |
-| T4.3 | Extraer HTML de `app.py` a templates/static | ✅ HECHA | `d86323f` + `505cf90` · app.py 6,368 → 3,133 · 504 passed, 1 skipped · 6/9 capturas idénticas píxel a píxel (las 3 restantes difieren solo en el reloj) | 2026-08-31 |
+| T4.3 | Extraer HTML de `app.py` a templates/static | ✅ HECHA | **PR #43** · `d86323f` (+ `505cf90`, `ba9cfd5`, `69e3e79`) · app.py 6,368 → 3,133 · **507 passed, 1 skipped** · 6/9 capturas idénticas píxel a píxel (las 3 restantes difieren solo en el reloj) · gates `refactoring-specialist` limpio, `code-reviewer` y `python-reviewer` con 1 CRITICAL cada uno, corregidos · CI verde | 2026-08-31 |
 | T4.4 | Sistema de diseño: tokens y componentes | PENDIENTE | | |
 | T4.5 | Estados de carga: esqueletos | PENDIENTE | | |
 | T4.6 | Sistema de movimiento | PENDIENTE | | |
