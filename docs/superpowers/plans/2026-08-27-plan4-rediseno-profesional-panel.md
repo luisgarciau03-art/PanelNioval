@@ -627,7 +627,7 @@ presupone cuentas de medios pagados, que este proyecto no tiene.
 | T4.1 | Auditoría del estado actual y ADN de marca | ✅ HECHA | `b5ff47d` · `docs/diseno/2026-08-31-auditoria-y-adn-marca.md` + `brand-profile.json` | 2026-08-31 |
 | T4.2 | Dirección visual (ADR) | ✅ HECHA | `1c3665d` · `docs/adr/2026-08-31-direccion-visual-panel.md` (método: `council`) | 2026-08-31 |
 | T4.3 | Extraer HTML de `app.py` a templates/static | ✅ HECHA | **PR #43** · `d86323f` (+ `505cf90`, `ba9cfd5`, `69e3e79`) · app.py 6,368 → 3,133 · **507 passed, 1 skipped** · 6/9 capturas idénticas píxel a píxel (las 3 restantes difieren solo en el reloj) · gates `refactoring-specialist` limpio, `code-reviewer` y `python-reviewer` con 1 CRITICAL cada uno, corregidos · CI verde | 2026-08-31 |
-| T4.4 | Sistema de diseño: tokens y componentes | PENDIENTE | | |
+| T4.4 | Sistema de diseño: tokens y componentes | ✅ HECHA | `211a70e` + `43ba0e8` · CE3: 288 → 31 colores literales (los 31 son las paletas de datos, T4.7) · verde de marca 2.16:1 → 4.54:1 · anillo de foco de dos tonos (el anterior fallaba en 6 de 8 fondos) · **564 passed, 1 skipped** · gates: `code-reviewer` 2 HIGH + `a11y-architect` 2 HIGH, todos corregidos | 2026-08-31 |
 | T4.5 | Estados de carga: esqueletos | PENDIENTE | | |
 | T4.6 | Sistema de movimiento | PENDIENTE | | |
 | T4.7 | Rediseño del dashboard `/` | PENDIENTE | | |
@@ -636,4 +636,4 @@ presupone cuentas de medios pagados, que este proyecto no tiene.
 | T4.10 | Accesibilidad, responsive y rendimiento | PENDIENTE | | |
 | T4.11 | Cierre: sistema documentado, PR, handoff | PENDIENTE | | |
 
-**Avance del plan: 4 / 12 tareas (33 %)**
+**Avance del plan: 5 / 12 tareas (42 %)**
