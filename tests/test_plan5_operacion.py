@@ -351,7 +351,7 @@ class TestFormatoTelefonoContactos:
 
     @pytest.mark.parametrize("entrada", [
         "525551234567",        # el caso que fallo, con lada de pais
-        "5551234567",          # nacional pelado
+        "5551234567",          # nacional pelado  barrido-ok: numero sintetico de fixture, prefijo 555 de ficcion
         "+52 555 123 4567",    # ya formateado con prefijo
         "5215551234567",       # con el '1' de movil que Mexico ya no usa
         "555-123-4567",        # con guiones
