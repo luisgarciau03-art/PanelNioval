@@ -1588,7 +1588,7 @@ def formulario_telefono():
             return jsonify({'ok': False,
                             'error': 'columna de telefono no encontrada en LISTA DE CONTACTOS'}), 400
         tel_norm = nc.normalizar_telefono(telefono)
-        # La hoja guarda el numero nacional con espacios ('662 353 4185'); el
+        # La hoja guarda el numero nacional con espacios ('555 123 4567'); el
         # operador la lee a ojo. tel_norm queda para la respuesta y la cola.
         tel_hoja = nc.formatear_telefono_contactos(telefono)
         wsc.batch_update(

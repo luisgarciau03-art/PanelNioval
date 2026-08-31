@@ -347,18 +347,18 @@ class TestColumnaTelefonoContactos:
 class TestFormatoTelefonoContactos:
     """La hoja guarda el numero nacional con espacios: 6787 de 7054 telefonos
     tienen 10 digitos y el formato dominante es 'NNN NNN NNNN'. Escribir
-    '+526623534185' seria ajeno al resto de la columna."""
+    '+525551234567' seria ajeno al resto de la columna."""
 
     @pytest.mark.parametrize("entrada", [
-        "526623534185",        # el caso que fallo, con lada de pais
-        "6623534185",          # nacional pelado
-        "+52 662 353 4185",    # ya formateado con prefijo
-        "5216623534185",       # con el '1' de movil que Mexico ya no usa
-        "662-353-4185",        # con guiones
-        "(662) 353 4185",      # con parentesis
+        "525551234567",        # el caso que fallo, con lada de pais
+        "5551234567",          # nacional pelado
+        "+52 555 123 4567",    # ya formateado con prefijo
+        "5215551234567",       # con el '1' de movil que Mexico ya no usa
+        "555-123-4567",        # con guiones
+        "(555) 123 4567",      # con parentesis
     ])
     def test_normaliza_al_formato_de_la_hoja(self, entrada):
-        assert nc.formatear_telefono_contactos(entrada) == "662 353 4185"
+        assert nc.formatear_telefono_contactos(entrada) == "555 123 4567"
 
     def test_no_inventa_agrupacion_si_no_son_10_digitos(self):
         """Agrupar a ciegas un numero raro escribiria algo falso en produccion."""
