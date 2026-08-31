@@ -1,0 +1,130 @@
+/* ============================================================================
+   NIOVAL - Base
+   Plan 4 - T4.4. Reset corto, tipografia base y foco visible.
+   Depende de tokens.css: aqui no hay ni un color literal.
+   ============================================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--fuente);
+  font-size: var(--texto-base);
+  line-height: var(--linea-normal);
+  color: var(--texto);
+  background: var(--fondo);
+}
+
+/* --- Tipografia ---------------------------------------------------------- */
+
+h1, h2, h3, h4 {
+  margin: 0 0 var(--esp-3);
+  line-height: var(--linea-apretada);
+  font-weight: var(--peso-fuerte);
+  /* `inherit`, NO --texto-fuerte. Un titulo dentro de una cabecera de color
+     ya hereda el blanco de su contenedor; fijarle un gris oscuro lo dejaba
+     ilegible sobre el degradado azul de las tres superficies. Un sistema que
+     se aplica sobre marcado existente no puede imponer color a un elemento
+     que ya lo recibia del contexto. */
+  color: inherit;
+  /* Los titulos largos no parten palabras a lo bruto en 320px. */
+  overflow-wrap: break-word;
+}
+
+h1 { font-size: var(--texto-xl); }
+h2 { font-size: var(--texto-lg); }
+h3 { font-size: var(--texto-base); }
+
+p { margin: 0 0 var(--esp-3); }
+
+/* Sin `color` a proposito. El marcado original no tenia ninguna regla `a{}` y
+   varios enlaces -los de Herramientas en la barra lateral- son contenedores de
+   bloques que toman el color de su contexto. Fijarles --texto-enlace los dejaba
+   en azul sobre el azul de la barra, ilegibles. Un sistema que se aplica sobre
+   marcado existente no impone color a lo que ya lo recibia del contexto; el
+   color de enlace se pone donde haga falta, en el CSS de cada superficie. */
+a { text-underline-offset: 2px; }
+a:hover { text-decoration: underline; }
+
+small, .texto-suave { color: var(--texto-suave); }
+
+/* Etiqueta corta en mayusculas: sin tracking se lee apelotonada. */
+.etiqueta {
+  font-size: var(--texto-xs);
+  font-weight: var(--peso-medio);
+  letter-spacing: var(--track-etiqueta);
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+
+/* --- Cifras --------------------------------------------------------------
+   Cifras tabulares en todo lo numerico. Con cifras proporcionales las columnas
+   bailan al reordenar una tabla, que es el defecto tipografico mas visible de
+   un panel de datos. Cuesta cero bytes. */
+.cifra, td, th, .stat-num, input[type="number"], input[type="tel"] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+code, pre, .consola {
+  font-family: var(--fuente-mono);
+  font-size: var(--texto-sm);
+}
+
+/* --- Foco visible --------------------------------------------------------
+   Requisito de accesibilidad, no adorno. `:focus-visible` da anillo al navegar
+   con teclado sin ensuciar el clic con raton.
+   El panel tenia 0 `tabindex`, 0 `aria-*` y 15 `onclick` sobre `div`; el foco
+   es lo primero que hay que poder ver. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+  border-radius: var(--radio-sm);
+}
+
+/* Nada de quitar el outline sin sustituirlo. */
+:focus:not(:focus-visible) { outline: none; }
+
+/* --- Landmarks -----------------------------------------------------------
+   El marcado no tenia ninguno. Estos estilos son neutros a proposito: existen
+   para que anadir <main>/<nav>/<header> en la T4.10 no cambie el aspecto. */
+main, nav, header, section, aside { display: block; }
+
+/* Saltar al contenido: visible solo al tabular. */
+.saltar-al-contenido {
+  position: absolute;
+  left: -9999px;
+  top: var(--esp-2);
+  z-index: 100;
+  padding: var(--esp-2) var(--esp-4);
+  background: var(--superficie);
+  color: var(--texto-enlace);
+  border: 2px solid var(--foco);
+  border-radius: var(--radio-md);
+}
+.saltar-al-contenido:focus { left: var(--esp-2); }
+
+/* --- Utilidades ---------------------------------------------------------- */
+
+/* Para lectores de pantalla: presente en el arbol, invisible en pantalla.
+   No usar `display:none`, que lo saca tambien del arbol de accesibilidad. */
+.solo-lectores {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Contenido ancho (tablas, consola) que hace scroll DENTRO de su caja.
+   El cuerpo de la pagina nunca debe hacer scroll horizontal (CE10). */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+img { max-width: 100%; height: auto; }

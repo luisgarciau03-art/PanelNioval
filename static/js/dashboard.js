@@ -76,9 +76,9 @@ async function loadSection(name) {
   } catch(e) {
     console.error('loadSection error:', name, e);
     const tableEl = document.getElementById(name + '-table') || document.getElementById('sec-' + name)?.querySelector('.tbl-wrap');
-    if (tableEl) tableEl.innerHTML = `<div class="empty" style="color:#e74c3c">⚠️ Error al cargar: ${e.message}</div>`;
+    if (tableEl) tableEl.innerHTML = `<div class="empty" style="color:var(--error)">⚠️ Error al cargar: ${e.message}</div>`;
     const cardsEl = document.getElementById(name.replace('-','') + '-cards') || document.getElementById('pend-cards');
-    if (name === 'pendientes' && cardsEl) cardsEl.innerHTML = `<div class="empty" style="color:#e74c3c">⚠️ Error: ${e.message}</div>`;
+    if (name === 'pendientes' && cardsEl) cardsEl.innerHTML = `<div class="empty" style="color:var(--error)">⚠️ Error: ${e.message}</div>`;
     state.loaded[name] = false; // permitir reintento
   }
 }
@@ -92,7 +92,7 @@ async function fetchAPI(url) {
 
 function showSectionError(sectionId, msg) {
   const el = document.getElementById(sectionId);
-  if (el) el.innerHTML = `<div class="empty" style="color:#e74c3c">⚠️ ${msg}</div>`;
+  if (el) el.innerHTML = `<div class="empty" style="color:var(--error)">⚠️ ${msg}</div>`;
 }
 
 // ─── DASHBOARD ──────────────────────────────────────────────────────────────
@@ -202,7 +202,7 @@ async function loadFrecuentes() {
       <td><span class="tag default">${r['Esquema'] || '—'}</span></td>
       <td style="text-align:center;font-weight:700">${r['Pedidos']}</td>
       <td style="text-align:right;font-weight:800;color:var(--green)">$${fmtMonto(r['Total Monto'])}</td>
-      <td style="color:#888;font-size:.85em">${r['Ultimo Pedido'] || '—'}</td>
+      <td style="color:var(--texto-suave);font-size:.85em">${r['Ultimo Pedido'] || '—'}</td>
     </tr>`;
   });
   html += '</tbody></table>';
@@ -354,12 +354,12 @@ async function loadVentasDash() {
       .map(([k,v]) => `<span class="tag default" style="font-size:.7em">${k}: $${fmtMonto(v)}</span>`)
       .join(' ');
     const isMejor = m.mes === d.mejor_mes;
-    html += `<tr ${isMejor ? 'style="background:#f0fff4"' : ''}>
+    html += `<tr ${isMejor ? 'style="background:var(--exito-tinte)"' : ''}>
       <td><strong ${isMejor ? 'style="color:var(--green)"' : ''}>${m.mes} ${isMejor ? '⭐' : ''}</strong></td>
       <td style="text-align:right;font-weight:800;color:var(--green)">$${fmtMonto(m.monto)}</td>
       <td style="text-align:center;font-weight:700">${m.pedidos}</td>
       <td style="text-align:center">${m.clientes}</td>
-      <td style="text-align:right;color:#888">$${fmtMonto(m.ticket_prom)}</td>
+      <td style="text-align:right;color:var(--texto-suave)">$${fmtMonto(m.ticket_prom)}</td>
       <td>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <div style="background:var(--green);height:8px;border-radius:4px;width:${barW}px;min-width:2px"></div>
@@ -554,7 +554,7 @@ function renderCell(col, val, row) {
       const factura = row['Num Factura'] || '';
       return `<button class="btn-upload-pago" onclick="abrirUpload('${factura}', this)" title="Subir comprobante">📎 Subir</button>`;
     }
-    return '<span style="color:#ccc">—</span>';
+    return '<span style="color:var(--texto-suave)">—</span>';
   }
   const colLow = col.toLowerCase();
   const valUp  = val.toUpperCase();
@@ -592,7 +592,7 @@ function renderCell(col, val, row) {
     // Tiene nombre de archivo pero no URL → solo subir
     const factura = row ? (row['Num Factura'] || '') : '';
     return `<span style="display:flex;align-items:center;gap:5px" id="pago-cell-${factura}">
-      <span style="font-size:.72em;color:#999;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${val}">🖼 ${val.slice(0,14)}…</span>
+      <span style="font-size:.72em;color:var(--texto-suave);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${val}">🖼 ${val.slice(0,14)}…</span>
       <button class="btn-upload-pago" onclick="abrirUpload('${factura}',this)" title="Subir comprobante a Drive">📤 Subir</button>
     </span>`;
   }
@@ -923,8 +923,8 @@ function openEdit(ctx, rowNum) {
     document.getElementById('edit-color-picker').innerHTML = Object.entries(SEG_COLORS).map(([code, c]) =>
       `<div class="color-opt${code===curColor?' selected':''}" data-color="${code}" onclick="selectEditColor(this)"
            title="${c.label}"
-           style="background:${code?c.hex:'#e2e8f0'};border:3px solid ${code===curColor?'#1e293b':'transparent'}">
-         ${code===curColor?'<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.75em;font-weight:900">✓</span>':''}
+           style="background:${code?c.hex:'var(--borde)'};border:3px solid ${code===curColor?'var(--gris-800)':'transparent'}">
+         ${code===curColor?'<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--texto-inverso);font-size:.75em;font-weight:900">✓</span>':''}
        </div>`).join('');
     document.getElementById('edit-color-label').textContent = SEG_COLORS[curColor]?.label || '';
     colorSection.style.display = 'flex';
@@ -982,8 +982,8 @@ function selectEditColor(el) {
     d.style.border = '3px solid transparent';
     d.innerHTML = '';
   });
-  el.style.border = '3px solid #1e293b';
-  el.innerHTML = '<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.75em;font-weight:900">✓</span>';
+  el.style.border = '3px solid var(--gris-800)';
+  el.innerHTML = '<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--texto-inverso);font-size:.75em;font-weight:900">✓</span>';
   document.getElementById('edit-seg-modal')._color = code;
   document.getElementById('edit-color-label').textContent = SEG_COLORS[code]?.label || '';
 }
@@ -1111,7 +1111,7 @@ async function refreshData() {
 // ─── BUSCAR IMAGEN EN DRIVE ──────────────────────────────────────────────────
 async function buscarEnDrive(nombreEnc, factura) {
   const cell = document.getElementById(`pago-cell-${factura}`);
-  if (cell) cell.innerHTML = '<span style="font-size:.78em;color:#888">🔍 Buscando...</span>';
+  if (cell) cell.innerHTML = '<span style="font-size:.78em;color:var(--texto-suave)">🔍 Buscando...</span>';
 
   try {
     const res = await fetch(`/api/ventas/buscar-imagen?nombre=${nombreEnc}`);
@@ -1121,7 +1121,7 @@ async function buscarEnDrive(nombreEnc, factura) {
       // Actualizar celda visualmente
       if (cell) {
         cell.innerHTML = `<span style="display:flex;align-items:center;gap:6px">
-          <img src="${data.thumb}" style="height:40px;border-radius:4px;cursor:pointer;border:1px solid #dde" onclick="verImagen('${data.url}','${data.thumb}')">
+          <img src="${data.thumb}" style="height:40px;border-radius:4px;cursor:pointer;border:1px solid var(--borde)" onclick="verImagen('${data.url}','${data.thumb}')">
           <a href="${data.url}" target="_blank" style="color:var(--blue);font-size:.78em">🔍 Abrir</a>
         </span>`;
       }
@@ -1132,7 +1132,7 @@ async function buscarEnDrive(nombreEnc, factura) {
       await fetch('/api/ventas/update-pago-url', { method: 'POST', body: form });
     } else {
       if (cell) cell.innerHTML = `<span style="display:flex;align-items:center;gap:5px">
-        <span style="font-size:.72em;color:#888">No en Drive</span>
+        <span style="font-size:.72em;color:var(--texto-suave)">No en Drive</span>
         <button class="btn-upload-pago" onclick="abrirUpload('${factura}',this)">📤 Subir</button>
       </span>`;
     }
@@ -1163,7 +1163,7 @@ function previewImagen(input) {
   const reader = new FileReader();
   reader.onload = e => {
     document.getElementById('upload-preview').innerHTML =
-      `<img src="${e.target.result}" style="max-height:160px;border-radius:8px;border:1px solid #dde;margin-top:8px">`;
+      `<img src="${e.target.result}" style="max-height:160px;border-radius:8px;border:1px solid var(--borde);margin-top:8px">`;
   };
   reader.readAsDataURL(file);
 }
@@ -1198,7 +1198,7 @@ async function subirComprobante() {
       // Actualizar preview con la imagen de Drive
       if (data.thumb) {
         document.getElementById('upload-preview').innerHTML =
-          `<img src="${data.thumb}" style="max-height:160px;border-radius:8px;border:1px solid #dde;margin-top:8px">
+          `<img src="${data.thumb}" style="max-height:160px;border-radius:8px;border:1px solid var(--borde);margin-top:8px">
            <div style="margin-top:6px"><a href="${data.url}" target="_blank" style="color:var(--blue);font-size:.82em">Ver en Drive →</a></div>`;
       }
       // Actualizar celda en la tabla sin recargar todo
@@ -1208,7 +1208,7 @@ async function subirComprobante() {
           const fileId = data.url.match(/\/d\/([^/]+)\//)?.[1] || '';
           const thumb = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w120` : '';
           td.innerHTML = `<span style="display:flex;align-items:center;gap:6px">
-            ${thumb ? `<img src="${thumb}" style="height:40px;border-radius:4px;cursor:pointer;border:1px solid #dde" onclick="verImagen('${data.url}','${thumb}')">` : ''}
+            ${thumb ? `<img src="${thumb}" style="height:40px;border-radius:4px;cursor:pointer;border:1px solid var(--borde)" onclick="verImagen('${data.url}','${thumb}')">` : ''}
             <a href="${data.url}" target="_blank" style="color:var(--blue);font-size:.78em">Ver →</a>
           </span>`;
         }
@@ -1283,7 +1283,7 @@ async function loadCatalogo(){
   try {
     if (filtro === 'problema') envios = await _catFetchProblema();
     else { const d = await fetch('/api/catalogo/envios'+(filtro?('?estado='+filtro):'')).then(r=>r.json()); envios = d.envios||[]; }
-  } catch(e){ cont.innerHTML = '<div class="empty" style="color:#e74c3c">⚠️ Error al cargar los envíos.</div>'; return; }
+  } catch(e){ cont.innerHTML = '<div class="empty" style="color:var(--error)">⚠️ Error al cargar los envíos.</div>'; return; }
   renderCatalogo(envios);
   actualizarBadgeCatalogo();
 }
@@ -1298,7 +1298,7 @@ function renderCatalogo(envios){
         + `<button class="btn-refresh" style="padding:4px 10px;font-size:.76em" onclick="catReintentar(${e._row})">🔁 Reintentar</button>`
       : '—';
     return `<tr><td>${_catEsc(e.tienda)}</td><td>${_catEsc(e.telefono)}</td><td>${_catTag(e.estado)}</td>`
-         + `<td style="text-align:center">${_catEsc(e.intentos)}</td><td style="font-size:.8em;color:#777">${_catEsc(e.timestamp_estado)}</td><td>${acc}</td></tr>`;
+         + `<td style="text-align:center">${_catEsc(e.intentos)}</td><td style="font-size:.8em;color:var(--texto-suave)">${_catEsc(e.timestamp_estado)}</td><td>${acc}</td></tr>`;
   }).join('');
   cont.innerHTML = `<table><thead><tr><th>Tienda</th><th>Teléfono</th><th>Estado</th><th>Intentos</th><th>Actualizado</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table>`;
 }

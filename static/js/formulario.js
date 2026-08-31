@@ -344,7 +344,7 @@ async function abrirEnviosProblema() {
     const envios = [].concat(inv.envios||[], fall.envios||[]);
     if (!envios.length) { cont.innerHTML = '<p style="color:var(--gray)">Sin envíos con problema. 🎉</p>'; return; }
     cont.innerHTML = envios.map(e =>
-      `<div style="border:1px solid #eef;border-radius:8px;padding:8px;margin-bottom:6px">
+      `<div style="border:1px solid var(--borde);border-radius:8px;padding:8px;margin-bottom:6px">
         <b>${escHtml(e.tienda)}</b> — <span style="color:var(--red)">${escHtml(e.estado)}</span><br>
         <span style="color:var(--gray);font-size:.85em">${escHtml(e.telefono)} · intentos: ${escHtml(e.intentos)}</span><br>
         <button class="btn btn-blue" style="margin-top:4px;font-size:.82em;padding:6px 10px"

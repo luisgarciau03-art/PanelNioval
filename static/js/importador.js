@@ -33,7 +33,7 @@ async function cargarCiudades() {
       // El catalogo no se pudo leer en el servidor. Sin este aviso, el operador
       // ve el mismo listado vacio que si simplemente no hubiera casado nada.
       document.getElementById('sin-clasificar').innerHTML =
-        '<div style="font-size:.75em;color:#a94442;background:#f2dede;border:1px solid #ebccd1;'
+        '<div style="font-size:.75em;color:var(--negado-fuerte);background:var(--negado-banda);border:1px solid var(--borde);'
         + 'border-radius:8px;padding:6px 9px;margin-bottom:10px">'
         + '⚠ El servidor no pudo leer el catalogo de ciudades. Escribe la ciudad a mano.</div>';
       todasCiudades = [];
@@ -54,7 +54,7 @@ async function cargarCiudades() {
     // silencioso a una lista vieja seria peor que no tener lista.
     todasCiudades = [];
     document.getElementById('ciudades-count').textContent = '';
-    cont.innerHTML = '<div style="color:#c0392b;font-size:.82em;padding:6px">'
+    cont.innerHTML = '<div style="color:var(--error);font-size:.82em;padding:6px">'
       + 'No se pudo cargar el catalogo de ciudades. Escribe la ciudad a mano.</div>';
   }
 }
@@ -79,8 +79,8 @@ function pintarSinClasificar() {
   // Visible a proposito: son contactos reales de la hoja cuya ciudad no casa con
   // ninguna del catalogo. Esconderlos los haria desaparecer del ranking sin que
   // nadie se entere.
-  caja.innerHTML = `<div style="font-size:.75em;color:#8a6d3b;background:#fcf8e3;`
-    + `border:1px solid #faebcc;border-radius:8px;padding:6px 9px;margin-bottom:10px">`
+  caja.innerHTML = `<div style="font-size:.75em;color:var(--buzon-fuerte);background:var(--buzon-banda);`
+    + `border:1px solid var(--borde);border-radius:8px;padding:6px 9px;margin-bottom:10px">`
     + `⚠ ${n} contactos en ${sinClasificar.length} ciudades que no estan en el catalogo: `
     + `${nombres}${resto}.</div>`;
 }
@@ -98,7 +98,7 @@ function escaparHtml(s) {
 
 function renderChips(lista) {
   const cont = document.getElementById('ciudades-chips');
-  if (!lista.length) { cont.innerHTML = '<div style="color:#aaa;font-size:.82em">Sin resultados</div>'; return; }
+  if (!lista.length) { cont.innerHTML = '<div style="color:var(--texto-suave);font-size:.82em">Sin resultados</div>'; return; }
 
   cont.innerHTML = lista.map((c) => {
     const rank   = (c.rank != null) ? c.rank : 0;
@@ -108,7 +108,7 @@ function renderChips(lista) {
     // logaritmica y comprime: un 86.7 frente a un 89.8 no significa lo que el
     // operador leeria que significa. El conteo si es interpretable y auditable.
     const badge  = c.interes_pct > 0
-      ? `<span style="background:rgba(0,204,71,.2);color:#155724;padding:1px 5px;border-radius:8px;font-size:.85em">${c.interes_pct}%</span>`
+      ? `<span style="background:rgba(0,204,71,.2);color:var(--aprobado-fuerte);padding:1px 5px;border-radius:8px;font-size:.85em">${c.interes_pct}%</span>`
       : `<span style="opacity:.55;font-size:.85em">${c.unidades_ferreteras}</span>`;
     const nombre = escaparHtml(c.ciudad);
     const porque = escaparHtml(c.explicacion || '');

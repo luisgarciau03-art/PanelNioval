@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Panel NIOVAL</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/componentes.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 </head>
 <body>
@@ -52,7 +55,7 @@
     </div>
     <div class="nav-item" onclick="showSection('catalogo')">
       <span class="icon">📖</span> Envíos Catálogo
-      <span id="cat-badge" style="display:none;margin-left:auto;background:#e74c3c;color:#fff;border-radius:10px;padding:1px 7px;font-size:.72em;font-weight:700"></span>
+      <span id="cat-badge" style="display:none;margin-left:auto;background:var(--error);color:var(--texto-inverso);border-radius:10px;padding:1px 7px;font-size:.72em;font-weight:700"></span>
     </div>
   </div>
 
@@ -160,7 +163,7 @@
         <h3>💰 Ventas — Orden de Ingreso</h3>
         <div class="table-controls">
           <input type="text" id="ventas-search" placeholder="🔍 Buscar..." oninput="filterTable('ventas')">
-          <span id="ventas-count" style="font-size:.8em;color:#888;align-self:center;margin-left:4px"></span>
+          <span id="ventas-count" style="font-size:.8em;color:var(--texto-suave);align-self:center;margin-left:4px"></span>
         </div>
         <div class="tbl-wrap" id="ventas-table"><div class="loading"><div class="spinner"></div></div></div>
         <div class="pagination" id="ventas-pag"></div>
@@ -245,9 +248,9 @@
     <div class="section" id="sec-catalogo">
       <div class="table-box">
         <h3>📖 Envíos de Catálogo — números a corregir</h3>
-        <p style="color:#777;font-size:.85em;margin:4px 0 10px">Cuando el envío falla por número inválido/erróneo, aquí lo corriges: se actualiza el teléfono en <b>LISTA DE CONTACTOS</b> y se reintenta.</p>
+        <p style="color:var(--texto-suave);font-size:.85em;margin:4px 0 10px">Cuando el envío falla por número inválido/erróneo, aquí lo corriges: se actualiza el teléfono en <b>LISTA DE CONTACTOS</b> y se reintenta.</p>
         <div class="table-controls">
-          <select id="cat-filtro" onchange="loadCatalogo()" style="padding:6px 10px;border:1px solid #ccd;border-radius:8px;font-size:.85em">
+          <select id="cat-filtro" onchange="loadCatalogo()" style="padding:6px 10px;border:1px solid var(--borde-control);border-radius:8px;font-size:.85em">
             <option value="problema">⚠️ Con problema (corregir número)</option>
             <option value="">Todos</option>
             <option value="PENDIENTE">Pendientes</option>
@@ -261,13 +264,13 @@
 
     <!-- Modal corrección de número (dashboard) -->
     <div id="modal-corregir-cat" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center;padding:16px">
-      <div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+      <div style="background:var(--superficie);border-radius:16px;max-width:440px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
         <h3 style="margin-bottom:6px">✏️ Corregir número</h3>
-        <p style="font-size:.88em;color:#777;margin-bottom:12px">Tienda: <b id="cat-corr-tienda"></b></p>
+        <p style="font-size:.88em;color:var(--texto-suave);margin-bottom:12px">Tienda: <b id="cat-corr-tienda"></b></p>
         <input id="cat-corr-input" type="tel" inputmode="numeric" placeholder="52 + 10 dígitos (ej. 525555555555)"
-               style="width:100%;padding:11px;border:1px solid #ccd;border-radius:8px;font-size:1em" oninput="catValidarCorregir()">
-        <p id="cat-corr-error" style="color:#e74c3c;font-size:.82em;min-height:16px;margin:4px 0"></p>
-        <button id="cat-corr-btn" class="btn-refresh" style="width:100%;background:#00CC47;border-color:#00CC47;color:#fff;padding:10px" disabled onclick="catGuardarCorreccion()">Guardar y reintentar</button>
+               style="width:100%;padding:11px;border:1px solid var(--borde-control);border-radius:8px;font-size:1em" oninput="catValidarCorregir()">
+        <p id="cat-corr-error" style="color:var(--error);font-size:.82em;min-height:16px;margin:4px 0"></p>
+        <button id="cat-corr-btn" class="btn-refresh" style="width:100%;background:var(--exito);border-color:var(--exito-vivo);color:var(--texto-inverso);padding:10px" disabled onclick="catGuardarCorreccion()">Guardar y reintentar</button>
         <button class="btn-refresh" style="width:100%;margin-top:8px" onclick="catCerrarModal()">Cancelar</button>
       </div>
     </div>
@@ -316,7 +319,7 @@
           </div>
           <div>
             <label>Fecha</label>
-            <input id="bf-fecha" disabled style="background:#e8edf5;color:#888">
+            <input id="bf-fecha" disabled style="background:var(--gris-200);color:var(--texto-suave)">
           </div>
           <div class="full">
             <label>NOTA</label>
@@ -342,27 +345,27 @@
 
 <!-- ═══ MODAL EDICIÓN ═══ -->
 <div id="edit-seg-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.65);backdrop-filter:blur(5px);z-index:9999;overflow-y:auto;padding:20px">
-  <div style="background:#fff;border-radius:22px;max-width:740px;margin:24px auto;position:relative;box-shadow:0 30px 90px rgba(0,0,0,.4);overflow:hidden">
+  <div style="background:var(--superficie);border-radius:22px;max-width:740px;margin:24px auto;position:relative;box-shadow:0 30px 90px rgba(0,0,0,.4);overflow:hidden">
     <!-- Header -->
-    <div style="background:linear-gradient(135deg,#0047CC 0%,#0284c7 100%);padding:22px 28px 18px;position:relative">
-      <button onclick="closeEditSeg()" style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.18);border:none;border-radius:50%;width:34px;height:34px;color:#fff;font-size:1.15em;cursor:pointer;line-height:34px;text-align:center;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.32)'" onmouseout="this.style.background='rgba(255,255,255,.18)'">✕</button>
-      <div id="edit-modal-title" style="color:#fff;font-size:1.05em;font-weight:800;letter-spacing:.3px">✏️ Editar Registro</div>
+    <div style="background:linear-gradient(135deg,var(--azul) 0%,var(--azul-cian) 100%);padding:22px 28px 18px;position:relative">
+      <button onclick="closeEditSeg()" style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.18);border:none;border-radius:50%;width:34px;height:34px;color:var(--texto-inverso);font-size:1.15em;cursor:pointer;line-height:34px;text-align:center;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.32)'" onmouseout="this.style.background='rgba(255,255,255,.18)'">✕</button>
+      <div id="edit-modal-title" style="color:var(--texto-inverso);font-size:1.05em;font-weight:800;letter-spacing:.3px">✏️ Editar Registro</div>
       <div id="edit-modal-subtitle" style="color:rgba(255,255,255,.65);font-size:.78em;margin-top:5px;max-width:560px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
     </div>
     <!-- Color selector (solo Seguimiento) -->
-    <div id="edit-color-section" style="padding:14px 28px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:14px">
-      <span style="font-size:.68em;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Estado visual</span>
+    <div id="edit-color-section" style="padding:14px 28px;border-bottom:1px solid var(--borde);display:flex;align-items:center;gap:14px">
+      <span style="font-size:.68em;font-weight:700;color:var(--gris-500);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Estado visual</span>
       <div id="edit-color-picker"></div>
-      <span id="edit-color-label" style="font-size:.78em;color:#475569;font-style:italic"></span>
+      <span id="edit-color-label" style="font-size:.78em;color:var(--gris-600);font-style:italic"></span>
     </div>
     <!-- Fields -->
     <div style="padding:22px 28px 10px">
       <div id="edit-seg-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:15px 18px"></div>
     </div>
     <!-- Footer -->
-    <div style="padding:16px 28px 20px;display:flex;gap:10px;justify-content:flex-end;background:#f8fafc;border-top:1px solid #e2e8f0;margin-top:10px">
-      <button onclick="closeEditSeg()" style="padding:10px 26px;border-radius:10px;border:1.5px solid #cbd5e1;background:#fff;cursor:pointer;font-weight:600;color:#475569;font-size:.9em;transition:all .15s" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#fff'">Cancelar</button>
-      <button id="edit-seg-save" onclick="saveEdit()" style="padding:10px 26px;border-radius:10px;border:none;background:linear-gradient(135deg,#0047CC,#0284c7);color:#fff;cursor:pointer;font-weight:700;font-size:.9em;box-shadow:0 4px 14px rgba(0,71,204,.35);transition:all .15s">💾 Guardar cambios</button>
+    <div style="padding:16px 28px 20px;display:flex;gap:10px;justify-content:flex-end;background:var(--gris-50);border-top:1px solid var(--borde);margin-top:10px">
+      <button onclick="closeEditSeg()" style="padding:10px 26px;border-radius:10px;border:1.5px solid var(--borde-control);background:var(--superficie);cursor:pointer;font-weight:600;color:var(--gris-600);font-size:.9em;transition:all .15s" onmouseover="this.style.background='var(--gris-100)'" onmouseout="this.style.background='var(--superficie)'">Cancelar</button>
+      <button id="edit-seg-save" onclick="saveEdit()" style="padding:10px 26px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--azul),var(--azul-cian));color:var(--texto-inverso);cursor:pointer;font-weight:700;font-size:.9em;box-shadow:0 4px 14px rgba(0,71,204,.35);transition:all .15s">💾 Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -371,27 +374,27 @@
 
 <!-- MODAL UPLOAD COMPROBANTE -->
 <div id="modal-upload" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:18px;padding:32px;width:420px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div style="background:var(--superficie);border-radius:18px;padding:32px;width:420px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
       <h2 style="color:var(--blue);font-size:1.1em;font-weight:700">📎 Subir Comprobante de Pago</h2>
-      <button onclick="cerrarUpload()" style="background:none;border:none;font-size:1.4em;cursor:pointer;color:#aaa">✕</button>
+      <button onclick="cerrarUpload()" style="background:none;border:none;font-size:1.4em;cursor:pointer;color:var(--texto-suave)">✕</button>
     </div>
     <div style="background:var(--blue3);border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:.85em;color:var(--blue)">
       Factura: <strong id="upload-factura-display"></strong>
     </div>
     <input type="hidden" id="upload-factura">
-    <label style="display:block;border:2px dashed #bcd;border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:border .2s"
-           onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='#bcd'">
+    <label style="display:block;border:2px dashed var(--borde-control);border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:border .2s"
+           onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--borde-control)'">
       <div style="font-size:2em;margin-bottom:8px">🖼️</div>
-      <div style="font-size:.9em;color:#666;margin-bottom:6px">Arrastra o haz clic para seleccionar</div>
-      <div style="font-size:.75em;color:#aaa">JPG, PNG, JPEG, WEBP</div>
+      <div style="font-size:.9em;color:var(--texto-suave);margin-bottom:6px">Arrastra o haz clic para seleccionar</div>
+      <div style="font-size:.75em;color:var(--texto-suave)">JPG, PNG, JPEG, WEBP</div>
       <input type="file" id="upload-file" accept="image/*" style="display:none" onchange="previewImagen(this)">
     </label>
     <div id="upload-preview" style="text-align:center"></div>
     <div id="upload-status" style="text-align:center;margin-top:10px;font-size:.85em;min-height:20px"></div>
     <div style="display:flex;gap:10px;margin-top:18px">
-      <button onclick="cerrarUpload()" style="flex:1;padding:11px;border:1px solid #dde;border-radius:10px;background:#fff;cursor:pointer;font-weight:600;color:#888">Cancelar</button>
-      <button id="btn-subir" onclick="subirComprobante()" style="flex:2;padding:11px;border:none;border-radius:10px;background:var(--blue);color:#fff;cursor:pointer;font-weight:700;font-size:.95em">⬆️ Subir Comprobante</button>
+      <button onclick="cerrarUpload()" style="flex:1;padding:11px;border:1px solid var(--borde);border-radius:10px;background:var(--superficie);cursor:pointer;font-weight:600;color:var(--texto-suave)">Cancelar</button>
+      <button id="btn-subir" onclick="subirComprobante()" style="flex:2;padding:11px;border:none;border-radius:10px;background:var(--blue);color:var(--texto-inverso);cursor:pointer;font-weight:700;font-size:.95em">⬆️ Subir Comprobante</button>
     </div>
   </div>
 </div>
@@ -400,8 +403,8 @@
 <div id="modal-imagen" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:14px" onclick="cerrarImagen()">
   <img id="img-full" src="" style="max-width:90vw;max-height:80vh;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.5)" onclick="event.stopPropagation()">
   <div style="display:flex;gap:14px">
-    <a id="img-link" href="#" target="_blank" onclick="event.stopPropagation()" style="background:#fff;color:var(--blue);padding:8px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.9em">Abrir en Drive →</a>
-    <button onclick="cerrarImagen()" style="background:rgba(255,255,255,.15);border:none;color:#fff;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.9em">✕ Cerrar</button>
+    <a id="img-link" href="#" target="_blank" onclick="event.stopPropagation()" style="background:var(--superficie);color:var(--blue);padding:8px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.9em">Abrir en Drive →</a>
+    <button onclick="cerrarImagen()" style="background:rgba(255,255,255,.15);border:none;color:var(--texto-inverso);padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.9em">✕ Cerrar</button>
   </div>
 </div>
 

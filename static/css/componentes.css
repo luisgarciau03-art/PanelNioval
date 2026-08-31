@@ -1,0 +1,297 @@
+/* ============================================================================
+   NIOVAL - Componentes compartidos
+   Plan 4 - T4.4. Los que usan las tres superficies: boton, tarjeta, chip,
+   recuadro de estadistica, tabla, campo de formulario, insignia y barra de
+   progreso.
+
+   Cada elemento interactivo trae sus CUATRO estados: hover, focus, active y
+   disabled. Antes solo existia `transition: all .2s` y algun `:hover`.
+
+   Depende de tokens.css y base.css. Ni un color literal.
+   ============================================================================ */
+
+/* --- Boton ---------------------------------------------------------------
+   El movimiento va solo en transform y en color, nunca en propiedades que
+   fuercen layout. Nada de `transition: all`, que anima tambien lo que provoca
+   recalculo. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--esp-2);
+  padding: var(--esp-3) var(--esp-5);
+  border: 1px solid transparent;
+  border-radius: var(--radio-md);
+  font-family: inherit;
+  font-size: var(--texto-sm);
+  font-weight: var(--peso-medio);
+  line-height: var(--linea-apretada);
+  cursor: pointer;
+  text-decoration: none;
+  background: var(--azul);
+  color: var(--texto-inverso);
+  transition: background-color var(--dur-rapida) var(--curva-estandar),
+              transform var(--dur-rapida) var(--curva-estandar),
+              box-shadow var(--dur-rapida) var(--curva-estandar);
+}
+
+.btn:hover:not(:disabled) { background: var(--azul-oscuro); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: .5;
+  cursor: not-allowed;
+  /* El estado deshabilitado no puede depender SOLO de la opacidad: quien no
+     distinga bien el contraste necesita otra senal. */
+  filter: grayscale(.4);
+}
+
+.btn--secundario {
+  background: var(--superficie);
+  color: var(--texto-enlace);
+  border-color: var(--borde-control);
+}
+.btn--secundario:hover:not(:disabled) { background: var(--azul-tenue-2); }
+
+.btn--fantasma {
+  background: transparent;
+  color: var(--texto);
+  border-color: transparent;
+}
+.btn--fantasma:hover:not(:disabled) { background: var(--gris-100); }
+
+/* Los de estado usan el token accesible, no el "vivo": llevan texto blanco
+   encima y el vivo daba 2.16:1. */
+.btn--exito { background: var(--exito); }
+.btn--exito:hover:not(:disabled) { filter: brightness(.9); }
+.btn--aviso { background: var(--aviso); }
+.btn--aviso:hover:not(:disabled) { filter: brightness(.9); }
+.btn--error { background: var(--error); }
+.btn--error:hover:not(:disabled) { filter: brightness(.9); }
+
+.btn--bloque { width: 100%; }
+.btn--grande { padding: var(--esp-4) var(--esp-6); font-size: var(--texto-base); }
+
+/* --- Tarjeta ------------------------------------------------------------- */
+.tarjeta {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-lg);
+  padding: var(--esp-5);
+  box-shadow: var(--sombra-1);
+}
+
+.tarjeta__titulo {
+  font-size: var(--texto-lg);
+  font-weight: var(--peso-fuerte);
+  color: var(--texto-fuerte);
+  margin: 0 0 var(--esp-4);
+}
+
+/* --- Recuadro de estadistica ---------------------------------------------
+   Jerarquia por contraste de escala: el dato que manda usa --texto-3xl y los
+   secundarios --texto-lg. Antes las ocho tarjetas de KPI pesaban igual, que es
+   lo mismo que no tener jerarquia. */
+.stat {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-left: 3px solid var(--azul);
+  border-radius: var(--radio-md);
+  padding: var(--esp-4);
+}
+
+.stat__etiqueta {
+  font-size: var(--texto-xs);
+  font-weight: var(--peso-medio);
+  letter-spacing: var(--track-etiqueta);
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+
+.stat__num {
+  font-size: var(--texto-xl);
+  font-weight: var(--peso-fuerte);
+  line-height: var(--linea-apretada);
+  color: var(--texto-fuerte);
+  font-variant-numeric: tabular-nums;
+}
+
+/* El dato principal de la pantalla. En el importador es `nuevos_en_sheet`:
+   las filas realmente escritas, no las encontradas. */
+.stat--principal .stat__num { font-size: var(--texto-3xl); }
+.stat--principal { border-left-width: 5px; }
+
+.stat--exito { border-left-color: var(--exito-vivo); }   /* franja, no texto */
+.stat--aviso { border-left-color: var(--aviso-vivo); }
+.stat--error { border-left-color: var(--error-vivo); }
+
+/* --- Chip ----------------------------------------------------------------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio-completo);
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: var(--texto-sm);
+  cursor: pointer;
+  transition: background-color var(--dur-rapida) var(--curva-estandar),
+              border-color var(--dur-rapida) var(--curva-estandar),
+              transform var(--dur-rapida) var(--curva-estandar);
+}
+.chip:hover { background: var(--azul-tenue-2); border-color: var(--azul-borde); }
+.chip:active { transform: translateY(1px); }
+
+.chip[aria-pressed="true"],
+.chip--activo {
+  background: var(--azul);
+  border-color: var(--azul);
+  color: var(--texto-inverso);
+}
+
+/* El conteo del chip: dato secundario, no compite con el nombre. */
+.chip__conteo {
+  font-size: var(--texto-xs);
+  color: var(--texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+.chip[aria-pressed="true"] .chip__conteo { color: var(--azul-tenue); }
+
+/* --- Insignia ------------------------------------------------------------- */
+.insignia {
+  display: inline-block;
+  padding: var(--esp-1) var(--esp-2);
+  border-radius: var(--radio-sm);
+  font-size: var(--texto-xs);
+  font-weight: var(--peso-medio);
+}
+.insignia--exito { background: var(--exito-tinte); color: var(--exito-fuerte); }
+.insignia--aviso { background: var(--aviso-tinte); color: var(--aviso-fuerte); }
+.insignia--error { background: var(--error-tinte); color: var(--error-fuerte); }
+.insignia--info  { background: var(--azul-tenue);  color: var(--azul); }
+
+/* --- Campo de formulario -------------------------------------------------
+   El borde usa --borde-control (3:1), no --borde: un control tiene que
+   distinguirse del fondo, que es WCAG 1.4.11. El anterior daba 1.4:1. */
+.campo { margin-bottom: var(--esp-4); }
+
+.campo__etiqueta {
+  display: block;
+  margin-bottom: var(--esp-2);
+  font-size: var(--texto-sm);
+  font-weight: var(--peso-medio);
+  color: var(--texto);
+}
+
+.campo__control,
+input[type="text"], input[type="tel"], input[type="email"],
+input[type="number"], input[type="search"], select, textarea {
+  width: 100%;
+  padding: var(--esp-3);
+  border: 1px solid var(--borde-control);
+  border-radius: var(--radio-md);
+  background: var(--superficie);
+  color: var(--texto-fuerte);
+  font-family: inherit;
+  font-size: var(--texto-base);
+  transition: border-color var(--dur-rapida) var(--curva-estandar),
+              box-shadow var(--dur-rapida) var(--curva-estandar);
+}
+
+.campo__control:hover:not(:disabled),
+input:hover:not(:disabled), select:hover:not(:disabled) {
+  border-color: var(--gris-500);
+}
+
+.campo__control:disabled,
+input:disabled, select:disabled, textarea:disabled {
+  background: var(--gris-100);
+  color: var(--texto-suave);
+  cursor: not-allowed;
+}
+
+.campo__error {
+  margin-top: var(--esp-1);
+  font-size: var(--texto-sm);
+  color: var(--error);
+  min-height: 1.2em;   /* reserva el hueco: sin esto el layout salta (CE4) */
+}
+
+.campo__control[aria-invalid="true"] { border-color: var(--error); }
+
+/* --- Tabla ---------------------------------------------------------------
+   Las tablas son el trabajo de verdad del dashboard: densidad legible,
+   cabecera fija y separacion que no canse. */
+.tabla { width: 100%; border-collapse: collapse; font-size: var(--texto-sm); }
+
+.tabla th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--gris-50);
+  padding: var(--esp-3);
+  text-align: left;
+  font-size: var(--texto-xs);
+  font-weight: var(--peso-medio);
+  letter-spacing: var(--track-etiqueta);
+  text-transform: uppercase;
+  color: var(--texto-suave);
+  border-bottom: 2px solid var(--borde-fuerte);
+  white-space: nowrap;
+}
+
+.tabla td {
+  padding: var(--esp-3);
+  border-bottom: 1px solid var(--borde);
+  color: var(--texto);
+}
+
+.tabla tbody tr:hover { background: var(--azul-tenue-2); }
+
+/* Cabecera ordenable: es un boton, y tiene que parecerlo y enfocarse. */
+.tabla th[aria-sort] { cursor: pointer; }
+.tabla th[aria-sort]:hover { color: var(--texto-enlace); }
+.tabla th[aria-sort="ascending"]::after  { content: " \2191"; }
+.tabla th[aria-sort="descending"]::after { content: " \2193"; }
+
+/* --- Barra de progreso ---------------------------------------------------
+   El ancho SI se anima aqui, y es la excepcion consciente: es el dato que la
+   barra comunica. Va aislada y no compite con nada mas en pantalla. */
+.progreso {
+  height: 10px;
+  background: var(--gris-200);
+  border-radius: var(--radio-completo);
+  overflow: hidden;
+}
+
+.progreso__barra {
+  height: 100%;
+  background: var(--azul);
+  border-radius: var(--radio-completo);
+  transition: width var(--dur-lenta) var(--curva-salida);
+}
+
+.progreso__etiqueta {
+  margin-top: var(--esp-2);
+  font-size: var(--texto-sm);
+  color: var(--texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Consola de log ------------------------------------------------------
+   Lo mas honesto de la pantalla del importador: dice que esta pasando, en
+   orden y sin adornos. Se conserva su funcion, dentro del sistema. */
+.consola {
+  background: var(--gris-900);
+  color: var(--gris-100);
+  padding: var(--esp-4);
+  border-radius: var(--radio-md);
+  max-height: 320px;
+  overflow-y: auto;
+  font-family: var(--fuente-mono);
+  font-size: var(--texto-sm);
+  line-height: var(--linea-normal);
+}

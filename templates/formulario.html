@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>NIOVAL — Formulario de Llamadas</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/componentes.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/formulario.css') }}">
 </head>
 <body>
@@ -36,7 +39,7 @@
         <button class="btn btn-orange" onclick="decidir('NO COMPATIBLE')">⊘ No Compatible</button>
         <button class="btn btn-purple" onclick="decidir('MARCA UNICA')">◈ Marca Única</button>
       </div>
-      <button class="btn btn-gray" onclick="encNoDisp()" style="width:100%;margin-top:4px;font-size:.85em;background:#7f8c8d">👤 Enc. Compras No Disponible</button>
+      <button class="btn btn-gray" onclick="encNoDisp()" style="width:100%;margin-top:4px;font-size:.85em;background:var(--gris-500)">👤 Enc. Compras No Disponible</button>
       <button class="btn btn-gray" onclick="saltarContacto()" style="width:100%;margin-top:8px;font-size:.82em">⟶ Saltar este contacto</button>
     </div>
 
@@ -59,7 +62,7 @@
       <button class="btn btn-blue" id="btn-p1" onclick="enviarP1()" disabled>→ Continuar</button>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-gray" onclick="colgo()" style="font-size:.82em;flex:1">📵 Colgó</button>
-        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:#7f8c8d">👤 Enc. No Dispo</button>
+        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:var(--gris-500)">👤 Enc. No Dispo</button>
       </div>
     </div>
 
@@ -73,7 +76,7 @@
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-gray" onclick="colgo()" style="font-size:.82em;flex:1">📵 Colgó</button>
-        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:#7f8c8d">👤 Enc. No Dispo</button>
+        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:var(--gris-500)">👤 Enc. No Dispo</button>
       </div>
     </div>
 
@@ -87,7 +90,7 @@
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-gray" onclick="colgo()" style="font-size:.82em;flex:1">📵 Colgó</button>
-        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:#7f8c8d">👤 Enc. No Dispo</button>
+        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:var(--gris-500)">👤 Enc. No Dispo</button>
       </div>
     </div>
 
@@ -101,7 +104,7 @@
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-gray" onclick="colgo()" style="font-size:.82em;flex:1">📵 Colgó</button>
-        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:#7f8c8d">👤 Enc. No Dispo</button>
+        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:var(--gris-500)">👤 Enc. No Dispo</button>
       </div>
     </div>
 
@@ -116,7 +119,7 @@
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-gray" onclick="colgo()" style="font-size:.82em;flex:1">📵 Colgó</button>
-        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:#7f8c8d">👤 Enc. No Dispo</button>
+        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:var(--gris-500)">👤 Enc. No Dispo</button>
       </div>
     </div>
 
@@ -131,7 +134,7 @@
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-gray" onclick="colgo()" style="font-size:.82em;flex:1">📵 Colgó</button>
-        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:#7f8c8d">👤 Enc. No Dispo</button>
+        <button class="btn btn-gray" onclick="encNoDisp()" style="font-size:.82em;flex:1;background:var(--gris-500)">👤 Enc. No Dispo</button>
       </div>
     </div>
 
@@ -172,13 +175,13 @@
 
     <!-- MODAL: envíos de catálogo con problema + corrección de número (Plan 3) -->
     <div id="modal-catalogo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:16px">
-      <div style="background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:85vh;overflow:auto;padding:22px">
+      <div style="background:var(--superficie);border-radius:16px;max-width:520px;width:100%;max-height:85vh;overflow:auto;padding:22px">
         <h3 style="margin-bottom:12px;color:var(--blue2)">📖 Envíos de catálogo con problema</h3>
         <div id="envios-lista" style="font-size:.9em"></div>
-        <div id="corregir-box" style="display:none;margin-top:14px;border-top:1px solid #eef;padding-top:12px">
+        <div id="corregir-box" style="display:none;margin-top:14px;border-top:1px solid var(--borde);padding-top:12px">
           <p style="font-size:.9em;margin-bottom:6px">Corregir número de <b id="corregir-tienda"></b>:</p>
           <input id="corregir-input" type="tel" inputmode="numeric" placeholder="10 a 13 dígitos"
-                 style="width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;font-size:1em"
+                 style="width:100%;padding:10px;border:1px solid var(--borde-control);border-radius:8px;font-size:1em"
                  oninput="validarCorregir()">
           <p id="corregir-error" style="color:var(--red);font-size:.82em;min-height:16px;margin:4px 0"></p>
           <button id="corregir-btn" class="btn btn-green" style="width:100%" disabled onclick="guardarCorreccion()">Guardar y reintentar</button>
@@ -189,11 +192,11 @@
 
     <!-- MODAL: captura de correo (Plan 4, conclusión "Correo") -->
     <div id="modal-correo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:16px">
-      <div style="background:#fff;border-radius:16px;max-width:460px;width:100%;padding:22px">
+      <div style="background:var(--superficie);border-radius:16px;max-width:460px;width:100%;padding:22px">
         <h3 style="margin-bottom:6px;color:var(--blue2)">📧 Correo del cliente</h3>
         <p style="font-size:.88em;color:var(--gray);margin-bottom:12px">Captura el correo o continúa sin correo.</p>
         <input id="correo-input" type="email" autocomplete="off" placeholder="cliente@dominio.com"
-               style="width:100%;padding:11px;border:1px solid #ccd;border-radius:8px;font-size:1em"
+               style="width:100%;padding:11px;border:1px solid var(--borde-control);border-radius:8px;font-size:1em"
                oninput="validarCorreo()" onkeydown="correoKeydown(event)">
         <p id="correo-error" style="color:var(--red);font-size:.82em;min-height:16px;margin:4px 0"></p>
         <button id="correo-btn" class="btn btn-green" style="width:100%" disabled onclick="guardarCorreo()">Guardar correo</button>
@@ -203,15 +206,15 @@
 
     <!-- MODAL: validador PRE-envío de catálogo (confirmar/corregir número) -->
     <div id="modal-validar-catalogo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:16px">
-      <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;padding:22px">
+      <div style="background:var(--superficie);border-radius:16px;max-width:480px;width:100%;padding:22px">
         <h3 style="margin-bottom:6px;color:var(--blue2)">📦 Confirmar envío de catálogo</h3>
         <p style="font-size:.9em;color:var(--gray);margin-bottom:12px">
           <b id="val-cat-tienda"></b> — conclusión: <b id="val-cat-conclusion"></b>.<br>
           Verifica que el <b>número de WhatsApp</b> sea correcto antes de enviar. Si lo corriges, se actualiza en LISTA DE CONTACTOS.
         </p>
-        <label style="font-size:.82em;color:#555;font-weight:600">Número de WhatsApp (10 dígitos; la lada 52 se añade sola)</label>
+        <label style="font-size:.82em;color:var(--texto);font-weight:600">Número de WhatsApp (10 dígitos; la lada 52 se añade sola)</label>
         <input id="val-cat-tel" type="tel" inputmode="numeric" placeholder="555 123 4567"
-               style="width:100%;padding:11px;border:1px solid #ccd;border-radius:8px;font-size:1em;margin-top:4px"
+               style="width:100%;padding:11px;border:1px solid var(--borde-control);border-radius:8px;font-size:1em;margin-top:4px"
                oninput="validarValCat()">
         <p id="val-cat-error" style="color:var(--red);font-size:.82em;min-height:16px;margin:4px 0"></p>
         <button id="val-cat-btn" class="btn btn-green" style="width:100%" onclick="confirmarEnviarCatalogo()">✅ Confirmar y enviar catálogo</button>

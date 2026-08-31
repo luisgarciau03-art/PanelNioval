@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>NIOVAL — Importador de Contactos</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/componentes.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/importador.css') }}">
 </head>
 <body>
@@ -22,26 +25,26 @@
     </div>
 
     <!-- CATEGORÍAS -->
-    <div style="font-size:.78em;color:#888;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.8px">Categorías a buscar</div>
+    <div style="font-size:.78em;color:var(--texto-suave);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.8px">Categorías a buscar</div>
     <div class="cats" id="cats-list"></div>
 
     <!-- CIUDADES -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;margin-bottom:8px">
-      <div style="font-size:.78em;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.8px">
+      <div style="font-size:.78em;color:var(--texto-suave);font-weight:700;text-transform:uppercase;letter-spacing:.8px">
         Ciudades <span id="ciudades-count" style="color:var(--blue)"></span> — <span style="color:var(--green)">ordenadas por prioridad</span>
       </div>
       <div style="display:flex;gap:6px">
         <select id="region-filter" onchange="filtrarCiudades()"
-          style="padding:5px 8px;border:1px solid #dde6ff;border-radius:8px;font-size:.8em;outline:none;max-width:190px">
+          style="padding:5px 8px;border:1px solid var(--borde-control);border-radius:8px;font-size:.8em;outline:none;max-width:190px">
           <option value="">Todas</option>
         </select>
         <input type="text" id="ciudad-filter" placeholder="🔍 Filtrar..." oninput="filtrarCiudades()"
-          style="padding:5px 10px;border:1px solid #dde6ff;border-radius:8px;font-size:.8em;outline:none;width:140px">
+          style="padding:5px 10px;border:1px solid var(--borde-control);border-radius:8px;font-size:.8em;outline:none;width:140px">
       </div>
     </div>
     <div id="sin-clasificar"></div>
     <div id="ciudades-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;max-height:220px;overflow-y:auto;padding:4px 2px">
-      <div style="color:#aaa;font-size:.82em;padding:6px">Cargando ciudades...</div>
+      <div style="color:var(--texto-suave);font-size:.82em;padding:6px">Cargando ciudades...</div>
     </div>
 
     <!-- INPUT CIUDAD -->
@@ -49,7 +52,7 @@
       <input type="text" id="input-ciudad" placeholder="O escribe una ciudad manualmente..." onkeydown="if(event.key==='Enter') iniciar()">
       <button class="btn btn-blue" id="btn-iniciar" onclick="iniciar()">🔍 Buscar</button>
       <button class="btn" id="btn-cancelar" onclick="cancelar()"
-        style="display:none;background:#f3f4f6;border:1px solid #dde;color:#666">⏹ Detener</button>
+        style="display:none;background:var(--gris-100);border:1px solid var(--borde);color:var(--texto-suave)">⏹ Detener</button>
     </div>
 
     <!-- PROGRESO -->
@@ -71,8 +74,8 @@
     <div class="progreso-row" id="progreso-row" style="display:none">
       <div class="stat-box blue"><div class="n" id="s-progreso">0/0</div><div class="l">Categorias procesadas</div></div>
     </div>
-    <div id="medidor-box" style="display:none;font-size:.78em;color:#777;margin:-6px 0 16px;
-      padding:8px 12px;background:#f8f9fa;border-radius:8px;border-left:3px solid #dde">
+    <div id="medidor-box" style="display:none;font-size:.78em;color:var(--texto-suave);margin:-6px 0 16px;
+      padding:8px 12px;background:var(--gris-50);border-radius:8px;border-left:3px solid var(--borde)">
       <span id="m-llamadas"></span><span id="m-ahorro"></span><span id="m-costo"></span>
     </div>
 
