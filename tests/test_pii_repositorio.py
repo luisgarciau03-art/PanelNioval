@@ -1,6 +1,6 @@
 """El telefono de un cliente real no puede volver al repositorio.
 
-Durante anios el proyecto uso `662 353 4185` como "numero canonico de ejemplo":
+Durante anios el proyecto uso un telefono real como "numero canonico de ejemplo":
 estaba en el placeholder de dos pantallas, en los docstrings de
 `nucleo_catalogo.py`, en el RUNBOOK y en las fixtures de dos archivos de tests.
 No era un numero inventado — es el telefono de un contacto real de
@@ -8,8 +8,8 @@ No era un numero inventado — es el telefono de un contacto real de
 
 Se sustituyo por `555 123 4567` en las 20 apariciones (Plan 4). Este guarda
 existe porque el barrido de secretos del CI **no lo habria detectado**: su patron
-de telefono exige 10 digitos contiguos, asi que ve `6623534185` pero no
-`662 353 4185`, `662-353-4185` ni `+52 662 353 4185`. El formato con espacios es
+de telefono exige 10 digitos contiguos, asi que ve la forma pegada pero no la
+separada por espacios, guiones o parentesis. El formato con espacios es
 justo el que usa la hoja de calculo, y por tanto el que acaba copiado a mano en
 codigo y documentacion.
 
@@ -28,8 +28,8 @@ RAIZ = Path(__file__).resolve().parent.parent
 # Se escribe partido para que este mismo archivo no sea una aparicion mas.
 _LADA, _MEDIO, _FINAL = "662", "353", "4185"
 # Cualquier cosa que no sea un digito entre grupo y grupo, hasta tres caracteres.
-# Con `[\s.\-]*` se escapaba `(662) 353 4185`, que es justamente una de las formas
-# en que estaba escrito: el `)` no entraba en la clase.
+# Con `[\s.\-]*` se escapaba la forma con parentesis, que es justamente una de
+# aquellas en que estaba escrito: el `)` no entraba en la clase.
 _SEP = r"[^0-9]{0,3}"
 PATRON = re.compile(_LADA + _SEP + _MEDIO + _SEP + _FINAL)
 

@@ -34,9 +34,12 @@ def main() -> int:
         print(__doc__)
         return 2
     dir_a, dir_b = Path(sys.argv[1]), Path(sys.argv[2])
-    archivos = sorted(p.name for p in dir_a.glob("*.png"))
+    # La union de los dos, no solo lo que hay en "antes": una captura que solo
+    # existe en "despues" es una superficie nueva sin comparar, y pasar de largo
+    # la contaria como si no existiera.
+    archivos = sorted({p.name for p in dir_a.glob("*.png")} | {p.name for p in dir_b.glob("*.png")})
     if not archivos:
-        print(f"no hay capturas en {dir_a}")
+        print(f"no hay capturas en {dir_a} ni en {dir_b}")
         return 2
 
     fallos = 0
@@ -44,6 +47,10 @@ def main() -> int:
     print("-" * 50)
     for nombre in archivos:
         pa, pb = dir_a / nombre, dir_b / nombre
+        if not pa.exists():
+            print(f"{nombre:24} {'SOLO EN B':12}   (sin referencia con que comparar)")
+            fallos += 1
+            continue
         if not pb.exists():
             print(f"{nombre:24} {'FALTA':12}")
             fallos += 1

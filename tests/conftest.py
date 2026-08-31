@@ -67,9 +67,9 @@ def leer_superficie(nombre: str) -> str:
     """
     raiz = Path(__file__).resolve().parent.parent
     partes = [
-        (raiz / "templates" / f"{nombre}.html").read_text(encoding="utf-8"),
-        (raiz / "static" / "css" / f"{nombre}.css").read_text(encoding="utf-8"),
-        (raiz / "static" / "js" / f"{nombre}.js").read_text(encoding="utf-8"),
+        _leer_crudo(raiz / "templates" / f"{nombre}.html"),
+        _leer_crudo(raiz / "static" / "css" / f"{nombre}.css"),
+        _leer_crudo(raiz / "static" / "js" / f"{nombre}.js"),
     ]
     return chr(10).join(partes)
 
@@ -77,7 +77,21 @@ def leer_superficie(nombre: str) -> str:
 def leer_js(nombre: str) -> str:
     """Solo el JavaScript de una superficie."""
     raiz = Path(__file__).resolve().parent.parent
-    return (raiz / "static" / "js" / f"{nombre}.js").read_text(encoding="utf-8")
+    return _leer_crudo(raiz / "static" / "js" / f"{nombre}.js")
+
+
+def _leer_crudo(ruta: Path) -> str:
+    """Lee sin traducir saltos de linea.
+
+    `read_text()` a secas convierte CRLF en LF, asi que en Windows devolveria
+    algo distinto de lo que `servir_superficie()` obtiene por HTTP, que entrega
+    el archivo tal cual esta en disco. Hoy las afirmaciones son de subcadena y
+    no lo notarian, pero dos funciones que dicen leer lo mismo tienen que
+    devolver lo mismo; si no, la discrepancia aparece el dia que alguien compare
+    longitudes o cuente lineas, y no se explicara por el codigo de produccion.
+    """
+    with open(ruta, encoding="utf-8", newline="") as f:
+        return f.read()
 
 
 def servir_superficie(client, ruta: str, nombre: str) -> str:

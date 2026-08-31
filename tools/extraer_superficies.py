@@ -44,9 +44,15 @@ def escribir(ruta: Path, texto: str) -> None:
 def cortar_literal(fuente: str, constante: str) -> tuple[str, str]:
     """Devuelve (bloque completo incluido el `X = r\"\"\"...\"\"\"`, cuerpo HTML)."""
     apertura = f'{constante} = r"""'
-    i = fuente.index(apertura)
+    try:
+        i = fuente.index(apertura)
+    except ValueError:
+        raise SystemExit(f"{constante}: no se encontro {apertura!r} en app.py")
     ini_cuerpo = i + len(apertura)
-    fin_cuerpo = fuente.index('"""', ini_cuerpo)
+    try:
+        fin_cuerpo = fuente.index('"""', ini_cuerpo)
+    except ValueError:
+        raise SystemExit(f"{constante}: el literal no esta cerrado")
     return fuente[i : fin_cuerpo + 3], fuente[ini_cuerpo:fin_cuerpo]
 
 
