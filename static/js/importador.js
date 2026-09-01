@@ -170,6 +170,36 @@ function pararSondeo() {
   polling = null;
 }
 
+// La barra avanza con `scaleX`, no con `width`. Animar el ancho obliga al
+// navegador a recalcular layout en cada cuadro, y una corrida del importador
+// son minutos de barra moviendose sin parar. `will-change` se pone solo
+// mientras hay corrida y se RETIRA al acabar: dejarlo puesto reserva una capa
+// de composicion permanente para un elemento que el resto del tiempo no se
+// mueve.
+function ponerAvance(pct) {
+  const fill = document.getElementById('prog-fill');
+  const v = Math.max(0, Math.min(100, Number(pct) || 0));
+  fill.style.setProperty('--avance', (v / 100).toFixed(4));
+  // El valor tambien va al ARIA: sin `aria-valuenow` la barra no expone
+  // ningun avance a un lector de pantalla, y una corrida son minutos. No se
+  // usa `aria-live`: con sondeo cada pocos segundos serian decenas de
+  // anuncios. `role=progressbar` se lee cuando el operador navega al control.
+  const pista = document.getElementById('prog-track');
+  if (pista) pista.setAttribute('aria-valuenow', String(Math.round(v)));
+  if (v > 0 && v < 100) fill.style.willChange = 'transform';
+  else fill.style.willChange = '';
+}
+
+// La corrida termino, acabe como acabe. `ponerAvance` solo suelta la capa de
+// composicion en 0 y en 100, y una corrida cancelada al 42 % no pasa por
+// ninguno de los dos: `fraccion` es monotona y el backend NO la normaliza a
+// 100 al cancelar, al agotarse el presupuesto, al interrumpirse ni al fallar.
+// El `will-change` se quedaba puesto hasta la siguiente busqueda.
+function soltarAvance() {
+  const fill = document.getElementById('prog-fill');
+  if (fill) fill.style.willChange = '';
+}
+
 function limpiarPantalla() {
   // La corrida anterior dejaba sus numeros y sus insignias puestos: la segunda
   // busqueda de la sesion arrancaba con todo marcado como completado.
@@ -177,7 +207,7 @@ function limpiarPantalla() {
     document.getElementById(id).textContent = '0';
   });
   document.getElementById('s-progreso').textContent = '0/0';
-  document.getElementById('prog-fill').style.width = '0%';
+  ponerAvance(0);
   document.getElementById('prog-pct').textContent = '0%';
   document.getElementById('log-box').innerHTML = '';
   CATS.forEach((_, i) => document.getElementById('cat-'+i).className = 'cat-badge');
@@ -274,7 +304,7 @@ async function restaurarEstado() {
 
 function pintarEstado(d) {
   const pct = d.fraccion || 0;
-  document.getElementById('prog-fill').style.width  = pct + '%';
+  ponerAvance(pct);
   document.getElementById('prog-pct').textContent   = pct + '%';
   document.getElementById('prog-label').textContent =
     d.fase || (d.categoria ? `Buscando: ${d.categoria}...` : 'Procesando...');
@@ -374,6 +404,7 @@ function rematar(d) {
       || d.status === 'presupuesto_agotado') {
     pararSondeo();
     ponerEnMarcha(false);
+    soltarAvance();
     document.getElementById('btn-iniciar').textContent = '🔍 Nueva Búsqueda';
     document.getElementById('result-box').style.display = 'block';
     ponerIconoResultado(d.status);
@@ -404,6 +435,7 @@ function rematar(d) {
   if (d.status === 'error') {
     pararSondeo();
     ponerEnMarcha(false);
+    soltarAvance();
     document.getElementById('prog-label').textContent = 'Error: ' + d.error;
     document.getElementById('btn-iniciar').textContent = '🔍 Reintentar';
     document.getElementById('result-box').style.display = 'block';

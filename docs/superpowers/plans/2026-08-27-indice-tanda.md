@@ -292,12 +292,12 @@ archivo" sino "añadirle cinco nombres"; el bloque exacto está en §7.
 | Plan 0 — Integración continua ⭐ | 4 | ✅ **COMPLETADO** | **4 / 4** |
 | Plan 2 — Optimización del gasto de Places | 9 | ✅ **COMPLETADO** | **9 / 9** |
 | Plan 1 — Relevancia de ciudades nacional | 10 | ✅ **COMPLETADO** | **10 / 10** |
-| Plan 4 — Rediseño profesional del panel | 12 | EN CURSO | **6 / 12** |
+| Plan 4 — Rediseño profesional del panel | 12 | EN CURSO | **7 / 12** |
 | Plan 5 — Endurecimiento del panel ⭐ | 8 | PENDIENTE | 0 / 8 |
 
-**PROGRESO GLOBAL: 39 / 53 tareas (74 %) · 4 de 6 planes completados**
+**PROGRESO GLOBAL: 40 / 53 tareas (75 %) · 4 de 6 planes completados**
 
-> Sobre el alcance original de 4 planes (41 tareas), el avance es **18 / 41 (44 %)**. El
+> Sobre el alcance original de 4 planes (41 tareas), el avance es **19 / 41 (46 %)**. El
 > denominador subió porque se redactaron dos planes que el §4 recomendaba y nadie había
 > escrito, no porque se haya perdido trabajo.
 

@@ -373,7 +373,7 @@
   <div style="background:var(--superficie);border-radius:22px;max-width:740px;margin:24px auto;position:relative;box-shadow:0 30px 90px rgba(0,0,0,.4);overflow:hidden">
     <!-- Header -->
     <div style="background:linear-gradient(135deg,var(--azul) 0%,var(--azul-cian) 100%);padding:22px 28px 18px;position:relative">
-      <button onclick="closeEditSeg()" style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.18);border:none;border-radius:50%;width:34px;height:34px;color:var(--texto-inverso);font-size:1.15em;cursor:pointer;line-height:34px;text-align:center;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.32)'" onmouseout="this.style.background='rgba(255,255,255,.18)'">✕</button>
+      <button onclick="closeEditSeg()" style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.18);border:none;border-radius:50%;width:34px;height:34px;color:var(--texto-inverso);font-size:1.15em;cursor:pointer;line-height:34px;text-align:center;transition:background-color var(--dur-rapida) var(--curva-estandar)" onmouseover="this.style.background='rgba(255,255,255,.32)'" onmouseout="this.style.background='rgba(255,255,255,.18)'">✕</button>
       <div id="edit-modal-title" style="color:var(--texto-inverso);font-size:1.05em;font-weight:800;letter-spacing:.3px">✏️ Editar Registro</div>
       <div id="edit-modal-subtitle" style="color:rgba(255,255,255,.65);font-size:.78em;margin-top:5px;max-width:560px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
     </div>
@@ -389,8 +389,8 @@
     </div>
     <!-- Footer -->
     <div style="padding:16px 28px 20px;display:flex;gap:10px;justify-content:flex-end;background:var(--gris-50);border-top:1px solid var(--borde);margin-top:10px">
-      <button onclick="closeEditSeg()" style="padding:10px 26px;border-radius:10px;border:1.5px solid var(--borde-control);background:var(--superficie);cursor:pointer;font-weight:600;color:var(--gris-600);font-size:.9em;transition:all .15s" onmouseover="this.style.background='var(--gris-100)'" onmouseout="this.style.background='var(--superficie)'">Cancelar</button>
-      <button id="edit-seg-save" onclick="saveEdit()" style="padding:10px 26px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--azul),var(--azul-cian));color:var(--texto-inverso);cursor:pointer;font-weight:700;font-size:.9em;box-shadow:0 4px 14px rgba(0,71,204,.35);transition:all .15s">💾 Guardar cambios</button>
+      <button onclick="closeEditSeg()" style="padding:10px 26px;border-radius:10px;border:1.5px solid var(--borde-control);background:var(--superficie);cursor:pointer;font-weight:600;color:var(--gris-600);font-size:.9em;transition:background-color var(--dur-rapida) var(--curva-estandar),color var(--dur-rapida) var(--curva-estandar)" onmouseover="this.style.background='var(--gris-100)'" onmouseout="this.style.background='var(--superficie)'">Cancelar</button>
+      <button id="edit-seg-save" onclick="saveEdit()" style="padding:10px 26px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--azul),var(--azul-cian));color:var(--texto-inverso);cursor:pointer;font-weight:700;font-size:.9em;box-shadow:0 4px 14px rgba(0,71,204,.35);transition:box-shadow var(--dur-rapida) var(--curva-estandar),transform var(--dur-rapida) var(--curva-estandar)">💾 Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -409,7 +409,7 @@
       Factura: <strong id="upload-factura-display"></strong>
     </div>
     <input type="hidden" id="upload-factura">
-    <label style="display:block;border:2px dashed var(--borde-control);border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:border .2s"
+    <label style="display:block;border:2px dashed var(--borde-control);border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:border-color var(--dur-rapida) var(--curva-estandar)"
            onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--borde-control)'">
       <div style="font-size:2em;margin-bottom:8px">🖼️</div>
       <div style="font-size:.9em;color:var(--texto-suave);margin-bottom:6px">Arrastra o haz clic para seleccionar</div>

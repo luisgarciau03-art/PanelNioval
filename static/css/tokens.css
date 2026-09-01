@@ -179,6 +179,15 @@
   --dur-lenta:  320ms;
   --curva-salida:   cubic-bezier(.16, 1, .3, 1);
   --curva-estandar: cubic-bezier(.4, 0, .2, 1);
+
+  /* Estas DOS las escribe el JavaScript en el elemento, no se leen de aqui:
+     el valor de arriba es el estado de reposo. Se declaran igualmente porque
+     un `var(--nombre)` sin definicion no falla en ninguna parte —el navegador
+     se queda sin valor y el elemento hereda o queda transparente, en silencio—
+     y el guarda de tokens fantasma de tests/test_plan4_tokens.py las quiere
+     declaradas. */
+  --avance: 0;             /* barra de progreso: 0 a 1, via scaleX */
+  --retardo-fila: 0ms;     /* entrada escalonada de filas de tabla */
 }
 
 /* Accesibilidad, no preferencia. Con la opcion del sistema activada no se

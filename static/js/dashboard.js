@@ -30,11 +30,90 @@ const SECTION_TITLES = {
 
 let charts = {};
 
+// ─── MOVIMIENTO ─────────────────────────────────────────────────────────────
+// Chart.js dibuja sobre <canvas>: sus animaciones NO pasan por la cascada CSS,
+// asi que el bloque `prefers-reduced-motion` de tokens.css no las toca. Es el
+// unico movimiento del panel que hay que apagar desde JavaScript, y son las
+// seis graficas. Se comprueba `matchMedia` y se escucha el cambio, porque la
+// preferencia del sistema puede activarse con la pagina ya abierta.
+const MOVIMIENTO_REDUCIDO = window.matchMedia
+  ? window.matchMedia('(prefers-reduced-motion: reduce)')
+  : { matches: false, addEventListener: () => {} };
+
+// El valor de fabrica, capturado ANTES de tocarlo. Restaurar con `undefined`
+// no restauraba nada: dejaba la configuracion de animacion de la libreria
+// borrada. Comprobado en navegador — sin la preferencia activa,
+// `Chart.defaults.animation` se quedaba en `undefined` en vez de en su objeto.
+const ANIMACION_CHART_FABRICA =
+  (typeof Chart !== 'undefined' && Chart.defaults) ? Chart.defaults.animation : undefined;
+
+function aplicarPreferenciaDeMovimiento() {
+  if (typeof Chart === 'undefined') return;   // el CDN pudo no responder
+  // `false` desactiva la animacion de entrada y las transiciones de datos.
+  Chart.defaults.animation = MOVIMIENTO_REDUCIDO.matches ? false : ANIMACION_CHART_FABRICA;
+}
+
+if (MOVIMIENTO_REDUCIDO.addEventListener) {
+  MOVIMIENTO_REDUCIDO.addEventListener('change', () => {
+    aplicarPreferenciaDeMovimiento();
+    // Las graficas ya dibujadas conservan la configuracion con la que
+    // nacieron, asi que hay que tocarlas. Pero EN SITIO, no recargando la
+    // seccion: `loadSection` reconstruye el innerHTML de tarjetas y tabla, lo
+    // que (a) descarta el filtro y la pagina que el operador tenia puestos
+    // -`loadTableSection` reasigna el dataset completo y vuelve a la pagina 1
+    // sin reaplicar `filterTable`- y (b) destruye el nodo con el foco, que cae
+    // a <body> sin aviso. Las dos cosas le pasan a quien acaba de pedir MENOS
+    // movimiento, que es exactamente a quien no hay que sobresaltar.
+    Object.keys(charts).forEach(id => {
+      charts[id].options.animation =
+        MOVIMIENTO_REDUCIDO.matches ? false : ANIMACION_CHART_FABRICA;
+      charts[id].update('none');   // 'none': el propio cambio no se anima
+    });
+  });
+}
+
+// Entrada escalonada de las filas de una tabla. Solo las primeras
+// FILAS_ANIMADAS: con 50 filas y un retardo por fila, la ultima entraria mas de
+// un segundo despues y el escalonado dejaria de aclarar nada para volverse
+// espera. El resto aparece sin retardo.
+const FILAS_ANIMADAS = 12;
+
+function escalonarFilas(contenedor) {
+  if (MOVIMIENTO_REDUCIDO.matches) return;
+  const el = typeof contenedor === 'string' ? document.getElementById(contenedor) : contenedor;
+  if (!el) return;
+  const filas = el.querySelectorAll('tbody tr');
+  for (let i = 0; i < Math.min(filas.length, FILAS_ANIMADAS); i++) {
+    filas[i].style.setProperty('--retardo-fila', (i * 25) + 'ms');
+    filas[i].classList.add('fila-entra');
+  }
+}
+
 // ─── NAVIGATION ─────────────────────────────────────────────────────────────
 function showSection(name) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('sec-' + name).classList.add('active');
+  const seccion = document.getElementById('sec-' + name);
+  seccion.classList.add('active');
+  // La clase se retira al terminar para que la animacion pueda repetirse en el
+  // siguiente cambio de seccion: una clase de animacion que se queda puesta
+  // solo corre la primera vez.
+  if (!MOVIMIENTO_REDUCIDO.matches) {
+    seccion.classList.remove('seccion-entra');
+    void seccion.offsetWidth;   // fuerza reinicio de la animacion
+    seccion.classList.add('seccion-entra');
+    // Se comprueba que la animacion VA a correr antes de esperar su final. Si
+    // una hoja la anula, `animationend` no llega nunca y el listener se queda
+    // registrado sin disparar. Salir de la seccion antes de que termine
+    // (display:none cancela la animacion sin evento) tiene el mismo efecto,
+    // pero ahi la clase ya se retira en la siguiente visita.
+    if (getComputedStyle(seccion).animationName !== 'none') {
+      seccion.addEventListener('animationend',
+        () => seccion.classList.remove('seccion-entra'), { once: true });
+    } else {
+      seccion.classList.remove('seccion-entra');
+    }
+  }
   document.querySelectorAll('.nav-item').forEach(n => {
     if (n.textContent.trim().toLowerCase().includes(SECTION_TITLES[name].slice(2,10).toLowerCase().trim()))
       n.classList.add('active');
@@ -644,6 +723,7 @@ function renderTable(key, tableId, pagId) {
   });
   html += '</tbody></table>';
   document.getElementById(tableId).innerHTML = html;
+  escalonarFilas(tableId);
 
   // Pagination
   let pag = `<span class="pag-info">${total} registros</span>`;
@@ -1453,6 +1533,7 @@ function renderCatalogo(envios){
          + `<td style="text-align:center">${_catEsc(e.intentos)}</td><td style="font-size:.8em;color:var(--texto-suave)">${_catEsc(e.timestamp_estado)}</td><td>${acc}</td></tr>`;
   }).join('');
   cont.innerHTML = `<table><thead><tr><th>Tienda</th><th>Teléfono</th><th>Estado</th><th>Intentos</th><th>Actualizado</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table>`;
+  escalonarFilas(cont);
 }
 
 async function actualizarBadgeCatalogo(){
@@ -1504,6 +1585,9 @@ async function catReintentar(row){
 function catCerrarModal(){ document.getElementById('modal-corregir-cat').style.display = 'none'; }
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
+// Antes de la primera grafica: aplicarla despues dejaria las seis nacidas con
+// la animacion puesta.
+aplicarPreferenciaDeMovimiento();
 loadSection('dashboard');
 actualizarBadgeCatalogo();  // badge de "números a corregir" desde el arranque
 
@@ -1567,6 +1651,7 @@ function renderBruceTable(data) {
   });
   html += '</tbody></table>';
   container.innerHTML = html;
+  escalonarFilas(container);
 }
 
 async function agregarBruce() {

@@ -293,16 +293,36 @@ class TestSinColisionesConElSistema:
 
 
 class TestNoHayTokensFantasma:
+    @staticmethod
+    def _sin_comentarios(texto: str) -> str:
+        """Los comentarios se descartan (correccion de la T4.6).
+
+        El barrido miraba el archivo entero, asi que un comentario que
+        EXPLICABA el propio patron se contaba como uso real y ponia el test en
+        rojo. Un guarda que se dispara con su propia documentacion acaba
+        desactivado por quien viene detras.
+        """
+        return re.sub(r"/\*.*?\*/", "", texto, flags=re.S)
+
     def test_todo_var_usado_esta_definido(self):
-        definidos = set(RE_DEF.findall(TOKENS.read_text(encoding="utf-8")))
+        definidos = set(RE_DEF.findall(self._sin_comentarios(
+            TOKENS.read_text(encoding="utf-8"))))
         problemas = []
         for archivo in CSS.glob("*.css"):
-            texto = archivo.read_text(encoding="utf-8")
+            texto = self._sin_comentarios(archivo.read_text(encoding="utf-8"))
             propios = set(RE_DEF.findall(texto))
             for usado in RE_USO.findall(texto):
                 if usado not in definidos and usado not in propios:
                     problemas.append(f"{archivo.name}: var({usado})")
         assert not problemas, "variables usadas y nunca definidas:\n  " + "\n  ".join(sorted(set(problemas)))
+
+    def test_el_barrido_sigue_viendo_un_fantasma_real(self):
+        """Control negativo: descartar comentarios no puede haber apagado el
+        guarda. Sobre codigo -no sobre comentario- tiene que seguir viendolo."""
+        muestra = "/* var(--solo-un-comentario) */" + chr(10) + ".x { color: var(--no-existe-jamas); }"
+        usados = set(RE_USO.findall(self._sin_comentarios(muestra)))
+        assert "--no-existe-jamas" in usados
+        assert "--solo-un-comentario" not in usados
 
 
 class TestContrasteDeLosTokens:

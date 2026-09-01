@@ -258,8 +258,13 @@ input:disabled, select:disabled, textarea:disabled {
 .tabla th[aria-sort="descending"]::after { content: " \2193"; }
 
 /* --- Barra de progreso ---------------------------------------------------
-   El ancho SI se anima aqui, y es la excepcion consciente: es el dato que la
-   barra comunica. Va aislada y no compite con nada mas en pantalla. */
+   La T4.4 dejo aqui `transition: width` como "excepcion consciente". La T4.6
+   la retira: no hacia falta ninguna excepcion. Una barra se anima igual de
+   bien con `scaleX` sobre el ancho completo, y eso lo resuelve el compositor
+   sin recalcular layout en cada cuadro — que en el importador son minutos de
+   corrida actualizandose sin parar.
+
+   El avance se escribe en la propiedad `--avance` (0 a 1), no en el ancho. */
 .progreso {
   height: 10px;
   background: var(--gris-200);
@@ -269,9 +274,12 @@ input:disabled, select:disabled, textarea:disabled {
 
 .progreso__barra {
   height: 100%;
+  width: 100%;
   background: var(--azul);
   border-radius: var(--radio-completo);
-  transition: width var(--dur-lenta) var(--curva-salida);
+  transform-origin: left center;
+  transform: scaleX(var(--avance, 0));
+  transition: transform var(--dur-lenta) var(--curva-salida);
 }
 
 .progreso__etiqueta {
@@ -497,5 +505,64 @@ input:disabled, select:disabled, textarea:disabled {
     animation: none;
     transform: none;
     opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   MOVIMIENTO  ·  Plan 4 - T4.6
+   ==========================================================================
+   Los tokens de duracion y curva viven en tokens.css desde la T4.4; aqui van
+   los dos unicos movimientos que el sistema anade, y ambos existen porque
+   ACLARAN algo, no porque decoren:
+
+     .fila-entra   la tabla llego: las filas aparecen de arriba abajo, asi que
+                   se ve que es contenido nuevo y en que orden viene.
+     .seccion-entra  al cambiar de seccion, la nueva entra desde abajo. Sin
+                   eso, catorce tablas parecidas se sustituyen sin transicion y
+                   cuesta saber si el clic hizo algo.
+
+   Los dos usan SOLO transform y opacity. Ninguno reserva espacio distinto del
+   final: el desplazamiento es de 6 px con transform, que no cuenta como salto
+   de layout (CE4 sigue midiendose igual).
+   ========================================================================== */
+
+.fila-entra {
+  animation: fila-entra var(--dur-normal) var(--curva-salida) backwards;
+  animation-delay: var(--retardo-fila, 0ms);
+}
+
+/* Sin `opacity`, y no es un descuido. Con `backwards`, la fila se queda en
+   el fotograma inicial durante TODO su retardo: hasta 275 ms para la fila 12,
+   mas los 200 ms de la animacion. Si ese fotograma llevaba `opacity: 0`, los
+   botones de esa fila -"Editar", "Subir comprobante"- eran enfocables con Tab
+   siendo completamente transparentes, anillo de foco incluido. Eso es un
+   incumplimiento de SC 2.4.7 (Focus Visible), y el criterio no admite
+   excepcion por ser breve.
+
+   El desplazamiento de 6 px basta para que la llegada se lea. */
+@keyframes fila-entra {
+  from { transform: translateY(6px); }
+  to   { transform: none; }
+}
+
+.seccion-entra {
+  animation: seccion-entra var(--dur-normal) var(--curva-salida);
+}
+
+@keyframes seccion-entra {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Accesibilidad, no preferencia. tokens.css ya lleva las duraciones a 1 ms de
+   forma global, pero eso deja la animacion CORRIENDO en un solo cuadro: aqui
+   se retira del todo, que es lo que pide el criterio ("sin movimiento no
+   esencial"), y ademas se anula el retardo escalonado — si no, las doce
+   primeras filas seguirian apareciendo en cascada aunque instantaneas. */
+@media (prefers-reduced-motion: reduce) {
+  .fila-entra,
+  .seccion-entra {
+    animation: none;
+    animation-delay: 0ms;
   }
 }
