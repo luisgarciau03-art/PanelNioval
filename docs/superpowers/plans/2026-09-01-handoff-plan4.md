@@ -226,8 +226,8 @@ DECISION D6, ABIERTA, esperando al owner:
     a un elemento que ya lo recibia del contexto. Fijar color en h1-h4 y en
     `a` dejo ilegibles el titulo de cabecera y los botones de Herramientas.
 12. El barrido de secretos del Plan 0 solo ve telefonos con DIGITOS
-    CONTIGUOS: `5551234567` si, pero `555 123 4567`, `555-123-4567` y
-    `(555) 123 4567` NO. Y el formato con espacios es el que usa la hoja.
+    CONTIGUOS: la forma pegada si, pero las separadas por espacios, guiones
+    o parentesis NO. Y el formato con espacios es el que usa la hoja.
     Ademas no distingue una fixture de una fuga: deja 13 falsos positivos
     fijos. Calibrarlo antes del --estricto del 2026-09-18.
 13. El panel cae a un .json de credencial en la raiz si falta
