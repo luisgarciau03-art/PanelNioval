@@ -43,8 +43,9 @@
       </div>
     </div>
     <div id="sin-clasificar"></div>
-    <div id="ciudades-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;max-height:220px;overflow-y:auto;padding:4px 2px">
-      <div style="color:var(--texto-suave);font-size:.82em;padding:6px">Cargando ciudades...</div>
+    <div id="ciudades-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;min-height:220px;max-height:220px;overflow-y:auto;padding:4px 2px">
+      <div class="solo-lectores" role="status" data-aviso-carga="Cargando ciudades..."></div>
+      <div class="esqueleto-chips" aria-hidden="true"><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div></div>
     </div>
 
     <!-- INPUT CIUDAD -->
@@ -84,8 +85,8 @@
 
     <!-- RESULTADO FINAL -->
     <div class="result-box" id="result-box">
-      <div class="icon">✅</div>
-      <h2 id="result-titulo">Búsqueda Completada</h2>
+      <div class="icon" id="result-icono" aria-hidden="true"></div>
+      <h2 id="result-titulo">Resultado de la búsqueda</h2>
       <p id="result-desc"></p>
       <br>
       <a href="/" class="link-panel">← Volver al Panel</a>
@@ -94,6 +95,7 @@
   </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/estados.js') }}"></script>
 <script src="{{ url_for('static', filename='js/importador.js') }}"></script>
 </body>
 </html>

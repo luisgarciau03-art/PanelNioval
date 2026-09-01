@@ -19,7 +19,7 @@ const O = {
   opcionesP1: [],
 };
 
-const PASOS = ['loading','contacto','p0','p1','p2','p3','p4','p5','p6','p7','guardando','siguiente','fin'];
+const PASOS = ['loading','contacto','p0','p1','p2','p3','p4','p5','p6','p7','guardando','siguiente','fin','error'];
 const TOTAL_PREGUNTAS = 7;
 
 function showStep(name) {
@@ -37,12 +37,44 @@ function setProgress(stepId, actual, total) {
   ).join('');
 }
 
+// Un fallo de lectura NO es el fin de la lista. Hasta la T4.5 lo era: el
+// backend se tragaba la excepción de Google y devolvía `{fin: true}`, así que
+// con las hojas caídas el operador veía «🎉 ¡Lista completada!» y dejaba de
+// llamar. La celebración queda reservada a estados verificados.
+function mostrarErrorDeLectura(e) {
+  const m = String((e && e.message) || e || '');
+  document.getElementById('header-sub').textContent = 'No se pudo cargar el contacto';
+  // El paso se revela ANTES de escribir el texto, y no al revés. Los pasos
+  // inactivos son `display:none`, que los saca del árbol de accesibilidad: si
+  // el texto se escribe con el bloque todavía oculto, la mutación de la región
+  // viva ocurre donde nadie la ve, y revelarla después no cuenta como cambio.
+  // Resultado del orden anterior: el error no se anunciaba NUNCA.
+  showStep('error');
+  document.getElementById('error-detalle').textContent =
+    /Failed to fetch|NetworkError/i.test(m)
+      ? 'Sin conexión con el panel. Revisa la red y vuelve a intentarlo.'
+      : (m || 'El panel no pudo leer la hoja de contactos.');
+  // El foco va al reintento: es la única acción disponible y el operador puede
+  // estar trabajando solo con teclado. Aquí es seguro moverlo porque el
+  // formulario muestra un paso a la vez; en el tablero no se hace, que ahí
+  // pueden aparecer dos bloques de error a la vez y se pelearían por el foco.
+  const btn = document.getElementById('btn-reintentar-contacto');
+  if (btn) btn.focus();
+}
+
 async function cargarContacto() {
   cerrarVentanasContacto();
   showStep('loading');
   document.getElementById('header-sub').textContent = 'Cargando contacto...';
-  const r = await fetch(`/api/formulario/siguiente?skip=${O.skip}`);
-  const d = await r.json();
+  let d;
+  try {
+    const r = await fetch(`/api/formulario/siguiente?skip=${O.skip}`);
+    d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || ('HTTP ' + r.status));
+  } catch (e) {
+    mostrarErrorDeLectura(e);
+    return;
+  }
   if (d.fin) { showStep('fin'); document.getElementById('stat-total').textContent = O.procesados; return; }
   O.contacto = d.contacto;
   O._telConfirmado = null;   // reset del número confirmado por contacto
@@ -398,6 +430,12 @@ function cargarSiguiente() {
   O.skip = 0;  // Resetear skip — el contacto anterior ya fue marcado
   cargarContacto();
 }
+
+// El reintento cuelga de un listener, no de un `onclick` en el marcado: el
+// paso de error se pinta con texto que viene del servidor y ahí es donde se
+// cuelan las comillas.
+document.getElementById('btn-reintentar-contacto')
+  .addEventListener('click', cargarContacto);
 
 // Iniciar
 cargarContacto();

@@ -628,7 +628,7 @@ presupone cuentas de medios pagados, que este proyecto no tiene.
 | T4.2 | Dirección visual (ADR) | ✅ HECHA | `1c3665d` · `docs/adr/2026-08-31-direccion-visual-panel.md` (método: `council`) | 2026-08-31 |
 | T4.3 | Extraer HTML de `app.py` a templates/static | ✅ HECHA | **PR #43** · `d86323f` (+ `505cf90`, `ba9cfd5`, `69e3e79`) · app.py 6,368 → 3,133 · **507 passed, 1 skipped** · 6/9 capturas idénticas píxel a píxel (las 3 restantes difieren solo en el reloj) · gates `refactoring-specialist` limpio, `code-reviewer` y `python-reviewer` con 1 CRITICAL cada uno, corregidos · CI verde | 2026-08-31 |
 | T4.4 | Sistema de diseño: tokens y componentes | ✅ HECHA | `211a70e` + `43ba0e8` · CE3: 288 → 31 colores literales (los 31 son las paletas de datos, T4.7) · verde de marca 2.16:1 → 4.54:1 · anillo de foco de dos tonos (el anterior fallaba en 6 de 8 fondos) · **564 passed, 1 skipped** · gates: `code-reviewer` 2 HIGH + `a11y-architect` 2 HIGH, todos corregidos | 2026-08-31 |
-| T4.5 | Estados de carga: esqueletos | PENDIENTE | | |
+| T4.5 | Estados de carga: esqueletos | ✅ HECHA | `static/js/estados.js` + bloque «ESTADOS DE CARGA» en `componentes.css` · CE5: 16 `class="loading"` → **0** · CE4 (gate): CLS del tablero a 768 px **0.5586 → 0.0103**, los 9 puntos < 0.1 (medido con `tools/medir_cls.py`, el «antes» sobre un worktree de `d890cde`) · los cuatro estados capturados en `docs/diseno/2026-09-01-estados-t45/` (7 PNG) · el formulario ya distingue «no hay más contactos» de «no pude leer la hoja» (`app.py` relanza en vez de tragarse la excepción; la ruta responde 503) · **637 passed, 1 skipped** (+73) · gates: `python-reviewer` aprobado; `code-reviewer` y `a11y-architect` encontraron el mismo CRITICAL (el esqueleto borraba los datos al pulsar «Actualizar») mas 4 hallazgos, todos corregidos · verificacion en navegador 5/5 (`tools/verificar_estados.py`), comprobada en las dos direcciones · evidencia: `docs/diseno/2026-09-01-estados-de-carga-t45.md` | 2026-09-01 |
 | T4.6 | Sistema de movimiento | PENDIENTE | | |
 | T4.7 | Rediseño del dashboard `/` | PENDIENTE | | |
 | T4.8 | Rediseño del formulario `/formulario` | PENDIENTE | | |
@@ -636,4 +636,4 @@ presupone cuentas de medios pagados, que este proyecto no tiene.
 | T4.10 | Accesibilidad, responsive y rendimiento | PENDIENTE | | |
 | T4.11 | Cierre: sistema documentado, PR, handoff | PENDIENTE | | |
 
-**Avance del plan: 5 / 12 tareas (42 %)**
+**Avance del plan: 6 / 12 tareas (50 %)**

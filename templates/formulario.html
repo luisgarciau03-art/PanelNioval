@@ -20,9 +20,16 @@
   </div>
   <div class="body">
 
-    <!-- LOADING -->
+    <!-- CARGA: esqueleto con la forma de la ficha, para que al llegar el
+         contacto la botonera no se mueva bajo el dedo del operador. -->
     <div class="step active" id="step-loading">
-      <div class="spinner-box"><div class="spinner"></div><br><br>Cargando contacto...</div>
+      <div class="solo-lectores" role="status" data-aviso-carga="Cargando contacto..."></div>
+      <div class="esqueleto-ficha" aria-hidden="true">
+        <div class="esqueleto esqueleto-chip"></div>
+        <div class="info-grid"><div class="esqueleto esqueleto-campo"></div><div class="esqueleto esqueleto-campo"></div><div class="esqueleto esqueleto-campo"></div><div class="esqueleto esqueleto-campo"></div><div class="esqueleto esqueleto-campo"></div><div class="esqueleto esqueleto-campo"></div></div>
+        <div class="esqueleto esqueleto--texto esqueleto--corto"></div>
+        <div class="esqueleto-botonera"><div class="esqueleto esqueleto-boton"></div><div class="esqueleto esqueleto-boton"></div><div class="esqueleto esqueleto-boton"></div><div class="esqueleto esqueleto-boton"></div></div>
+      </div>
     </div>
 
     <!-- CONTACTO INFO -->
@@ -154,7 +161,10 @@
 
     <!-- FIN / GUARDANDO -->
     <div class="step" id="step-guardando">
-      <div class="spinner-box"><div class="spinner"></div><br><br>Guardando respuestas...</div>
+      <div class="estado" role="status">
+        <div class="estado__titulo">Guardando respuestas...</div>
+        <div class="esqueleto esqueleto--texto" aria-hidden="true"></div>
+      </div>
     </div>
 
     <!-- SIGUIENTE CONTACTO -->
@@ -222,6 +232,18 @@
       </div>
     </div>
 
+    <!-- ERROR DE LECTURA: NO es el fin de la lista. Vocabulario propio, sin
+         confeti ni verde de exito (ADR de direccion visual). -->
+    <div class="step" id="step-error">
+      <div class="estado estado--error" role="status">
+        <div class="estado__titulo">No se pudo leer la lista de contactos</div>
+        <div class="estado__detalle" id="error-detalle"></div>
+        <div class="estado__accion">
+          <button type="button" class="btn btn--secundario" id="btn-reintentar-contacto">Reintentar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- FIN TOTAL -->
     <div class="step" id="step-fin">
       <div class="fin">
@@ -238,6 +260,7 @@
   </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/estados.js') }}"></script>
 <script src="{{ url_for('static', filename='js/formulario.js') }}"></script>
 </body>
 </html>

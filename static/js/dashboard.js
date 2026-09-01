@@ -2,6 +2,9 @@
 const state = {
   currentSection: 'dashboard',
   loaded: {},
+  // Secciones que ya se pintaron una vez. La PRIMERA carga trae su esqueleto
+  // desde la plantilla; a partir de la segunda lo pinta el JS.
+  pintada: {},
   data: {},
   filtered: {},
   page: {},
@@ -39,13 +42,65 @@ function showSection(name) {
   // simpler: mark by onclick
   event.currentTarget.classList.add('active');
   state.currentSection = name;
-  document.getElementById('topbar-title').textContent = SECTION_TITLES[name];
+  const titulo = document.getElementById('topbar-title');
+  titulo.textContent = SECTION_TITLES[name];
+  // El h1 se recorta con puntos suspensivos para que la barra no cambie de
+  // alto (ver dashboard.css). El lector de pantalla anuncia el textContent
+  // completo igual, pero quien amplía la página y no usa lector se quedaba
+  // sin forma de leer el resto.
+  titulo.title = SECTION_TITLES[name];
   if (!state.loaded[name]) loadSection(name);
+}
+
+// ─── CONTENEDORES POR SECCIÓN ───────────────────────────────────────────────
+// Dónde va el esqueleto al recargar y dónde aterriza el estado de error.
+// Antes el catch genérico adivinaba el id concatenando cadenas
+// (`name.replace('-','') + '-cards'`), que acertaba en unas secciones y en
+// otras no: 'ventas-dash' salía como 'ventasdash-cards', que no existe, así
+// que el fallo se quedaba sin pintar y la sección se veía cargando para
+// siempre. El número de tarjetas es el que pinta cada `load*`: si el esqueleto
+// lleva otro, la rejilla cambia de alto al llegar los datos (CE4).
+const CONTENEDORES = {
+  dashboard:     { tarjetas: 'dash-cards',  n: 8, graficas: 'dash-charts', avisoGraficas: 'dash-charts-aviso' },
+  frecuentes:    { tarjetas: 'frec-cards',  n: 4, tabla: 'frec-top-table' },
+  'ventas-dash': { tarjetas: 'vdash-cards', n: 5, tabla: 'vdash-table', graficas: 'vdash-charts', avisoGraficas: 'vdash-charts-aviso' },
+  ventas:        { tabla: 'ventas-table' },
+  contactos:     { tabla: 'contactos-table' },
+  pendientes:    { tarjetas: 'pend-cards',  n: 2, tabla: 'pendientes-table' },
+  ciudades:      { tabla: 'ciudades-table' },
+  respuestas:    { tabla: 'respuestas-table' },
+  mensajes:      { tabla: 'mensajes-table' },
+  catalogo:      { tabla: 'catalogo-table' },
+  seguimiento:   { tarjetas: 'seg-cards',   n: 4, tabla: 'seguimiento-table' },
+  bruce:         { tabla: 'bruce-table' },
+};
+
+// Esqueletos de una sección al RE-cargarla (cambio de sección ya visitada o
+// botón Actualizar). En la primera carga el esqueleto ya viene en la plantilla:
+// pintarlo desde JS llegaría tarde y provocaría justo el salto que evita.
+// Devuelve la función que los retira.
+function pintarEsqueletos(name) {
+  const c = CONTENEDORES[name];
+  if (!c || typeof Estados === 'undefined') return function () {};
+  const cierres = [];
+  if (c.tarjetas) cierres.push(Estados.esqueleto(c.tarjetas, 'tarjetas', { tarjetas: c.n }));
+  if (c.tabla)    cierres.push(Estados.esqueleto(c.tabla, 'tabla'));
+  return function () { cierres.forEach(f => f()); };
 }
 
 // ─── LOAD SECTION ───────────────────────────────────────────────────────────
 async function loadSection(name) {
   state.loaded[name] = true;
+  const quitarEsqueletos = state.pintada[name] ? pintarEsqueletos(name) : function () {};
+  const graficas = CONTENEDORES[name] && CONTENEDORES[name].graficas
+    ? document.getElementById(CONTENEDORES[name].graficas) : null;
+  if (graficas) graficas.hidden = false;
+  // El aviso de la carga anterior se limpia SIEMPRE al empezar: si no, un
+  // reintento correcto dejaría en pantalla el "las gráficas no se pudieron
+  // dibujar" de la vez anterior.
+  const avisoGraficas = CONTENEDORES[name] && CONTENEDORES[name].avisoGraficas
+    ? document.getElementById(CONTENEDORES[name].avisoGraficas) : null;
+  if (avisoGraficas) avisoGraficas.innerHTML = '';
   try {
   switch(name) {
     case 'dashboard':   await loadDashboard(); break;
@@ -75,11 +130,36 @@ async function loadSection(name) {
   }
   } catch(e) {
     console.error('loadSection error:', name, e);
-    const tableEl = document.getElementById(name + '-table') || document.getElementById('sec-' + name)?.querySelector('.tbl-wrap');
-    if (tableEl) tableEl.innerHTML = `<div class="empty" style="color:var(--error)">⚠️ Error al cargar: ${e.message}</div>`;
-    const cardsEl = document.getElementById(name.replace('-','') + '-cards') || document.getElementById('pend-cards');
-    if (name === 'pendientes' && cardsEl) cardsEl.innerHTML = `<div class="empty" style="color:var(--error)">⚠️ Error: ${e.message}</div>`;
+    const c = CONTENEDORES[name] || {};
+    const reintentar = () => { state.loaded[name] = false; loadSection(name); };
+    // El error va donde estaba el contenido, en las DOS piezas de la sección:
+    // dejar la rejilla de indicadores con su esqueleto girando mientras la
+    // tabla dice "falló" es contarle al operador dos cosas distintas.
+    if (c.tabla) Estados.error(c.tabla, {
+      titulo: 'No se pudo cargar esta tabla',
+      detalle: mensajeDeFallo(e),
+      reintentar,
+    });
+    if (c.tarjetas) Estados.error(c.tarjetas, {
+      titulo: 'No se pudieron cargar los indicadores',
+      detalle: mensajeDeFallo(e),
+      reintentar,
+    });
+    // Las tarjetas de gráfica se retiran: sin datos quedan como tres cajas
+    // blancas con título y nada dentro, que se leen como "sigue cargando".
+    // El bloque de error de arriba ya dice lo que pasó; repetirlo tres veces
+    // más no informa, y dejarlas vacías desinforma.
+    // Se OCULTAN, no se borran: vaciar el contenedor se llevaria por delante
+    // los <canvas>, y el reintento moriria buscando un elemento que ya no
+    // existe. `loadSection` las vuelve a mostrar al empezar.
+    if (c.graficas) {
+      const g = document.getElementById(c.graficas);
+      if (g) g.hidden = true;
+    }
     state.loaded[name] = false; // permitir reintento
+  } finally {
+    quitarEsqueletos();
+    state.pintada[name] = true;
   }
 }
 
@@ -90,9 +170,39 @@ async function fetchAPI(url) {
   return res.json();
 }
 
-function showSectionError(sectionId, msg) {
-  const el = document.getElementById(sectionId);
-  if (el) el.innerHTML = `<div class="empty" style="color:var(--error)">⚠️ ${msg}</div>`;
+// Un `TypeError: Failed to fetch` no le dice nada a quien opera el panel, y un
+// 500 crudo de Google tampoco. Se traduce lo que se puede y se conserva el
+// resto para la consola.
+function mensajeDeFallo(e) {
+  const m = String((e && e.message) || e || '');
+  if (/HTTP 401|HTTP 403/.test(m)) return 'La sesión del panel caducó. Recarga la página para volver a entrar.';
+  if (/HTTP 429/.test(m))          return 'Google está limitando las peticiones. Espera unos segundos y reintenta.';
+  if (/HTTP 5\d\d/.test(m))        return 'El panel no pudo leer la hoja de Google. Suele resolverse reintentando.';
+  if (/Failed to fetch|NetworkError/i.test(m)) return 'Sin conexión con el panel. Revisa la red y reintenta.';
+  return m || 'Fallo no identificado.';
+}
+
+// Las gráficas fallan APARTE del resto: los indicadores ya están en pantalla y
+// siguen siendo válidos. Chart.js viene de un CDN sin SRI (deuda del Plan 5), así
+// que "no cargó la librería" es un caso real, no teórico.
+//
+// El aviso va en un contenedor PROPIO, nunca dentro de `.charts`: pintarlo ahí
+// con innerHTML borraría los <canvas>, y el siguiente intento moriría buscando
+// un elemento que ya no existe — el fallo pasaría de temporal a permanente,
+// recuperable solo recargando la página entera.
+function pintarGraficasConAviso(pintar, idGraficas, idAviso) {
+  const caja = document.getElementById(idGraficas);
+  try {
+    if (caja) caja.hidden = false;
+    pintar();
+  } catch (e) {
+    console.error('graficas:', idGraficas, e);
+    if (caja) caja.hidden = true;
+    Estados.parcial(idAviso, {
+      titulo: 'Las gráficas no se pudieron dibujar',
+      detalle: 'Los indicadores de arriba sí están completos. Recargar la página suele bastar.',
+    });
+  }
 }
 
 // ─── DASHBOARD ──────────────────────────────────────────────────────────────
@@ -125,6 +235,15 @@ async function loadDashboard() {
     <div class="card purple"><div class="label">Marca Única</div><div class="value">${mu}</div><div class="sub">Competencia</div></div>
   `;
 
+  // Las gráficas van aparte, y su fallo es PARCIAL: los indicadores de arriba
+  // ya están en pantalla y siguen siendo válidos. Chart.js viene de un CDN sin
+  // SRI (deuda del Plan 5): si ese CDN no responde, `new Chart` revienta y
+  // antes se llevaba por delante toda la sección, indicadores incluidos.
+  pintarGraficasConAviso(() => pintarGraficasDashboard(stats, res),
+                         'dash-charts', 'dash-charts-aviso');
+}
+
+function pintarGraficasDashboard(stats, res) {
   // Chart: Resultados donut
   destroyChart('chartResultados');
   const ctxR = document.getElementById('chartResultados').getContext('2d');
@@ -136,7 +255,7 @@ async function loadDashboard() {
       labels: labelsR,
       datasets: [{ data: dataR, backgroundColor: ['#00CC47','#e74c3c','#e67e22','#8e44ad','#6c757d','#ffc107'] }]
     },
-    options: { plugins: { legend: { position: 'right' } }, cutout: '65%' }
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } }, cutout: '65%' }
   });
 
   // Chart: Semanas
@@ -149,7 +268,7 @@ async function loadDashboard() {
       labels: semanas.map(s => s.semana),
       datasets: [{ label: 'Contactos', data: semanas.map(s => s.total), borderColor: '#0047CC', backgroundColor: 'rgba(0,71,204,.1)', fill: true, tension: .4 }]
     },
-    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
   });
 
   // Chart: Ciudades
@@ -162,7 +281,7 @@ async function loadDashboard() {
       labels: ciudades.map(c => c[0]),
       datasets: [{ label: 'Contactos', data: ciudades.map(c => c[1]), backgroundColor: '#0047CC' }]
     },
-    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
   });
 }
 
@@ -235,6 +354,74 @@ function fmtMonto(n) {
 }
 
 // ─── DASHBOARD VENTAS ────────────────────────────────────────────────────────
+function pintarGraficasVentas(labels, montos, pedidos, tickets) {
+  // ── Chart: Facturación mensual ──
+  destroyChart('chartVentasMonto');
+  charts['chartVentasMonto'] = new Chart(
+    document.getElementById('chartVentasMonto').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Facturación $',
+        data: montos,
+        backgroundColor: montos.map((v,i) =>
+          v === Math.max(...montos) ? '#00CC47' : 'rgba(0,71,204,0.7)'),
+        borderRadius: 6,
+      }]
+    },
+    options: { maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => '$'+fmtMonto(v) } }
+      }
+    }
+  });
+
+  // ── Chart: Pedidos por mes ──
+  destroyChart('chartVentasPedidos');
+  charts['chartVentasPedidos'] = new Chart(
+    document.getElementById('chartVentasPedidos').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Pedidos',
+        data: pedidos,
+        backgroundColor: 'rgba(0,71,204,0.75)',
+        borderRadius: 6,
+      }]
+    },
+    options: { maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+  });
+
+  // ── Chart: Ticket promedio ──
+  destroyChart('chartVentasTicket');
+  charts['chartVentasTicket'] = new Chart(
+    document.getElementById('chartVentasTicket').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Ticket Promedio $',
+        data: tickets,
+        borderColor: '#e67e22',
+        backgroundColor: 'rgba(230,126,34,.1)',
+        fill: true, tension: .4, pointRadius: 4,
+      }]
+    },
+    options: { maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => '$'+fmtMonto(v) } }
+      }
+    }
+  });
+}
+
 async function loadVentasDash() {
   const d = await fetchAPI('/api/prospectos/ventas-dashboard');
   const meses = d.por_mes || [];
@@ -273,71 +460,12 @@ async function loadVentasDash() {
   const pedidos = meses.map(m => m.pedidos);
   const tickets = meses.map(m => m.ticket_prom);
 
-  // ── Chart: Facturación mensual ──
-  destroyChart('chartVentasMonto');
-  charts['chartVentasMonto'] = new Chart(
-    document.getElementById('chartVentasMonto').getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Facturación $',
-        data: montos,
-        backgroundColor: montos.map((v,i) =>
-          v === Math.max(...montos) ? '#00CC47' : 'rgba(0,71,204,0.7)'),
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, ticks: { callback: v => '$'+fmtMonto(v) } }
-      }
-    }
-  });
-
-  // ── Chart: Pedidos por mes ──
-  destroyChart('chartVentasPedidos');
-  charts['chartVentasPedidos'] = new Chart(
-    document.getElementById('chartVentasPedidos').getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Pedidos',
-        data: pedidos,
-        backgroundColor: 'rgba(0,71,204,0.75)',
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-    }
-  });
-
-  // ── Chart: Ticket promedio ──
-  destroyChart('chartVentasTicket');
-  charts['chartVentasTicket'] = new Chart(
-    document.getElementById('chartVentasTicket').getContext('2d'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Ticket Promedio $',
-        data: tickets,
-        borderColor: '#e67e22',
-        backgroundColor: 'rgba(230,126,34,.1)',
-        fill: true, tension: .4, pointRadius: 4,
-      }]
-    },
-    options: {
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, ticks: { callback: v => '$'+fmtMonto(v) } }
-      }
-    }
-  });
+  // Mismo trato que el tablero: si la libreria de graficas no cargo, la tabla
+  // de desglose de abajo tiene que seguir pintandose. Antes el fallo subia al
+  // catch generico de loadSection y se llevaba la seccion entera.
+  pintarGraficasConAviso(
+    () => pintarGraficasVentas(labels, montos, pedidos, tickets),
+    'vdash-charts', 'vdash-charts-aviso');
 
   // ── Tabla desglose por mes ──
   const maxMonto = Math.max(...montos, 1);
@@ -443,7 +571,10 @@ function renderTable(key, tableId, pagId) {
   const totalPages = Math.ceil(total / ps);
 
   if (!total) {
-    document.getElementById(tableId).innerHTML = '<div class="empty">No hay datos</div>';
+    Estados.vacio(tableId, {
+      titulo: 'No hay filas que mostrar',
+      detalle: 'La hoja se leyó bien; sencillamente no hay registros con los filtros aplicados.',
+    });
     document.getElementById(pagId).innerHTML = '';
     return;
   }
@@ -718,7 +849,10 @@ function sortCiudades(col) {
 
 function renderCiudades(data) {
   if (!data || !data.length) {
-    document.getElementById('ciudades-table').innerHTML = '<div class="empty">Sin datos</div>';
+    Estados.vacio('ciudades-table', {
+      titulo: 'Ninguna ciudad coincide',
+      detalle: 'Prueba con otro texto en el buscador.',
+    });
     return;
   }
   const maxAprob = Math.max(...data.map(c => c.aprobados), 1);
@@ -1004,7 +1138,10 @@ async function loadMensajes() {
   const container = document.getElementById('mensajes-table');
   document.getElementById('mensajes-pag').innerHTML = '';
   if (!data.length) {
-    container.innerHTML = '<div class="empty">No hay mensajes configurados</div>';
+    Estados.vacio(container, {
+      titulo: 'No hay mensajes configurados',
+      detalle: 'Se cargan desde la hoja «Mensajes»; en cuanto tenga filas aparecerán aquí.',
+    });
     return;
   }
   container.innerHTML = `<div class="men-grid">${data.map(d => `
@@ -1278,19 +1415,34 @@ function _catTag(estado){
 async function loadCatalogo(){
   const filtro = document.getElementById('cat-filtro').value;
   const cont = document.getElementById('catalogo-table');
-  cont.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const quitarEsqueleto = Estados.esqueleto(cont, 'tabla');
   let envios = [];
   try {
     if (filtro === 'problema') envios = await _catFetchProblema();
     else { const d = await fetch('/api/catalogo/envios'+(filtro?('?estado='+filtro):'')).then(r=>r.json()); envios = d.envios||[]; }
-  } catch(e){ cont.innerHTML = '<div class="empty" style="color:var(--error)">⚠️ Error al cargar los envíos.</div>'; return; }
+  } catch(e){
+    quitarEsqueleto();
+    Estados.error(cont, {
+      titulo: 'No se pudieron cargar los envíos',
+      detalle: mensajeDeFallo(e),
+      reintentar: loadCatalogo,
+    });
+    return;
+  }
+  quitarEsqueleto();
   renderCatalogo(envios);
   actualizarBadgeCatalogo();
 }
 
 function renderCatalogo(envios){
   const cont = document.getElementById('catalogo-table');
-  if (!envios.length){ cont.innerHTML = '<div class="empty">Sin envíos en este filtro. 🎉</div>'; return; }
+  if (!envios.length){
+    Estados.vacio(cont, {
+      titulo: 'Ningún envío en este filtro',
+      detalle: 'Puede ser que no haya nada pendiente, o que el worker no haya registrado nada todavía.',
+    });
+    return;
+  }
   const rows = envios.map(e=>{
     const prob = CAT_ESTADOS_PROBLEMA.includes(String(e.estado).toUpperCase());
     const acc = prob
@@ -1387,7 +1539,10 @@ function renderBruceTable(data) {
   const container = document.getElementById('bruce-table');
   document.getElementById('bruce-pag').innerHTML = '';
   if (!data.length) {
-    container.innerHTML = '<div class="empty">Sin prospectos aún</div>';
+    Estados.vacio(container, {
+      titulo: 'Sin prospectos todavía',
+      detalle: 'Los que agregues con el formulario de arriba aparecerán en esta tabla.',
+    });
     return;
   }
   let html = `<table><thead><tr>

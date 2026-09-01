@@ -8,6 +8,13 @@
 
 html { -webkit-text-size-adjust: 100%; }
 
+/* El atributo `hidden` solo lo declara la hoja del navegador, asi que
+   cualquier `display` escrito por nosotros le gana: `.charts{display:grid}`
+   dejaba visible un bloque marcado como oculto. Con `!important` el atributo
+   vuelve a significar lo que dice, que es de lo que dependen los estados de
+   la T4.5 para retirar una region sin destruir su marcado. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: var(--fuente);

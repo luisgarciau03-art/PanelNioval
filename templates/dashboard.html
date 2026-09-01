@@ -99,20 +99,29 @@
     <!-- ═══ DASHBOARD ═══ -->
     <div class="section active" id="sec-dashboard">
       <div class="cards" id="dash-cards">
-        <div class="loading"><div class="spinner"></div><br>Cargando...</div>
+        <div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
       </div>
-      <div class="charts">
+      <div id="dash-charts-aviso"></div>
+      <div class="charts" id="dash-charts">
         <div class="chart-box">
           <h3>📈 Resultados de Llamadas</h3>
-          <canvas id="chartResultados" height="180"></canvas>
+          <div class="chart-lienzo"><canvas id="chartResultados"></canvas></div>
         </div>
         <div class="chart-box">
           <h3>📅 Contactos por Semana</h3>
-          <canvas id="chartSemanas" height="180"></canvas>
+          <div class="chart-lienzo"><canvas id="chartSemanas"></canvas></div>
         </div>
         <div class="chart-box full">
           <h3>🏙️ Top Ciudades en Lista</h3>
-          <canvas id="chartCiudades" height="100"></canvas>
+          <div class="chart-lienzo"><canvas id="chartCiudades"></canvas></div>
         </div>
       </div>
     </div>
@@ -120,14 +129,18 @@
     <!-- ═══ FRECUENTES ═══ -->
     <div class="section" id="sec-frecuentes">
       <div class="cards" id="frec-cards">
-        <div class="loading"><div class="spinner"></div><br>Cargando...</div>
+        <div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
       </div>
       <div class="table-box">
         <h3>⭐ Clientes Frecuentes — Orden de Ingreso</h3>
         <div class="table-controls">
           <input type="text" id="frecuentes-search" placeholder="🔍 Buscar..." oninput="filterTable('frecuentes')">
         </div>
-        <div class="tbl-wrap" id="frec-top-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="tbl-wrap" id="frec-top-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
         <div class="pagination" id="frec-pag"></div>
       </div>
     </div>
@@ -135,25 +148,31 @@
     <!-- ═══ DASHBOARD VENTAS ═══ -->
     <div class="section" id="sec-ventas-dash">
       <div class="cards" id="vdash-cards">
-        <div class="loading"><div class="spinner"></div><br>Cargando...</div>
+        <div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
       </div>
-      <div class="charts">
+      <div id="vdash-charts-aviso"></div>
+      <div class="charts" id="vdash-charts">
         <div class="chart-box full">
           <h3>💰 Facturación Mensual</h3>
-          <canvas id="chartVentasMonto" height="90"></canvas>
+          <div class="chart-lienzo"><canvas id="chartVentasMonto"></canvas></div>
         </div>
         <div class="chart-box">
           <h3>📦 Pedidos por Mes</h3>
-          <canvas id="chartVentasPedidos" height="160"></canvas>
+          <div class="chart-lienzo"><canvas id="chartVentasPedidos"></canvas></div>
         </div>
         <div class="chart-box">
           <h3>🎯 Ticket Promedio por Mes</h3>
-          <canvas id="chartVentasTicket" height="160"></canvas>
+          <div class="chart-lienzo"><canvas id="chartVentasTicket"></canvas></div>
         </div>
       </div>
       <div class="table-box">
         <h3>📅 Desglose por Mes</h3>
-        <div class="tbl-wrap" id="vdash-table"></div>
+        <div class="tbl-wrap" id="vdash-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
       </div>
     </div>
 
@@ -165,7 +184,7 @@
           <input type="text" id="ventas-search" placeholder="🔍 Buscar..." oninput="filterTable('ventas')">
           <span id="ventas-count" style="font-size:.8em;color:var(--texto-suave);align-self:center;margin-left:4px"></span>
         </div>
-        <div class="tbl-wrap" id="ventas-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="tbl-wrap" id="ventas-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
         <div class="pagination" id="ventas-pag"></div>
       </div>
     </div>
@@ -183,7 +202,7 @@
             <option value="">Todas las categorías</option>
           </select>
         </div>
-        <div class="tbl-wrap" id="contactos-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="tbl-wrap" id="contactos-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
         <div class="pagination" id="contactos-pag"></div>
       </div>
     </div>
@@ -191,7 +210,9 @@
     <!-- ═══ POR LLAMAR ═══ -->
     <div class="section" id="sec-pendientes">
       <div class="cards" id="pend-cards">
-        <div class="loading"><div class="spinner"></div><br>Cargando...</div>
+        <div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
       </div>
       <div class="table-box">
         <h3>📞 Contactos Sin Respuesta — Por Llamar</h3>
@@ -201,7 +222,7 @@
             <option value="">Todas las ciudades</option>
           </select>
         </div>
-        <div class="tbl-wrap" id="pendientes-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="tbl-wrap" id="pendientes-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
         <div class="pagination" id="pendientes-pag"></div>
       </div>
     </div>
@@ -213,7 +234,7 @@
         <div class="table-controls">
           <input type="text" id="ciudades-search" placeholder="🔍 Buscar ciudad..." oninput="filterCiudades()">
         </div>
-        <div class="tbl-wrap" id="ciudades-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="tbl-wrap" id="ciudades-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
       </div>
     </div>
 
@@ -227,7 +248,7 @@
             <option value="">Todas las conclusiones</option>
           </select>
         </div>
-        <div class="tbl-wrap" id="respuestas-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="tbl-wrap" id="respuestas-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
         <div class="pagination" id="respuestas-pag"></div>
       </div>
     </div>
@@ -239,7 +260,7 @@
         <div class="table-controls">
           <input type="text" id="mensajes-search" placeholder="🔍 Buscar mensaje..." oninput="filterMensajes(this.value)">
         </div>
-        <div class="tbl-wrap" id="mensajes-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="tbl-wrap" id="mensajes-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
         <div class="pagination" id="mensajes-pag"></div>
       </div>
     </div>
@@ -258,7 +279,7 @@
           </select>
           <button class="btn-refresh" onclick="loadCatalogo()">↻ Actualizar</button>
         </div>
-        <div class="tbl-wrap" id="catalogo-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="tbl-wrap" id="catalogo-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
       </div>
     </div>
 
@@ -278,7 +299,11 @@
     <!-- ═══ SEGUIMIENTO ═══ -->
     <div class="section" id="sec-seguimiento">
       <div class="cards" id="seg-cards">
-        <div class="loading"><div class="spinner"></div><br>Cargando...</div>
+        <div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
       </div>
       <div class="seg-tabs" id="seg-tabs"></div>
       <div class="table-box">
@@ -286,7 +311,7 @@
         <div class="table-controls">
           <input type="text" id="seg-search" placeholder="🔍 Buscar en este panel..." oninput="filterSegTab()">
         </div>
-        <div class="tbl-wrap" id="seguimiento-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="tbl-wrap" id="seguimiento-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
         <div class="pagination" id="seguimiento-pag"></div>
       </div>
     </div>
@@ -335,7 +360,7 @@
         <div class="table-controls">
           <input type="text" id="bruce-search" placeholder="🔍 Buscar..." oninput="filterBruce(this.value)">
         </div>
-        <div class="tbl-wrap" id="bruce-table"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="tbl-wrap" id="bruce-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
         <div class="pagination" id="bruce-pag"></div>
       </div>
     </div>
@@ -370,6 +395,7 @@
   </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/estados.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 
 <!-- MODAL UPLOAD COMPROBANTE -->

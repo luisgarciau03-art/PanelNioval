@@ -295,3 +295,207 @@ input:disabled, select:disabled, textarea:disabled {
   font-size: var(--texto-sm);
   line-height: var(--linea-normal);
 }
+
+/* ==========================================================================
+   ESTADOS DE CARGA  ·  Plan 4 - T4.5
+   ==========================================================================
+   Antes habia UN estado no-feliz: `.loading` con un spinner, que sustituia el
+   contenido. Dos consecuencias medidas:
+
+     - Al llegar los datos el bloque pasaba de ~100 px a varios cientos, y todo
+       lo de abajo saltaba (CE4 pide CLS < 0.1).
+     - Un spinner se ve identico mientras carga, cuando no hay nada que cargar
+       y cuando la peticion ya murio. Son tres cosas distintas.
+
+   Aqui viven las dos piezas del sistema:
+
+     .esqueleto*  la forma del contenido que viene, con SU altura, para que
+                  nada se mueva cuando llegue.
+     .estado*     los tres finales: vacio, error y parcial. Cada uno con su
+                  propio vocabulario de color; el ADR de direccion visual lo
+                  exige explicitamente porque hoy vacio y error se ven igual.
+
+   Ni un color literal: todo sale de tokens.css.
+   ========================================================================== */
+
+/* --- Esqueleto ------------------------------------------------------------
+   El brillo se desplaza con `transform` sobre un pseudo-elemento. La
+   alternativa habitual —animar `background-position` de un degradado— repinta
+   el bloque entero en cada cuadro, y aqui puede haber catorce esqueletos de
+   tabla a la vez. */
+.esqueleto {
+  position: relative;
+  overflow: hidden;
+  height: var(--esp-4);
+  border-radius: var(--radio-sm);
+  background: var(--gris-200);
+}
+
+.esqueleto::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--superficie),
+    transparent
+  );
+  opacity: .55;
+  transform: translateX(-100%);
+  animation: esqueleto-brillo 1.4s ease-in-out infinite;
+}
+
+@keyframes esqueleto-brillo {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+/* Variantes por forma. La altura de cada una es la del elemento real que
+   sustituye, no un valor decorativo. */
+.esqueleto--titulo { height: var(--esp-5); width: 40%; }
+.esqueleto--texto  { height: var(--esp-3); }
+.esqueleto--num    { height: var(--esp-6); width: 55%; }
+.esqueleto--corto  { width: 30%; }
+.esqueleto--medio  { width: 60%; }
+
+/* Tarjeta de indicador: replica el alto de `.card` del tablero y de `.stat`
+   del sistema (etiqueta + cifra + padding). */
+.esqueleto-tarjeta {
+  height: 92px;
+  padding: var(--esp-4);
+  border-radius: var(--radio-lg);
+  border-left: 4px solid var(--gris-200);
+  background: var(--superficie);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--esp-2);
+}
+
+/* Tabla: cabecera de color pleno mas filas del alto real de una `td`. */
+.esqueleto-tabla { width: 100%; }
+
+.esqueleto-tabla__cabecera {
+  height: 34px;
+  border-radius: var(--radio-sm) var(--radio-sm) 0 0;
+  background: var(--gris-300);
+  margin-bottom: var(--esp-1);
+}
+
+.esqueleto-tabla__fila {
+  height: 33px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.esqueleto-chip {
+  height: 26px;
+  width: 96px;
+  border-radius: var(--radio-completo);
+}
+
+/* Campo de la ficha de contacto: alto de `.info-item` (etiqueta + valor). */
+.esqueleto-campo {
+  height: 60px;
+  border-radius: var(--radio-md);
+}
+
+/* Boton de resultado: alto de `.btn` con su padding vertical. */
+.esqueleto-boton {
+  height: 42px;
+  flex: 1;
+  min-width: 120px;
+  border-radius: var(--radio-md);
+}
+
+.esqueleto-botonera {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-3);
+}
+
+/* Rejillas de esqueleto: el mismo reparto que el contenido real, para que el
+   ancho tampoco cambie al sustituir. */
+.esqueleto-rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--esp-4);
+}
+
+.esqueleto-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+}
+
+/* Ficha de contacto del formulario: encabezado corto mas la rejilla de datos. */
+.esqueleto-ficha {
+  display: grid;
+  gap: var(--esp-4);
+}
+
+/* --- Estados finales ------------------------------------------------------
+   Vacio, error y parcial. Vocabulario distinto a proposito: el ADR reserva la
+   celebracion y el verde de exito a estados verificados de forma explicita, y
+   "no recibi datos" no es uno de ellos. */
+.estado {
+  padding: var(--esp-6) var(--esp-5);
+  border-radius: var(--radio-md);
+  text-align: center;
+  font-size: var(--texto-sm);
+  line-height: var(--linea-normal);
+}
+
+.estado__titulo {
+  font-size: var(--texto-base);
+  font-weight: var(--peso-medio);
+  margin-bottom: var(--esp-2);
+}
+
+.estado__detalle {
+  font-size: var(--texto-sm);
+  margin-bottom: var(--esp-4);
+}
+
+.estado__accion { margin-top: var(--esp-2); }
+
+/* Vacio: gris, sin alarma. No paso nada malo; simplemente no hay filas.
+   El texto NO usa `--texto-suave`: sobre `--gris-50` ese par da 4.55:1, que
+   pasa AA por dos centesimas y se rompe con cualquier retoque del fondo
+   (misma trampa que costo el anillo de foco en la T4.4). El tono apagado lo
+   pone el borde punteado, no el contraste del texto. */
+.estado--vacio {
+  background: var(--gris-50);
+  color: var(--texto);
+  border: 1px dashed var(--borde-fuerte);
+}
+
+/* Error: la lectura fallo. Banda roja, y siempre con salida (reintentar). */
+.estado--error {
+  background: var(--error-tinte);
+  color: var(--error-fuerte);
+  border-left: 4px solid var(--error);
+  text-align: left;
+}
+
+/* Parcial: lo demas cargo; esta pieza no. Es un aviso al margen, no un muro:
+   por eso va en linea y ocupa poco. */
+.estado--parcial {
+  background: var(--aviso-tinte);
+  color: var(--aviso-fuerte);
+  border-left: 4px solid var(--aviso);
+  text-align: left;
+  padding: var(--esp-3) var(--esp-4);
+  font-size: var(--texto-sm);
+}
+
+/* --- Movimiento reducido --------------------------------------------------
+   Accesibilidad, no preferencia. Con la preferencia activa el esqueleto sigue
+   reservando el espacio —que es su trabajo— pero deja de brillar. */
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto::after {
+    animation: none;
+    transform: none;
+    opacity: 0;
+  }
+}

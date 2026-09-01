@@ -1323,9 +1323,15 @@ def get_contacto_pendiente(skip=0):
                 return datos
         return None
     except Exception as e:
+        # Se registra y se RELANZA. Devolver None aquí era indistinguible de
+        # "la hoja se leyó bien y no quedan pendientes", así que el endpoint
+        # respondía {'fin': True} y el formulario remataba con la pantalla de
+        # confeti: con Google caído, el operador leía "¡Lista completada!" y
+        # dejaba de llamar. La celebración queda reservada a estados
+        # verificados (ADR de dirección visual, Plan 4 T4.5).
         print(f"[formulario] get_contacto_pendiente error: {e}")
         traceback.print_exc()
-        return None
+        raise
 
 
 def marcar_contacto_procesado(row_num, col_respuesta=6):
@@ -1509,7 +1515,18 @@ def api_bruce_actualizar():
 @app.route('/api/formulario/siguiente')
 def formulario_siguiente():
     skip = int(request.args.get('skip', 0))
-    c = get_contacto_pendiente(skip)
+    try:
+        c = get_contacto_pendiente(skip)
+    except Exception:
+        # 503, no 200: para el cliente son dos respuestas distintas y el
+        # formulario las pinta distinto. El mensaje NO arrastra la excepción
+        # original: viene de gspread y puede traer contenido de la fila, o sea
+        # datos del cliente, a una pantalla que se comparte y se fotografía.
+        # La causa completa ya quedó en el log del servidor.
+        return jsonify({
+            'error': 'No se pudo leer la lista de contactos. '
+                     'Suele ser un límite temporal de Google; reintenta en unos segundos.'
+        }), 503
     if not c:
         return jsonify({'fin': True})
     return jsonify({'fin': False, 'contacto': c})

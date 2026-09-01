@@ -54,8 +54,11 @@ async function cargarCiudades() {
     // silencioso a una lista vieja seria peor que no tener lista.
     todasCiudades = [];
     document.getElementById('ciudades-count').textContent = '';
-    cont.innerHTML = '<div style="color:var(--error);font-size:.82em;padding:6px">'
-      + 'No se pudo cargar el catalogo de ciudades. Escribe la ciudad a mano.</div>';
+    Estados.error(cont, {
+      titulo: 'No se pudo cargar el catalogo de ciudades',
+      detalle: 'El campo de texto sigue funcionando: escribe la ciudad a mano.',
+      reintentar: cargarCiudades,
+    });
   }
 }
 
@@ -98,7 +101,13 @@ function escaparHtml(s) {
 
 function renderChips(lista) {
   const cont = document.getElementById('ciudades-chips');
-  if (!lista.length) { cont.innerHTML = '<div style="color:var(--texto-suave);font-size:.82em">Sin resultados</div>'; return; }
+  if (!lista.length) {
+    Estados.vacio(cont, {
+      titulo: 'Ninguna ciudad coincide',
+      detalle: 'Cambia el texto del filtro o elige otra region.',
+    });
+    return;
+  }
 
   cont.innerHTML = lista.map((c) => {
     const rank   = (c.rank != null) ? c.rank : 0;
@@ -343,6 +352,23 @@ async function actualizarEstado() {
   if (d.status !== 'running') rematar(d);
 }
 
+// El recuadro de resultado traia un `✅` fijo en la plantilla, asi que una
+// corrida detenida a mano, agotada por presupuesto, interrumpida por un
+// reinicio o caida con error se remataba con una marca de exito verde. El
+// icono sale ahora del estado real: la celebracion queda reservada a `done`,
+// que es el unico verificado (ADR de direccion visual, voto del Critico).
+const ICONO_RESULTADO = {
+  done: '✅',
+  cancelado: '⏹',
+  presupuesto_agotado: '⛔',
+  interrumpido: '⚠',
+  error: '⚠',
+};
+
+function ponerIconoResultado(status) {
+  document.getElementById('result-icono').textContent = ICONO_RESULTADO[status] || '⚠';
+}
+
 function rematar(d) {
   if (d.status === 'done' || d.status === 'cancelado' || d.status === 'interrumpido'
       || d.status === 'presupuesto_agotado') {
@@ -350,23 +376,24 @@ function rematar(d) {
     ponerEnMarcha(false);
     document.getElementById('btn-iniciar').textContent = '🔍 Nueva Búsqueda';
     document.getElementById('result-box').style.display = 'block';
+    ponerIconoResultado(d.status);
 
     if (d.status === 'done') {
-      document.getElementById('prog-label').textContent = '¡Completado!';
+      document.getElementById('prog-label').textContent = 'Completado';
       document.getElementById('result-titulo').textContent =
-        `✅ ${d.nuevos_en_sheet} contactos nuevos en la hoja — ${d.ciudad}`;
+        `${d.nuevos_en_sheet} contactos nuevos en la hoja — ${d.ciudad}`;
       document.getElementById('result-desc').textContent =
         `De ${d.encontrados + d.descartados} candidatos de Google, ${d.encontrados} pasaron los ` +
         `filtros de calidad: ${d.nuevos_en_sheet} se guardaron y ${d.duplicados} ya estaban en la lista. ` +
         `Los otros ${d.descartados} se descartaron por reseñas, calificación o falta de teléfono.`;
     } else {
       const titulos = {
-        cancelado: '⏹ Búsqueda detenida — ',
-        presupuesto_agotado: '⛔ Se alcanzó el tope de gasto — ',
-        interrumpido: '⚠ Búsqueda interrumpida — ',
+        cancelado: 'Búsqueda detenida — ',
+        presupuesto_agotado: 'Se alcanzó el tope de gasto — ',
+        interrumpido: 'Búsqueda interrumpida — ',
       };
       document.getElementById('result-titulo').textContent =
-        (titulos[d.status] || '⚠ ') + d.ciudad;
+        (titulos[d.status] || 'Búsqueda sin completar — ') + d.ciudad;
       document.getElementById('result-desc').textContent =
         (d.status === 'presupuesto_agotado' ? d.error + ' ' : '') +
         `Se alcanzaron a guardar ${d.nuevos_en_sheet} contactos nuevos, y siguen en la hoja. ` +
@@ -377,10 +404,11 @@ function rematar(d) {
   if (d.status === 'error') {
     pararSondeo();
     ponerEnMarcha(false);
-    document.getElementById('prog-label').textContent = '❌ Error: ' + d.error;
+    document.getElementById('prog-label').textContent = 'Error: ' + d.error;
     document.getElementById('btn-iniciar').textContent = '🔍 Reintentar';
     document.getElementById('result-box').style.display = 'block';
-    document.getElementById('result-titulo').textContent = '❌ La búsqueda falló — ' + d.ciudad;
+    ponerIconoResultado('error');
+    document.getElementById('result-titulo').textContent = 'La búsqueda falló — ' + d.ciudad;
     document.getElementById('result-desc').textContent =
       (d.error || '') + ` Se alcanzaron a guardar ${d.nuevos_en_sheet} contactos nuevos.`;
   }
