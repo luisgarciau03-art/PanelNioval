@@ -24,7 +24,7 @@ Este script conduce el panel con Playwright y comprueba comportamiento:
 Como el resto de herramientas de la tarea: la app arranca SIN credenciales de
 Google, comprobado en la direccion util. No llama a ninguna API de pago.
 
-Salida: 0 si las cuatro pasan, 1 si alguna falla.
+Salida: 0 si las cinco comprobaciones pasan, 1 si alguna falla.
 """
 import json
 import os
@@ -58,14 +58,6 @@ class Resultado:
         print("  %s %s%s" % (marca, nombre, ("  -> " + detalle) if detalle and not condicion else ""))
         if not condicion:
             self.fallos.append(nombre)
-
-
-def _ruta_lenta(pagina, cuerpo_de=None, estado=200):
-    """Responde /api/* tras un retardo, dentro del navegador."""
-    def manejar(ruta):
-        cuerpo = cuerpo_de(ruta.request.url) if cuerpo_de else []
-        ruta.fulfill(status=estado, content_type="application/json", body=json.dumps(cuerpo))
-    pagina.route("**/api/**", manejar)
 
 
 def _esperar_datos(pagina, selector, ms=8000):
