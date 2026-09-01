@@ -20,68 +20,71 @@
     <p>Panel de Gestión</p>
   </div>
 
-  <div class="nav-group">
-    <div class="nav-label">Ventas</div>
-    <div class="nav-item" onclick="showSection('frecuentes')">
-      <span class="icon">⭐</span> Clientes Frecuentes
+  <nav aria-label="Secciones del panel">
+    <div class="nav-group">
+      <div class="nav-label">Ventas</div>
+      <button type="button" class="nav-item" data-seccion="frecuentes">
+        <span class="icon" aria-hidden="true">⭐</span> Clientes Frecuentes
+      </button>
+      <button type="button" class="nav-item" data-seccion="ventas-dash">
+        <span class="icon" aria-hidden="true">📈</span> Dashboard Ventas
+      </button>
+      <button type="button" class="nav-item" data-seccion="ventas">
+        <span class="icon" aria-hidden="true">💰</span> Ventas
+      </button>
     </div>
-    <div class="nav-item" onclick="showSection('ventas-dash')">
-      <span class="icon">📈</span> Dashboard Ventas
-    </div>
-    <div class="nav-item" onclick="showSection('ventas')">
-      <span class="icon">💰</span> Ventas
-    </div>
-  </div>
 
-  <div class="nav-group">
-    <div class="nav-label">Clientes Prospectos</div>
-    <div class="nav-item active" onclick="showSection('dashboard')">
-      <span class="icon">📊</span> Dashboard
+    <div class="nav-group">
+      <div class="nav-label">Clientes Prospectos</div>
+      <button type="button" class="nav-item active" data-seccion="dashboard" aria-current="page">
+        <span class="icon" aria-hidden="true">📊</span> Dashboard
+      </button>
+      <button type="button" class="nav-item" data-seccion="contactos">
+        <span class="icon" aria-hidden="true">📋</span> Lista de Contactos
+      </button>
+      <button type="button" class="nav-item" data-seccion="pendientes">
+        <span class="icon" aria-hidden="true">📞</span> Por Llamar
+      </button>
+      <button type="button" class="nav-item" data-seccion="ciudades">
+        <span class="icon" aria-hidden="true">🗺️</span> Ciudades por Interés
+      </button>
+      <button type="button" class="nav-item" data-seccion="respuestas">
+        <span class="icon" aria-hidden="true">📝</span> Respuestas
+      </button>
+      <button type="button" class="nav-item" data-seccion="mensajes">
+        <span class="icon" aria-hidden="true">💬</span> Mensajes
+      </button>
+      <button type="button" class="nav-item" data-seccion="catalogo">
+        <span class="icon" aria-hidden="true">📖</span> Envíos Catálogo
+        <span class="nav-item__insignia" id="cat-badge" aria-hidden="true" hidden></span>
+      </button>
     </div>
-    <div class="nav-item" onclick="showSection('contactos')">
-      <span class="icon">📋</span> Lista de Contactos
-    </div>
-    <div class="nav-item" onclick="showSection('pendientes')">
-      <span class="icon">📞</span> Por Llamar
-    </div>
-    <div class="nav-item" onclick="showSection('ciudades')">
-      <span class="icon">🗺️</span> Ciudades por Interés
-    </div>
-    <div class="nav-item" onclick="showSection('respuestas')">
-      <span class="icon">📝</span> Respuestas
-    </div>
-    <div class="nav-item" onclick="showSection('mensajes')">
-      <span class="icon">💬</span> Mensajes
-    </div>
-    <div class="nav-item" onclick="showSection('catalogo')">
-      <span class="icon">📖</span> Envíos Catálogo
-      <span id="cat-badge" style="display:none;margin-left:auto;background:var(--error);color:var(--texto-inverso);border-radius:10px;padding:1px 7px;font-size:.72em;font-weight:700"></span>
-    </div>
-  </div>
 
-  <div class="nav-group">
-    <div class="nav-label">Seguimiento</div>
-    <div class="nav-item" onclick="showSection('seguimiento')">
-      <span class="icon">🔄</span> Seguimiento
+    <div class="nav-group">
+      <div class="nav-label">Seguimiento</div>
+      <button type="button" class="nav-item" data-seccion="seguimiento">
+        <span class="icon" aria-hidden="true">🔄</span> Seguimiento
+      </button>
+      <button type="button" class="nav-item" data-seccion="bruce">
+        <span class="icon" aria-hidden="true">🤖</span> Prospectos Bruce
+      </button>
     </div>
-    <div class="nav-item" onclick="showSection('bruce')">
-      <span class="icon">🤖</span> Prospectos Bruce
-    </div>
-  </div>
 
-  <div class="nav-group">
-    <div class="nav-label">Herramientas</div>
-    <a href="/formulario" target="_blank" style="text-decoration:none">
-      <div class="nav-item" style="background:rgba(0,204,71,.2);border:1px solid rgba(0,204,71,.4)">
-        <span class="icon">📞</span> Iniciar Llamadas
-      </div>
-    </a>
-    <a href="/importador" target="_blank" style="text-decoration:none">
-      <div class="nav-item" style="background:rgba(230,126,34,.2);border:1px solid rgba(230,126,34,.4)">
-        <span class="icon">📥</span> Importar Contactos
-      </div>
-    </a>
-  </div>
+    <div class="nav-group">
+      <div class="nav-label">Herramientas</div>
+      <a class="nav-item nav-item--herramienta" href="/formulario"
+         target="_blank" rel="noopener">
+        <span class="icon" aria-hidden="true">📞</span> Iniciar Llamadas
+        <span class="solo-lectores">(se abre en una pestaña nueva)</span>
+      </a>
+      <a class="nav-item nav-item--herramienta" href="/importador"
+         target="_blank" rel="noopener">
+        <span class="icon" aria-hidden="true">📥</span> Importar Contactos
+        <span class="solo-lectores">(se abre en una pestaña nueva)</span>
+      </a>
+    </div>
+  </nav>
+  <div class="solo-lectores" role="status" id="anuncios-menu"></div>
 </aside>
 
 <!-- MAIN -->
@@ -89,7 +92,7 @@
   <div id="topbar">
     <h1 id="topbar-title">📊 Dashboard Prospectos</h1>
     <div class="actions">
-      <span class="badge-cache" id="cache-badge">—</span>
+      <span class="badge-cache" id="cache-badge">—<span class="solo-lectores" id="cache-badge-detalle"></span></span>
       <button class="btn-refresh" onclick="refreshData()">↻ Actualizar</button>
     </div>
   </div>
@@ -98,16 +101,20 @@
 
     <!-- ═══ DASHBOARD ═══ -->
     <div class="section active" id="sec-dashboard">
-      <div class="cards" id="dash-cards">
+      <div id="dash-cards">
         <div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div>
-        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
-        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
-        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
-        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
-        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
-        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
-        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
-        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="cards cards--principal" aria-hidden="true">
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        </div>
+        <div class="cards cards--desglose" aria-hidden="true">
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        </div>
       </div>
       <div id="dash-charts-aviso"></div>
       <div class="charts" id="dash-charts">

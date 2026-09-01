@@ -277,6 +277,20 @@ def values_to_records(rows: list) -> list:
     return records
 
 
+def edad_de_cache(key: str):
+    """Segundos desde que se leyo la hoja, o None si no hay nada cacheado.
+
+    La insignia del panel decia "Actualizado 10:17" con la hora del NAVEGADOR,
+    que es cuando llego la respuesta — no cuando se leyo la hoja. Con la cache
+    caliente esas dos cosas se separan hasta CACHE_TTL, asi que la insignia
+    afirmaba una frescura que no tenia.
+    """
+    entrada = _cache_get(key)
+    if entrada is None:
+        return None
+    return max(0, time.time() - entrada[1])
+
+
 def get_data(key: str, force: bool = False) -> list:
     now = time.time()
     entrada = None if force else _cache_get(key)
@@ -607,6 +621,12 @@ def api_stats():
         'conclusiones': dict(conclusiones),
         'por_semana': [{'semana': s, 'total': n} for s, n in semanas_sorted],
         'top_ciudades': ciudades_contactos.most_common(10),
+        # Para que la insignia pueda decir la verdad: la edad la mide quien
+        # tiene el dato, no el navegador.
+        'cache': {
+            'edad_seg': edad_de_cache('contactos'),
+            'ttl_seg': CACHE_TTL,
+        },
     })
 
 

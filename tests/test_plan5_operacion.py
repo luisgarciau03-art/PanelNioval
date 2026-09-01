@@ -68,7 +68,12 @@ class TestSeccionCatalogo:
         html = servir_superficie(client, "/", "dashboard")
         # Sección, nav, badge y funciones JS presentes.
         assert 'id="sec-catalogo"' in html
-        assert "showSection('catalogo')" in html
+        # La navegacion dejo de colgar de un `onclick` en el marcado (Plan 4,
+        # T4.7): los 12 `div` pasaron a `<button data-seccion>` para que se
+        # pudiera llegar a ellos con el teclado. Lo que este test comprueba
+        # sigue siendo lo mismo -que a la seccion se llega desde el menu-,
+        # solo cambia por donde.
+        assert 'data-seccion="catalogo"' in html
         assert 'id="cat-badge"' in html
         assert "function loadCatalogo" in html
         assert "catGuardarCorreccion" in html

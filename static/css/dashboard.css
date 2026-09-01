@@ -10,9 +10,25 @@ body{font-family:'Segoe UI',sans-serif;background:var(--azul-tenue-2);display:fl
 #sidebar .logo p{font-size:.72em;opacity:.75;margin-top:2px}
 .nav-group{padding:14px 12px 4px}
 .nav-label{font-size:.65em;text-transform:uppercase;letter-spacing:1.5px;opacity:.6;padding:0 8px;margin-bottom:6px}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;cursor:pointer;font-size:.88em;font-weight:500;line-height:var(--linea-apretada);transition:background-color var(--dur-rapida) var(--curva-estandar),opacity var(--dur-rapida) var(--curva-estandar);margin-bottom:2px;opacity:.85}
+/* Los 12 elementos de navegacion pasaron de `div` con `onclick` a `<button>`
+   (T4.7): un div no entra en el orden de tabulacion, no responde a Enter ni a
+   Espacio y no se anuncia como control, asi que TODA la navegacion del panel
+   quedaba fuera del alcance de quien no usa raton. El precio de usar el
+   elemento correcto es reponer lo que el navegador le pone de fabrica. */
+.nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:0;border-radius:10px;background:transparent;color:inherit;font-family:inherit;text-align:left;text-decoration:none;cursor:pointer;font-size:.88em;font-weight:500;line-height:var(--linea-apretada);transition:background-color var(--dur-rapida) var(--curva-estandar),opacity var(--dur-rapida) var(--curva-estandar);margin-bottom:2px;opacity:.85}
+/* La barra lateral es azul oscuro: el anillo de foco de dos tonos de base.css
+   se ve sobre ella, pero se le da holgura para que no lo coma el borde. */
+.nav-item:focus-visible{outline-offset:2px}
+.nav-item--herramienta{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2)}
+.nav-item--herramienta:hover{background:rgba(255,255,255,.22)}
+/* La insignia de envios con problema: numero + nombre accesible. */
+.nav-item__insignia{margin-left:auto;background:var(--error);color:var(--texto-inverso);border-radius:10px;padding:1px 7px;font-size:.72em;font-weight:700}
 .nav-item:hover{background:rgba(255,255,255,.15);opacity:1}
 .nav-item.active{background:rgba(255,255,255,.22);opacity:1;font-weight:700}
+/* El estado activo no puede depender solo del fondo: sobre el degradado azul
+   la diferencia entre .22 y .15 de blanco es sutil. La franja lo hace
+   inequivoco sin usar color como unico canal. */
+.nav-item.active{box-shadow:inset 3px 0 0 var(--texto-inverso)}
 .nav-item .icon{font-size:1.1em;width:20px;text-align:center}
 
 /* MAIN */
@@ -22,7 +38,10 @@ body{font-family:'Segoe UI',sans-serif;background:var(--azul-tenue-2);display:fl
 #topbar .actions{display:flex;gap:10px;align-items:center}
 .btn-refresh{background:var(--blue3);border:1px solid var(--blue);color:var(--blue);padding:6px 16px;border-radius:8px;cursor:pointer;font-size:.82em;font-weight:600;white-space:nowrap;transition:background-color var(--dur-rapida) var(--curva-estandar),color var(--dur-rapida) var(--curva-estandar)}
 .btn-refresh:hover{background:var(--blue);color:var(--texto-inverso)}
-.badge-cache{font-size:.72em;color:var(--gris-600);background:var(--gris-100);padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;min-width:16ch;text-align:center}
+/* Ya no reserva un ancho fijo: el texto pasa de "—" a "Datos de hace N min",
+   que es de largo estable. Lo que sigue haciendo falta es `nowrap`, para que
+   no envuelva y devuelva el salto de layout que la T4.5 quito. */
+.badge-cache{font-size:.72em;color:var(--gris-600);background:var(--gris-100);padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;cursor:help}
 #topbar .actions{flex-wrap:nowrap;flex-shrink:0}
 #content{padding:24px 28px;flex:1}
 
@@ -32,6 +51,24 @@ body{font-family:'Segoe UI',sans-serif;background:var(--azul-tenue-2);display:fl
 
 /* CARDS */
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:22px}
+/* Jerarquia real (T4.7). Las ocho tarjetas del tablero pesaban EXACTAMENTE lo
+   mismo: mismo tamano de cifra, mismo alto, mismo peso visual. Ocho cosas
+   igual de importantes es lo mismo que ninguna importante.
+   Ahora hay dos filas: la de arriba son los tres numeros que contestan "como
+   va la operacion", con la conversion como cifra dominante; la de abajo es el
+   desglose por resultado, que se consulta, no se vigila. */
+.cards--principal{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:14px}
+.cards--desglose{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.cards--desglose .card{padding:14px}
+.cards--desglose .card .value{font-size:1.35em}
+/* `.card.card--principal` y no `.card--principal` a secas: `.card .value`
+   se declara MAS ABAJO en este archivo y, con la misma especificidad,
+   gana la ultima. La cifra dominante salia del mismo tamano que las
+   demas y la jerarquia no se veia — que es exactamente el defecto que
+   esta tarea viene a corregir. */
+.card.card--principal .value{font-size:var(--texto-3xl);line-height:var(--linea-apretada)}
+.card.card--principal{border-left-width:5px}
+.cards-titulo{font-size:var(--texto-xs);font-weight:var(--peso-medio);letter-spacing:var(--track-etiqueta);text-transform:uppercase;color:var(--texto-suave);margin:0 0 var(--esp-3)}
 .card{background:var(--superficie);border-radius:14px;padding:18px 16px;box-shadow:0 2px 10px rgba(0,71,204,.08);border-left:4px solid var(--blue);transition:transform var(--dur-rapida) var(--curva-estandar)}
 .card:hover{transform:translateY(-3px)}
 .card .label{font-size:.7em;text-transform:uppercase;letter-spacing:.8px;color:var(--texto-suave);margin-bottom:6px}
@@ -85,9 +122,30 @@ body{font-family:'Segoe UI',sans-serif;background:var(--azul-tenue-2);display:fl
 .color-opt.selected{transform:scale(1.1)}
 .color-legend{font-size:.7em;color:var(--gris-500);display:flex;align-items:center;gap:5px;white-space:nowrap}
 #edit-color-picker{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.tbl-wrap{overflow-x:auto}
+/* El encabezado se queda fijo al desplazar: con 50 filas por pagina, a media
+   tabla ya no se sabe que columna se esta mirando. El `max-height` es lo que
+   crea el area desplazable; sin el, `sticky` no tiene contra que pegarse. */
+.tbl-wrap{overflow:auto;max-height:70vh;scroll-padding-top:40px}
+.tbl-wrap th{position:sticky;top:0;z-index:2}
 table{width:100%;border-collapse:collapse;font-size:.82em}
-th{background:var(--blue);color:var(--texto-inverso);padding:9px 10px;text-align:left;font-weight:600;white-space:nowrap}
+th{background:var(--blue);color:var(--texto-inverso);padding:0;text-align:left;font-weight:600;white-space:nowrap}
+/* El orden vive en un <button> dentro del <th>: antes era un `onclick` sobre
+   el propio `th`, que no es alcanzable con Tab ni se anuncia como control. El
+   boton hereda el color del encabezado y ocupa toda la celda, asi que el area
+   de clic no cambia. */
+.tabla__orden{display:block;width:100%;padding:9px 10px;border:0;background:transparent;color:inherit;font:inherit;font-weight:600;text-align:left;white-space:nowrap;cursor:pointer;transition:background-color var(--dur-rapida) var(--curva-estandar)}
+.tabla__orden:hover{background:rgba(255,255,255,.14)}
+/* El anillo va POR DENTRO. El de base.css se dibuja hacia afuera
+   (`outline-offset:2px` + `box-shadow` de 2px), y este boton vive en un `<th>`
+   pegado con `position:sticky` al borde mismo del contenedor con `overflow`:
+   el anillo claro se recortaba SIEMPRE, ya en el primer render. El que
+   sobrevivia era el oscuro, que sobre el azul del encabezado da 2.36:1 y no
+   llega al 3:1 que pide WCAG 1.4.11 para un indicador de foco. */
+.tabla__orden:focus-visible{outline:none;box-shadow:inset 0 0 0 3px var(--foco-claro),inset 0 0 0 5px var(--foco-oscuro)}
+.tabla__flecha{opacity:.55;font-size:.75em;margin-left:4px}
+th[aria-sort="ascending"] .tabla__flecha,
+th[aria-sort="descending"] .tabla__flecha{opacity:1}
+.tabla__acciones{width:60px}
 td{padding:8px 10px;border-bottom:1px solid var(--borde);white-space:nowrap;vertical-align:top}
 tr:nth-child(even) td{background:var(--azul-tenue-2)}
 tr:hover td{background:var(--blue3)}

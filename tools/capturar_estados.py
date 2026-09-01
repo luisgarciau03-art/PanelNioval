@@ -94,6 +94,11 @@ def main():
         pagina.route(CDN_CHART, lambda r: r.abort())
         pagina.route("**/api/**", lambda r: json_de(r, medir_cls._cuerpo(r.request.url)))
 
+    def prep_parcial_con_graficas(pagina):
+        # Igual que prep_parcial pero SIN bloquear el CDN: aqui interesa el
+        # tablero completo, graficas incluidas.
+        pagina.route("**/api/**", lambda r: json_de(r, medir_cls._cuerpo(r.request.url)))
+
     from playwright.sync_api import sync_playwright
 
     escritas = []
@@ -113,6 +118,13 @@ def main():
                                       prep_error, 2000))
             escritas.append(_capturar(navegador, destino, "importador-carga", "/importador",
                                       prep_carga, 1200))
+            # El tablero con datos: es lo que el gate de la T4.7 pide comparar
+            # contra `docs/diseno/antes/dashboard-1440.png`.
+            escritas.append(_capturar(navegador, destino, "tablero-despues", "/",
+                                      prep_parcial_con_graficas, 3000))
+            escritas.append(_capturar(navegador, destino, "tablero-tabla", "/",
+                                      prep_parcial_con_graficas, 2500,
+                                      seccion="Lista de Contactos"))
         finally:
             navegador.close()
             servidor.shutdown()

@@ -30,6 +30,54 @@ const SECTION_TITLES = {
 
 let charts = {};
 
+// ─── PALETA DE DATOS ────────────────────────────────────────────────────────
+// Chart.js necesita una CADENA de color: no puede consumir `var(--x)`. Antes
+// eso se resolvia escribiendo los hex a mano en este archivo — los 31 literales
+// que quedaban del criterio CE3. Ahora se leen de tokens.css en tiempo de
+// ejecucion, asi que el sistema de diseno sigue siendo la unica fuente.
+function token(nombre) {
+  return getComputedStyle(document.documentElement).getPropertyValue(nombre).trim();
+}
+
+// El color de un resultado de llamada SIGNIFICA algo: verde aprobado, rojo
+// negado, naranja no compatible, morado marca unica (regla de color semantico
+// del ADR). Antes la grafica usaba una paleta POSICIONAL sobre
+// `Object.keys(res)`, es decir el orden en que la hoja devolvia las claves:
+// bastaba con que Google las reordenara para pintar APROBADO de rojo.
+const COLOR_RESULTADO = {
+  'APROBADO':          '--dato-aprobado',
+  'NEGADO':            '--dato-negado',
+  'NO COMPATIBLE':     '--dato-no-compatible',
+  'MARCA UNICA':       '--dato-marca-unica',
+  'MARCA ÚNICA':       '--dato-marca-unica',
+  'BUZON':             '--dato-buzon',
+  'BUZÓN':             '--dato-buzon',
+  'TELEFONO INCORRECTO': '--dato-tel-incorrecto',
+  'TELÉFONO INCORRECTO': '--dato-tel-incorrecto',
+};
+
+function colorDeResultado(etiqueta) {
+  const clave = String(etiqueta || '').trim().toUpperCase();
+  return token(COLOR_RESULTADO[clave] || '--dato-otro');
+}
+
+// Ejes y leyendas legibles: por defecto Chart.js pinta el texto en un gris que
+// no llega a AA sobre blanco, y la rejilla en un gris casi invisible.
+function estiloDeGrafica() {
+  return {
+    color: token('--texto'),
+    rejilla: token('--dato-rejilla'),
+  };
+}
+
+function ejesDelSistema() {
+  const e = estiloDeGrafica();
+  return {
+    x: { ticks: { color: e.color }, grid: { color: e.rejilla } },
+    y: { beginAtZero: true, ticks: { color: e.color }, grid: { color: e.rejilla } },
+  };
+}
+
 // ─── MOVIMIENTO ─────────────────────────────────────────────────────────────
 // Chart.js dibuja sobre <canvas>: sus animaciones NO pasan por la cascada CSS,
 // asi que el bloque `prefers-reduced-motion` de tokens.css no las toca. Es el
@@ -92,7 +140,10 @@ function escalonarFilas(contenedor) {
 // ─── NAVIGATION ─────────────────────────────────────────────────────────────
 function showSection(name) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => {
+    n.classList.remove('active');
+    n.removeAttribute('aria-current');
+  });
   const seccion = document.getElementById('sec-' + name);
   seccion.classList.add('active');
   // La clase se retira al terminar para que la animacion pueda repetirse en el
@@ -114,12 +165,17 @@ function showSection(name) {
       seccion.classList.remove('seccion-entra');
     }
   }
-  document.querySelectorAll('.nav-item').forEach(n => {
-    if (n.textContent.trim().toLowerCase().includes(SECTION_TITLES[name].slice(2,10).toLowerCase().trim()))
-      n.classList.add('active');
-  });
-  // simpler: mark by onclick
-  event.currentTarget.classList.add('active');
+  // El boton activo se busca por su `data-seccion`, no por `event.currentTarget`.
+  // Lo anterior tenia dos problemas: dependia de que showSection se llamara
+  // SIEMPRE desde un manejador de evento -llamarla desde codigo reventaba con
+  // `event is not defined`- y ademas intentaba adivinar el boton comparando
+  // trozos del titulo con el texto del menu, heuristica que fallaba en cuanto
+  // dos secciones empezaban parecido.
+  const boton = document.querySelector('.nav-item[data-seccion="' + name + '"]');
+  if (boton) {
+    boton.classList.add('active');
+    boton.setAttribute('aria-current', 'page');
+  }
   state.currentSection = name;
   const titulo = document.getElementById('topbar-title');
   titulo.textContent = SECTION_TITLES[name];
@@ -130,6 +186,14 @@ function showSection(name) {
   titulo.title = SECTION_TITLES[name];
   if (!state.loaded[name]) loadSection(name);
 }
+
+// Un solo listener para toda la navegacion. Antes cada elemento llevaba su
+// `onclick` en el marcado, que obliga a que la funcion sea global y a que el
+// nombre de la seccion viaje interpolado dentro de un atributo de codigo.
+document.addEventListener('click', (ev) => {
+  const boton = ev.target.closest('.nav-item[data-seccion]');
+  if (boton) showSection(boton.dataset.seccion);
+});
 
 // ─── CONTENEDORES POR SECCIÓN ───────────────────────────────────────────────
 // Dónde va el esqueleto al recargar y dónde aterriza el estado de error.
@@ -303,15 +367,32 @@ async function loadDashboard() {
   const totalResp = stats.total_respuestas || 0;
   const tasaConv  = totalResp > 0 ? ((aprobados / totalResp) * 100).toFixed(1) : 0;
 
+  // Las ocho tarjetas pesaban EXACTAMENTE lo mismo. Ocho cosas igual de
+  // importantes es lo mismo que ninguna importante, y era el defecto que el
+  // ADR marcaba como "si al terminar las ocho siguen pesando igual, la
+  // direccion no se aplico".
+  //
+  // Arriba, los tres numeros que contestan "como va la operacion", con
+  // Aprobados como cifra dominante porque es el unico resultado que produce
+  // negocio. Abajo, el desglose por resultado, que se consulta pero no se
+  // vigila.
+  //
+  // SUPUESTO: que Aprobados es lo que el owner mira primero. Es lo que se
+  // deduce de la operacion (llamar para conseguir clientes), pero no lo ha
+  // dicho nadie. Cambiarlo es mover una tarjeta de un grupo al otro.
   document.getElementById('dash-cards').innerHTML = `
-    <div class="card"><div class="label">Total Contactos</div><div class="value">${stats.total_contactos}</div><div class="sub">En lista</div></div>
-    <div class="card"><div class="label">Llamadas Realizadas</div><div class="value">${totalResp}</div><div class="sub">Con respuesta</div></div>
-    <div class="card green"><div class="label">Aprobados</div><div class="value">${aprobados}</div><div class="sub">Tasa: ${tasaConv}%</div></div>
-    <div class="card red"><div class="label">Negados</div><div class="value">${negados}</div><div class="sub">Rechazaron</div></div>
-    <div class="card orange"><div class="label">Buzón</div><div class="value">${buzon}</div><div class="sub">No contestó</div></div>
-    <div class="card gray"><div class="label">Tel. Incorrecto</div><div class="value">${telInc}</div><div class="sub">Fuera de servicio</div></div>
-    <div class="card orange"><div class="label">No Compatible</div><div class="value">${nc}</div><div class="sub">Sin fit</div></div>
-    <div class="card purple"><div class="label">Marca Única</div><div class="value">${mu}</div><div class="sub">Competencia</div></div>
+    <div class="cards cards--principal">
+      <div class="card green card--principal"><div class="label">Aprobados</div><div class="value">${aprobados}</div><div class="sub">Tasa de conversión: ${tasaConv}%</div></div>
+      <div class="card"><div class="label">Llamadas Realizadas</div><div class="value">${totalResp}</div><div class="sub">Con respuesta registrada</div></div>
+      <div class="card"><div class="label">Total Contactos</div><div class="value">${stats.total_contactos}</div><div class="sub">En la lista</div></div>
+    </div>
+    <div class="cards cards--desglose">
+      <div class="card red"><div class="label">Negados</div><div class="value">${negados}</div><div class="sub">Rechazaron</div></div>
+      <div class="card orange"><div class="label">Buzón</div><div class="value">${buzon}</div><div class="sub">No contestó</div></div>
+      <div class="card gray"><div class="label">Tel. Incorrecto</div><div class="value">${telInc}</div><div class="sub">Fuera de servicio</div></div>
+      <div class="card orange"><div class="label">No Compatible</div><div class="value">${nc}</div><div class="sub">Sin fit</div></div>
+      <div class="card purple"><div class="label">Marca Única</div><div class="value">${mu}</div><div class="sub">Competencia</div></div>
+    </div>
   `;
 
   // Las gráficas van aparte, y su fallo es PARCIAL: los indicadores de arriba
@@ -332,9 +413,18 @@ function pintarGraficasDashboard(stats, res) {
     type: 'doughnut',
     data: {
       labels: labelsR,
-      datasets: [{ data: dataR, backgroundColor: ['#00CC47','#e74c3c','#e67e22','#8e44ad','#6c757d','#ffc107'] }]
+      datasets: [{
+        data: dataR,
+        backgroundColor: labelsR.map(colorDeResultado),
+        borderColor: token('--superficie'),
+        borderWidth: 2,
+      }]
     },
-    options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } }, cutout: '65%' }
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { color: token('--texto') } } },
+      cutout: '65%',
+    }
   });
 
   // Chart: Semanas
@@ -345,9 +435,18 @@ function pintarGraficasDashboard(stats, res) {
     type: 'line',
     data: {
       labels: semanas.map(s => s.semana),
-      datasets: [{ label: 'Contactos', data: semanas.map(s => s.total), borderColor: '#0047CC', backgroundColor: 'rgba(0,71,204,.1)', fill: true, tension: .4 }]
+      datasets: [{
+        label: 'Contactos', data: semanas.map(s => s.total),
+        borderColor: token('--dato-serie'),
+        backgroundColor: token('--dato-serie-tinte'),
+        fill: true, tension: .4,
+      }]
     },
-    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: ejesDelSistema(),
+    }
   });
 
   // Chart: Ciudades
@@ -358,9 +457,17 @@ function pintarGraficasDashboard(stats, res) {
     type: 'bar',
     data: {
       labels: ciudades.map(c => c[0]),
-      datasets: [{ label: 'Contactos', data: ciudades.map(c => c[1]), backgroundColor: '#0047CC' }]
+      datasets: [{
+        label: 'Contactos', data: ciudades.map(c => c[1]),
+        backgroundColor: token('--dato-serie'),
+        borderRadius: 4,
+      }]
     },
-    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: ejesDelSistema(),
+    }
   });
 }
 
@@ -444,15 +551,17 @@ function pintarGraficasVentas(labels, montos, pedidos, tickets) {
       datasets: [{
         label: 'Facturación $',
         data: montos,
-        backgroundColor: montos.map((v,i) =>
-          v === Math.max(...montos) ? '#00CC47' : 'rgba(0,71,204,0.7)'),
+        backgroundColor: montos.map(v =>
+          v === Math.max(...montos) ? token('--dato-destacado') : token('--dato-serie')),
         borderRadius: 6,
       }]
     },
     options: { maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        y: { beginAtZero: true, ticks: { callback: v => '$'+fmtMonto(v) } }
+        x: ejesDelSistema().x,
+        y: Object.assign(ejesDelSistema().y, { ticks: Object.assign(
+             ejesDelSistema().y.ticks, { callback: v => '$'+fmtMonto(v) }) }),
       }
     }
   });
@@ -473,7 +582,11 @@ function pintarGraficasVentas(labels, montos, pedidos, tickets) {
     },
     options: { maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+      scales: {
+        x: ejesDelSistema().x,
+        y: Object.assign(ejesDelSistema().y, { ticks: Object.assign(
+             ejesDelSistema().y.ticks, { stepSize: 1 }) }),
+      }
     }
   });
 
@@ -487,7 +600,7 @@ function pintarGraficasVentas(labels, montos, pedidos, tickets) {
       datasets: [{
         label: 'Ticket Promedio $',
         data: tickets,
-        borderColor: '#e67e22',
+        borderColor: token('--dato-no-compatible'),
         backgroundColor: 'rgba(230,126,34,.1)',
         fill: true, tension: .4, pointRadius: 4,
       }]
@@ -495,7 +608,9 @@ function pintarGraficasVentas(labels, montos, pedidos, tickets) {
     options: { maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        y: { beginAtZero: true, ticks: { callback: v => '$'+fmtMonto(v) } }
+        x: ejesDelSistema().x,
+        y: Object.assign(ejesDelSistema().y, { ticks: Object.assign(
+             ejesDelSistema().y.ticks, { callback: v => '$'+fmtMonto(v) }) }),
       }
     }
   });
@@ -699,23 +814,41 @@ function renderTable(key, tableId, pagId) {
   }
   const isEditable    = isSeguimiento || isMensajes;
   const openFn        = isMensajes ? 'openEditMen' : 'openEditSeg';
-  const arrow = c => c === sc ? (sd ? ' ▲' : ' ▼') : ' ⇅';
-  const thStyle = 'cursor:pointer;white-space:nowrap;user-select:none';
+  // `aria-sort` es lo que un lector de pantalla usa para anunciar el orden. La
+  // flecha sola no dice nada: es un caracter decorativo dentro del texto del
+  // encabezado, y ademas el `<th>` con `onclick` no era alcanzable con Tab.
+  const orden = c => c === sc ? (sd ? 'ascending' : 'descending') : 'none';
+  const flecha = c => c === sc ? (sd ? '▲' : '▼') : '⇅';
 
-  const editTh = isEditable ? '<th style="width:60px"></th>' : '';
-  let html = `<table><thead><tr>${editTh}${sortedCols.map(c =>
-    `<th style="${thStyle}" data-key="${key}" data-tableid="${tableId}" data-pagid="${pagId}" data-col="${c.replace(/"/g,'&quot;')}" onclick="sortTable(this)">${c}<span style="opacity:.4;font-size:.75em">${arrow(c)}</span></th>`
-  ).join('')}</tr></thead><tbody>`;
+  const editTh = isEditable ? '<th scope="col" class="tabla__acciones"><span class="solo-lectores">Acciones</span></th>' : '';
+  let html = `<table><thead><tr>${editTh}${sortedCols.map(c => {
+    const col = c.replace(/"/g, '&quot;');
+    return `<th scope="col" aria-sort="${orden(c)}">` +
+      `<button type="button" class="tabla__orden" data-key="${key}" data-tableid="${tableId}" ` +
+      `data-pagid="${pagId}" data-col="${col}">` +
+      `${c}<span class="tabla__flecha" aria-hidden="true">${flecha(c)}</span>` +
+      `</button></th>`;
+  }).join('')}</tr></thead><tbody>`;
 
   slice.forEach(row => {
     if (isSeguimiento && row._row) _segRowMap[row._row] = row;
     const editKey = row._row;
-    const editTd = isEditable && editKey
-      ? `<td><button class="btn-edit-row" onclick="${openFn}(${editKey})">✏️ Editar</button></td>`
-      : '<td></td>';
+    // La celda de acciones solo existe si existe SU ENCABEZADO. Antes se
+    // emitia siempre: `editTh` era condicional y `editTd` no, asi que toda
+    // tabla no editable salia con 7 encabezados y 8 celdas y el contenido
+    // aparecia corrido una columna a la derecha — el telefono debajo de
+    // "CIUDAD", la ciudad debajo de "TIENDA" y la primera columna vacia.
+    // Preexistente, sin relacion con el rediseno; lo encontro la verificacion
+    // funcional en navegador de esta tarea al comparar el orden de las filas.
+    const editTd = !isEditable ? ''
+      : (editKey
+          ? `<td><button class="btn-edit-row" onclick="${openFn}(${editKey})">✏️ Editar</button></td>`
+          : '<td></td>');
     const colorCode = (isSeguimiento && row._row) ? (_segColorMap[row._row] || '') : '';
     const colorD    = colorCode ? SEG_COLORS[colorCode] : null;
-    const rowStyle  = colorD ? `style="background:${colorD.bg};border-left:5px solid ${colorD.border}"` : '';
+    const rowStyle  = (colorD && colorD.fondo)
+      ? `style="background:var(${colorD.fondo});border-left:5px solid var(${colorD.tono})"`
+      : '';
     html += `<tr ${rowStyle}>` + editTd + sortedCols.map(c => {
       const v = row[c] !== undefined ? row[c] : '';
       return `<td>${renderCell(c, String(v), row)}</td>`;
@@ -726,17 +859,33 @@ function renderTable(key, tableId, pagId) {
   escalonarFilas(tableId);
 
   // Pagination
+  // La paginacion dice en que pagina esta y de cuantas. Antes solo se veia el
+  // numero resaltado, que para un lector de pantalla es un boton mas.
   let pag = `<span class="pag-info">${total} registros</span>`;
   if (totalPages > 1) {
-    if (page > 1) pag += `<button onclick="goPage('${key}','${tableId}','${pagId}',${page-1})">‹</button>`;
+    pag += `<span class="pag-info">Página ${page} de ${totalPages}</span>`;
+    const ir = (p, texto, etiqueta, activa) =>
+      `<button type="button" class="${activa ? 'active' : ''}"` +
+      (activa ? ' aria-current="page"' : '') +
+      ` aria-label="${etiqueta}"` +
+      ` onclick="goPage('${key}','${tableId}','${pagId}',${p})">${texto}</button>`;
+    if (page > 1) pag += ir(page - 1, '‹', 'Página anterior', false);
     const start = Math.max(1, page-2), end = Math.min(totalPages, page+2);
     for (let p = start; p <= end; p++) {
-      pag += `<button class="${p===page?'active':''}" onclick="goPage('${key}','${tableId}','${pagId}',${p})">${p}</button>`;
+      pag += ir(p, p, 'Página ' + p, p === page);
     }
-    if (page < totalPages) pag += `<button onclick="goPage('${key}','${tableId}','${pagId}',${page+1})">›</button>`;
+    if (page < totalPages) pag += ir(page + 1, '›', 'Página siguiente', false);
   }
   document.getElementById(pagId).innerHTML = pag;
 }
+
+// Delegado, como la navegacion: el boton de orden nace y muere en cada
+// re-render de la tabla, asi que colgarle un listener propio a cada uno
+// obligaria a volver a registrarlos cada vez.
+document.addEventListener('click', (ev) => {
+  const orden = ev.target.closest('.tabla__orden');
+  if (orden) sortTable(orden);
+});
 
 function goPage(key, tableId, pagId, p) {
   state.page[key] = p;
@@ -794,7 +943,7 @@ function renderCell(col, val, row) {
         : val;
       return `<span style="display:flex;align-items:center;gap:6px">
         <img src="${thumb}" class="pago-thumb" data-full="${full}" data-link="${val}"
-             style="height:40px;border-radius:4px;cursor:pointer;border:2px solid #0047CC"
+             style="height:40px;border-radius:4px;cursor:pointer;border:2px solid var(--azul)"
              title="Clic para ampliar"
              onerror="this.style.display='none'">
         <a href="${val}" target="_blank" style="color:var(--blue);font-size:.78em;font-weight:600">🔍 Abrir</a>
@@ -1079,14 +1228,18 @@ let _segColumnOptions = {};
 let _editCtx = { endpoint: '', rowMap: {}, reload: null, label: '' };
 
 // Colores de estado visual — persisten en localStorage
+// Las claves siguen siendo las de siempre ('yellow', 'red'...): estan
+// guardadas en el localStorage del operador y renombrarlas le borraria todas
+// las marcas de fila que tenga puestas. Lo que cambia es de donde sale el
+// color: de tokens.css, no de un hex escrito aqui.
 const SEG_COLORS = {
-  '':       { hex:'#cbd5e1', bg:'',        border:'',        label:'Sin estado' },
-  'yellow': { hex:'#f59e0b', bg:'#fffbeb', border:'#f59e0b', label:'Pendiente envío' },
-  'red':    { hex:'#ef4444', bg:'#fef2f2', border:'#ef4444', label:'Urgente' },
-  'green':  { hex:'#22c55e', bg:'#f0fdf4', border:'#22c55e', label:'Completado' },
-  'blue':   { hex:'#3b82f6', bg:'#eff6ff', border:'#3b82f6', label:'En seguimiento' },
-  'orange': { hex:'#f97316', bg:'#fff7ed', border:'#f97316', label:'Esperando resp.' },
-  'purple': { hex:'#a855f7', bg:'#faf5ff', border:'#a855f7', label:'Info enviada' },
+  '':       { tono:'--fila-ninguno', fondo:'',                label:'Sin estado' },
+  'yellow': { tono:'--fila-ambar',   fondo:'--fila-ambar-fondo',   label:'Pendiente envío' },
+  'red':    { tono:'--fila-rojo',    fondo:'--fila-rojo-fondo',    label:'Urgente' },
+  'green':  { tono:'--fila-verde',   fondo:'--fila-verde-fondo',   label:'Completado' },
+  'blue':   { tono:'--fila-azul',    fondo:'--fila-azul-fondo',    label:'En seguimiento' },
+  'orange': { tono:'--fila-naranja', fondo:'--fila-naranja-fondo', label:'Esperando resp.' },
+  'purple': { tono:'--fila-morado',  fondo:'--fila-morado-fondo',  label:'Info enviada' },
 };
 let _segColorMap = {};
 try { _segColorMap = JSON.parse(localStorage.getItem('seg_colors') || '{}'); } catch(e) {}
@@ -1137,7 +1290,7 @@ function openEdit(ctx, rowNum) {
     document.getElementById('edit-color-picker').innerHTML = Object.entries(SEG_COLORS).map(([code, c]) =>
       `<div class="color-opt${code===curColor?' selected':''}" data-color="${code}" onclick="selectEditColor(this)"
            title="${c.label}"
-           style="background:${code?c.hex:'var(--borde)'};border:3px solid ${code===curColor?'var(--gris-800)':'transparent'}">
+           style="background:var(${c.tono});border:3px solid ${code===curColor?'var(--gris-800)':'transparent'}">
          ${code===curColor?'<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--texto-inverso);font-size:.75em;font-weight:900">✓</span>':''}
        </div>`).join('');
     document.getElementById('edit-color-label').textContent = SEG_COLORS[curColor]?.label || '';
@@ -1314,8 +1467,40 @@ function destroyChart(id) {
   if (charts[id]) { charts[id].destroy(); delete charts[id]; }
 }
 
+// La insignia decia "Actualizado 10:17" con la hora del NAVEGADOR, o sea
+// cuando llego la respuesta. Pero el panel sirve de una cache de 5 minutos:
+// con la cache caliente el dato puede tener 4 minutos y la insignia afirmaba
+// que era de ahora mismo. Ahora dice la edad real, que la mide el servidor, y
+// dice tambien QUE significa: de donde viene el dato y como forzar su relectura.
 function updateCacheBadge() {
-  document.getElementById('cache-badge').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'});
+  const insignia = document.getElementById('cache-badge');
+  const cache = (state.data.dashStats || {}).cache || {};
+  const edad = cache.edad_seg;
+
+  if (edad === null || edad === undefined) {
+    ponerInsigniaCache(insignia, 'Datos recién leídos',
+      'Se acaba de leer la hoja de Google, sin pasar por la caché.');
+    return;
+  }
+  const min = Math.floor(edad / 60);
+  const texto = min < 1 ? 'Datos de hace menos de 1 min'
+                        : 'Datos de hace ' + min + ' min';
+  const ttlMin = Math.round((cache.ttl_seg || 300) / 60);
+  const explicacion = 'El panel guarda lo leído de Google hasta ' + ttlMin
+    + ' min para no repetir consultas. «Actualizar» fuerza una lectura nueva.';
+  ponerInsigniaCache(insignia, texto, explicacion);
+}
+
+// La explicacion NO puede vivir solo en `title`: no es alcanzable por teclado,
+// no existe en pantalla tactil y los lectores de pantalla no lo anuncian de
+// forma fiable. Se escribe tambien en un nodo `solo-lectores` dentro de la
+// propia insignia, que si esta siempre en el arbol de accesibilidad. El
+// `title` se conserva porque para quien usa raton sigue siendo comodo.
+function ponerInsigniaCache(insignia, texto, explicacion) {
+  const detalle = insignia.querySelector('#cache-badge-detalle');
+  insignia.firstChild.nodeValue = texto;
+  if (detalle) detalle.textContent = '. ' + explicacion;
+  insignia.title = explicacion;
 }
 
 async function refreshData() {
@@ -1399,7 +1584,7 @@ async function subirComprobante() {
 
   btnSubir.disabled = true;
   statusEl.textContent = '⏳ Subiendo...';
-  statusEl.style.color = '#0047CC';
+  statusEl.style.color = 'var(--azul)';
 
   const form = new FormData();
   form.append('imagen', fileInput.files[0]);
@@ -1541,8 +1726,28 @@ async function actualizarBadgeCatalogo(){
     const envios = await _catFetchProblema();
     const badge = document.getElementById('cat-badge');
     if (!badge) return;
-    if (envios.length){ badge.textContent = envios.length; badge.style.display='inline-block'; }
-    else badge.style.display='none';
+    // `hidden`, no `style.display`: el atributo saca la insignia tambien del
+    // arbol de accesibilidad, y base.css ya lo hace valer sobre cualquier
+    // `display` de la hoja. Y el texto dice QUE es el numero: un "3" suelto
+    // dentro del boton "Envios Catalogo" no significa nada para quien lo oye.
+    const boton = badge.closest('.nav-item');
+    const anuncios = document.getElementById('anuncios-menu');
+    if (envios.length) {
+      badge.textContent = envios.length;
+      badge.hidden = false;
+      // El nombre accesible completo va en el BOTON, no en la insignia: un
+      // "3" suelto no significa nada, y un `aria-label` en el hijo se cuela
+      // en el nombre del padre.
+      if (boton) boton.setAttribute('aria-label',
+        'Envíos Catálogo, ' + envios.length + ' con problema');
+      if (anuncios) anuncios.textContent =
+        envios.length + ' envíos de catálogo con problema';
+    } else {
+      badge.textContent = '';
+      badge.hidden = true;
+      if (boton) boton.removeAttribute('aria-label');
+      if (anuncios) anuncios.textContent = '';
+    }
   } catch(e){ /* silencioso */ }
 }
 

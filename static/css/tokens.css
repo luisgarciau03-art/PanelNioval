@@ -188,6 +188,41 @@
      declaradas. */
   --avance: 0;             /* barra de progreso: 0 a 1, via scaleX */
   --retardo-fila: 0ms;     /* entrada escalonada de filas de tabla */
+
+  /* --- Paleta de datos (T4.7) -------------------------------------------
+     Los 31 colores literales que quedaban del CE3 vivian todos en
+     `dashboard.js`, y eran estas dos paletas. Se declaran aqui y el JS las
+     lee con `getComputedStyle`: una grafica necesita una cadena de color, no
+     puede consumir `var()`.
+
+     Serie de la grafica de resultados. NO es una paleta posicional: cada
+     entrada corresponde a un resultado de llamada concreto, porque el color
+     SIGNIFICA algo (regla de color semantico del ADR). Antes el color salia
+     del ORDEN en que la hoja devolvia las claves, asi que bastaba con que
+     Google las reordenara para pintar "APROBADO" de rojo. */
+  --dato-aprobado:      var(--exito-vivo);
+  --dato-negado:        var(--error-vivo);
+  --dato-no-compatible: var(--aviso-vivo);
+  --dato-marca-unica:   var(--marca-unica);
+  --dato-buzon:         #d4a017;   /* 3.05:1 sobre blanco - relleno, sin texto */
+  --dato-tel-incorrecto: var(--gris-500);
+  --dato-otro:          var(--gris-400);
+  --dato-serie:         var(--azul);
+  --dato-serie-tinte:   rgba(0, 71, 204, .10);
+  --dato-destacado:     var(--exito-vivo);
+  --dato-rejilla:       var(--gris-200);   /* lineas de eje */
+
+  /* Color de fila del operador, en Seguimiento. Es una marca que el propio
+     operador elige y guarda en localStorage; el trio es punto + fondo de fila
+     + franja izquierda. Los fondos son tintes muy claros a proposito: encima
+     va texto que tiene que seguir pasando AA. */
+  --fila-ambar:   #f59e0b;  --fila-ambar-fondo:   #fffbeb;
+  --fila-rojo:    #ef4444;  --fila-rojo-fondo:    #fef2f2;
+  --fila-verde:   #22c55e;  --fila-verde-fondo:   #f0fdf4;
+  --fila-azul:    #3b82f6;  --fila-azul-fondo:    #eff6ff;
+  --fila-naranja: #f97316;  --fila-naranja-fondo: #fff7ed;
+  --fila-morado:  #a855f7;  --fila-morado-fondo:  #faf5ff;
+  --fila-ninguno: var(--gris-300);
 }
 
 /* Accesibilidad, no preferencia. Con la opcion del sistema activada no se
