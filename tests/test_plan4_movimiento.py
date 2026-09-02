@@ -111,15 +111,21 @@ class TestLasAnimacionesSonDelCompositor:
 
 class TestLaBarraDeProgresoUsaTransform:
     def test_el_css_escala_en_vez_de_ensanchar(self):
+        # El espacio entre el selector y la llave es indiferente: la T4.9 dejo
+        # de escribir el CSS del importador minificado y el patron pegado
+        # (`\.progress-fill\{`) dejaba de encontrar la regla, o sea que el
+        # guarda se apagaba solo al reformatear el archivo.
         css = _texto(CSS / "importador.css")
-        regla = re.search(r"\.progress-fill\{([^}]*)\}", css)
+        regla = re.search(r"\.progress-fill\s*\{([^}]*)\}", css)
         assert regla, "no se encuentra .progress-fill"
         cuerpo = regla.group(1)
         assert "scaleX" in cuerpo
         assert "transform-origin" in cuerpo, (
             "sin origen a la izquierda la barra crece desde el centro"
         )
-        assert "transition:transform" in cuerpo
+        assert re.search(r"transition:\s*transform", cuerpo), (
+            "la barra vuelve a animar una propiedad que no es transform"
+        )
 
     def test_el_js_ya_no_escribe_el_ancho(self):
         js = _texto(JS / "importador.js")

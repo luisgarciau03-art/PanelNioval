@@ -117,8 +117,11 @@ def main():
             pagina.goto("http://127.0.0.1:%d/importador" % PUERTO, wait_until="load")
             pagina.wait_for_timeout(1200)
             medida = pagina.evaluate("""() => {
-                const caja = document.getElementById('progress-box');
-                caja.style.display = 'block';          // el panel solo la muestra en corrida
+                // La T4.9 pasa los paneles del importador a `hidden`, y
+                // base.css lo declara `display:none !important`: escribir
+                // `style.display` ya no los muestra. Se usa la misma via que el
+                // panel de verdad.
+                mostrarPaneles();
                 ponerAvance(50);
                 const fill = document.getElementById('prog-fill');
                 const cs = getComputedStyle(fill);

@@ -10,90 +10,139 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/importador.css') }}">
 </head>
 <body>
+<a class="saltar-al-contenido" href="#inicio-corrida">Saltar al inicio de la búsqueda</a>
 <div class="card">
-  <div class="header">
-    <img src="https://res.cloudinary.com/dipt3jq6r/image/upload/v1764307686/NIOVAL-05_xhfrrh.jpg" onerror="this.style.display='none'">
+  <header class="header">
+    <img src="https://res.cloudinary.com/dipt3jq6r/image/upload/v1764307686/NIOVAL-05_xhfrrh.jpg"
+         alt="NIOVAL" width="44" height="44" onerror="this.style.display='none'">
     <div>
       <h1>Importador de Contactos</h1>
       <p>Busca ferreterías en Google Maps y las agrega a tu lista</p>
     </div>
-  </div>
-  <div class="body">
+  </header>
+  <main class="body">
 
-    <div class="filters">
+    <p class="filters">
       <strong>Filtros aplicados:</strong> Mínimo 5 reseñas · Calificación ≥ 3.5 ⭐ · Con teléfono
-    </div>
+    </p>
 
-    <!-- CATEGORÍAS -->
-    <div style="font-size:.78em;color:var(--texto-suave);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.8px">Categorías a buscar</div>
-    <div class="cats" id="cats-list"></div>
+    <!-- ── 1. QUÉ SE BUSCA ─────────────────────────────────────────────── -->
+    <section class="bloque" aria-labelledby="tit-categorias">
+      <h2 id="tit-categorias" class="etiqueta">Categorías a buscar</h2>
+      <div class="cats" id="cats-list"></div>
+    </section>
 
-    <!-- CIUDADES -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;margin-bottom:8px">
-      <div style="font-size:.78em;color:var(--texto-suave);font-weight:700;text-transform:uppercase;letter-spacing:.8px">
-        Ciudades <span id="ciudades-count" style="color:var(--blue)"></span> — <span style="color:var(--green)">ordenadas por prioridad</span>
+    <!-- ── 2. DÓNDE ────────────────────────────────────────────────────── -->
+    <section class="bloque" aria-labelledby="tit-ciudades">
+      <div class="bloque__cabecera">
+        <h2 id="tit-ciudades" class="etiqueta">
+          Ciudades <span id="ciudades-count" class="cifra"></span>
+        </h2>
+        <div class="filtros-ciudad">
+          <label class="solo-lectores" for="region-filter">Macro-región</label>
+          <select id="region-filter" class="control--compacto" onchange="filtrarCiudades()">
+            <option value="">Todas</option>
+          </select>
+          <label class="solo-lectores" for="ciudad-filter">Filtrar ciudades por nombre</label>
+          <input type="search" id="ciudad-filter" class="control--compacto"
+                 placeholder="🔍 Filtrar..." autocomplete="off"
+                 aria-controls="ciudades-chips" oninput="filtrarCiudades()">
+        </div>
       </div>
-      <div style="display:flex;gap:6px">
-        <select id="region-filter" onchange="filtrarCiudades()"
-          style="padding:5px 8px;border:1px solid var(--borde-control);border-radius:8px;font-size:.8em;outline:none;max-width:190px">
-          <option value="">Todas</option>
-        </select>
-        <input type="text" id="ciudad-filter" placeholder="🔍 Filtrar..." oninput="filtrarCiudades()"
-          style="padding:5px 10px;border:1px solid var(--borde-control);border-radius:8px;font-size:.8em;outline:none;width:140px">
+
+      <!-- El contador por grupo vive en la cabecera de cada region; este es el
+           total, y se anuncia porque cambia con cada pulsacion del buscador. -->
+      <p id="chips-resumen" class="chips-resumen" aria-hidden="true"></p>
+      <p id="chips-resumen-lectores" class="solo-lectores" role="status"></p>
+
+      <div id="sin-clasificar"></div>
+
+      <!-- La caja de scroll. El `listbox` de verdad lo construye el JS dentro
+           (#chips-lista), con un `role="group"` por macro-región: son 606
+           opciones y antes NINGUNA era alcanzable con teclado. Una sola parada
+           de tabulación (tabindex móvil) y flechas para recorrerlas. -->
+      <div id="ciudades-chips" class="chips-caja">
+        <div class="solo-lectores" role="status" data-aviso-carga="Cargando ciudades..."></div>
+        <div class="esqueleto-chips" aria-hidden="true"><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div></div>
       </div>
-    </div>
-    <div id="sin-clasificar"></div>
-    <div id="ciudades-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;min-height:220px;max-height:220px;overflow-y:auto;padding:4px 2px">
-      <div class="solo-lectores" role="status" data-aviso-carga="Cargando ciudades..."></div>
-      <div class="esqueleto-chips" aria-hidden="true"><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div><div class="esqueleto esqueleto-chip"></div></div>
+      <p id="chips-ayuda" class="chips-ayuda">
+        Agrupadas por macro-región; dentro de cada una, ordenadas por prioridad.
+        Con el teclado: flechas para recorrerlas, Enter para elegir.
+      </p>
+    </section>
+
+    <!-- ── 3. ARRANQUE ─────────────────────────────────────────────────── -->
+    <div class="input-row" id="inicio-corrida">
+      <label class="solo-lectores" for="input-ciudad">Ciudad a importar</label>
+      <input type="text" id="input-ciudad" placeholder="O escribe una ciudad manualmente..."
+             autocomplete="off" aria-describedby="aviso-inicio"
+             onkeydown="if(event.key==='Enter') iniciar()">
+      <button type="button" class="btn btn-blue" id="btn-iniciar" onclick="iniciar()">🔍 Buscar</button>
+      <button type="button" class="btn btn-detener" id="btn-cancelar" onclick="pedirDetener()" hidden>⏹ Detener</button>
     </div>
 
-    <!-- INPUT CIUDAD -->
-    <div class="input-row">
-      <input type="text" id="input-ciudad" placeholder="O escribe una ciudad manualmente..." onkeydown="if(event.key==='Enter') iniciar()">
-      <button class="btn btn-blue" id="btn-iniciar" onclick="iniciar()">🔍 Buscar</button>
-      <button class="btn" id="btn-cancelar" onclick="cancelar()"
-        style="display:none;background:var(--gris-100);border:1px solid var(--borde);color:var(--texto-suave)">⏹ Detener</button>
-    </div>
+    <!-- Lo que antes era un alert() del navegador: bloqueaba la pagina, robaba
+         el foco y no dejaba rastro al aceptarlo. -->
+    <div id="aviso-inicio" class="aviso-inicio"></div>
 
-    <!-- PROGRESO -->
-    <div class="progress-box" id="progress-box">
+    <!-- ── 4. LA CORRIDA ───────────────────────────────────────────────── -->
+    <section class="progress-box" id="progress-box" aria-labelledby="prog-fase" hidden>
       <div class="progress-label">
-        <span id="prog-label">Iniciando...</span>
-        <span id="prog-pct">0%</span>
+        <span class="insignia insignia--info" id="prog-fase">Iniciando…</span>
+        <span id="prog-pct" class="cifra">0%</span>
       </div>
-      <div class="progress-bar" id="prog-track" role="progressbar" aria-labelledby="prog-label"
+      <div class="progress-bar" id="prog-track" role="progressbar" aria-labelledby="prog-fase"
            aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-fill" id="prog-fill"></div></div>
+      <p class="progreso__etiqueta" id="prog-label">Iniciando...</p>
+    </section>
+
+    <div class="stats-row" id="stats-row" hidden>
+      <div class="stat stat--principal stat--exito">
+        <div class="stat__etiqueta">Nuevos en la hoja</div>
+        <div class="stat__num" id="s-nuevos">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat__etiqueta">Aprobados por filtros</div>
+        <div class="stat__num" id="s-encontrados">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat__etiqueta">Ya estaban</div>
+        <div class="stat__num" id="s-duplicados">0</div>
+      </div>
+      <div class="stat stat--error">
+        <div class="stat__etiqueta">Descartados</div>
+        <div class="stat__num" id="s-descartados">0</div>
+      </div>
+    </div>
+    <div class="progreso-row" id="progreso-row" hidden>
+      <div class="stat">
+        <div class="stat__etiqueta">Categorías procesadas</div>
+        <div class="stat__num" id="s-progreso">0/0</div>
+      </div>
     </div>
 
-    <!-- STATS -->
-    <div class="stats-row" id="stats-row" style="display:none">
-      <div class="stat-box green principal"><div class="n" id="s-nuevos">0</div><div class="l">Nuevos en la hoja</div></div>
-      <div class="stat-box blue"><div class="n" id="s-encontrados">0</div><div class="l">Aprobados por filtros</div></div>
-      <div class="stat-box"><div class="n" id="s-duplicados">0</div><div class="l">Ya estaban</div></div>
-      <div class="stat-box red"><div class="n" id="s-descartados">0</div><div class="l">Descartados</div></div>
-    </div>
-    <div class="progreso-row" id="progreso-row" style="display:none">
-      <div class="stat-box blue"><div class="n" id="s-progreso">0/0</div><div class="l">Categorias procesadas</div></div>
-    </div>
-    <div id="medidor-box" style="display:none;font-size:.78em;color:var(--texto-suave);margin:-6px 0 16px;
-      padding:8px 12px;background:var(--gris-50);border-radius:8px;border-left:3px solid var(--borde)">
+    <p id="medidor-box" class="medidor" hidden>
       <span id="m-llamadas"></span><span id="m-ahorro"></span><span id="m-costo"></span>
-    </div>
+    </p>
 
-    <!-- LOG -->
-    <div class="log-box" id="log-box" style="display:none"></div>
+    <!-- ── 5. EL RELATO ────────────────────────────────────────────────── -->
+    <section class="bloque" id="log-seccion" aria-labelledby="tit-log" hidden>
+      <h2 id="tit-log" class="etiqueta">Registro de la corrida</h2>
+      <!-- `tabindex="0"`: una caja con scroll tiene que poder recorrerse con
+           teclado (SC 2.1.1). El anillo de foco de dos tonos de base.css está
+           calculado para verse sobre este fondo oscuro. -->
+      <div class="consola log-box" id="log-box" tabindex="0" role="log" aria-labelledby="tit-log"></div>
+    </section>
 
-    <!-- RESULTADO FINAL -->
-    <div class="result-box" id="result-box">
-      <div class="icon" id="result-icono" aria-hidden="true"></div>
+    <!-- ── 6. CÓMO ACABÓ ───────────────────────────────────────────────── -->
+    <div class="resultado" id="result-box" hidden>
+      <div class="resultado__icono" id="result-icono" aria-hidden="true"></div>
       <h2 id="result-titulo">Resultado de la búsqueda</h2>
       <p id="result-desc"></p>
-      <br>
       <a href="/" class="link-panel">← Volver al Panel</a>
     </div>
 
-  </div>
+  </main>
 </div>
 
 <script src="{{ url_for('static', filename='js/estados.js') }}"></script>

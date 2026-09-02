@@ -1,48 +1,390 @@
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--blue:var(--azul);--blue2:var(--azul-oscuro);--green:var(--exito);--orange:var(--aviso)}
-body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,var(--azul-oscuro),var(--azul));min-height:100vh;padding:20px;display:flex;justify-content:center}
-.card{background:var(--superficie);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:100%;max-width:640px;overflow:hidden}
-.header{background:linear-gradient(135deg,var(--azul-oscuro),var(--azul));color:var(--texto-inverso);padding:24px 28px;display:flex;align-items:center;gap:14px}
-.header img{height:44px;background:var(--superficie);border-radius:10px;padding:5px}
-.header h1{font-size:1.15em;font-weight:800}
-.header p{font-size:.78em;opacity:.8;margin-top:3px}
-.body{padding:28px}
-.input-row{display:flex;gap:10px;margin-bottom:20px}
-.input-row input{flex:1;padding:12px 16px;border:2px solid var(--borde-control);border-radius:10px;font-size:.95em;outline:none;transition:border-color var(--dur-rapida) var(--curva-estandar)}
-.input-row input:focus{border-color:var(--blue)}
+/* ============================================================================
+   NIOVAL - Importador  ·  Plan 4, T4.9
+   Registro del ADR: NARRATIVO. Es una operacion larga que gasta dinero, asi
+   que la pantalla cuenta la corrida: donde va, en que fase, cuanto lleva
+   gastado y como acabo. El movimiento existe para leer ese avance, no para
+   decorar.
 
-.btn-blue{background:var(--blue);color:var(--texto-inverso)}.btn-blue:hover{background:var(--blue2)}
-.btn-blue:disabled{opacity:.5;cursor:not-allowed}
-.filters{background:var(--azul-tenue-2);border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:.82em;color:var(--texto)}
-.filters strong{color:var(--blue)}
-.progress-box{display:none;margin-bottom:20px}
-.progress-label{display:flex;justify-content:space-between;font-size:.82em;color:var(--texto);margin-bottom:8px}
-.progress-bar{height:10px;background:var(--azul-tenue);border-radius:5px;overflow:hidden}
-.progress-fill{height:100%;width:100%;background:var(--blue);border-radius:5px;transform-origin:left center;transform:scaleX(var(--avance,0));transition:transform var(--dur-lenta) var(--curva-salida)}
-.cats{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-.cat-badge{padding:5px 12px;border-radius:20px;font-size:.78em;font-weight:600;background:var(--azul-tenue);color:var(--gris-600);transition:background-color var(--dur-normal) var(--curva-estandar),color var(--dur-normal) var(--curva-estandar)}
-.cat-badge.active{background:var(--blue);color:var(--texto-inverso)}
-.cat-badge.done{background:var(--green);color:var(--texto-inverso)}
-.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px}
-.stats-row .stat-box.principal{background:var(--exito-tinte);border-top-width:4px}
-.stat-box.principal .n{font-size:2.4em}
-@media(max-width:620px){.stats-row{grid-template-columns:1fr 1fr}}
-.progreso-row{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:16px}
-.stat-box{background:var(--gris-50);border-radius:10px;padding:12px;text-align:center;border-top:3px solid var(--borde-fuerte)}
-.stat-box.green{border-color:var(--green)}.stat-box.red{border-color:var(--error-vivo)}.stat-box.blue{border-color:var(--blue)}
-.stat-box .n{font-size:1.8em;font-weight:800;color:var(--blue)}.stat-box.green .n{color:var(--green)}.stat-box.red .n{color:var(--error)}
-.stat-box .l{font-size:.68em;color:var(--texto-suave);text-transform:uppercase;margin-top:2px}
-.log-box{background:var(--consola-fondo);border-radius:10px;padding:14px;max-height:160px;overflow-y:auto;font-family:monospace;font-size:.78em;color:var(--consola-texto);margin-bottom:16px}
-.log-box .entry{margin-bottom:4px;line-height:1.4}
-.result-box{display:none;text-align:center;padding:20px 0}
-.result-box .icon{font-size:3.5em;margin-bottom:12px}
-.result-box h2{color:var(--blue);margin-bottom:8px}
-.result-box p{color:var(--texto-suave);font-size:.88em}
-.link-panel{display:inline-flex;align-items:center;gap:8px;background:var(--azul-tenue);border:1px solid var(--azul-borde);color:var(--blue);padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:600;font-size:.88em;margin-top:16px}
-.link-panel:hover{background:var(--blue);color:var(--texto-inverso)}
-.chip-ciudad{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:.78em;font-weight:600;cursor:pointer;border:1px solid var(--borde-control);background:var(--azul-tenue-2);color:var(--texto);transition:background-color var(--dur-rapida) var(--curva-estandar),color var(--dur-rapida) var(--curva-estandar),border-color var(--dur-rapida) var(--curva-estandar),transform var(--dur-rapida) var(--curva-estandar);white-space:nowrap}
-.chip-ciudad:hover{background:var(--blue);color:var(--texto-inverso);border-color:var(--blue)}
-.chip-ciudad.active{background:var(--blue);color:var(--texto-inverso);border-color:var(--blue)}
-.chip-ciudad.top{border-color:var(--green);background:var(--exito-tinte);color:var(--exito-fuerte)}
-.chip-ciudad.top:hover,.chip-ciudad.top.active{background:var(--green);color:var(--texto-inverso);border-color:var(--green)}
-.chip-ciudad .pct{font-size:.85em;opacity:.8}
+   Depende de tokens.css, base.css y componentes.css. Aqui no hay ni un color
+   literal (CE3), y ninguna transicion toca propiedades de layout (T4.6).
+   ============================================================================ */
+
+:root {
+  --blue: var(--azul);
+  --blue2: var(--azul-oscuro);
+  --green: var(--exito);
+  --orange: var(--aviso);
+}
+
+/* La pila de sistema del ADR, no la 'Segoe UI' que estaba por omision. */
+body {
+  font-family: var(--fuente);
+  background: linear-gradient(135deg, var(--azul-oscuro), var(--azul));
+  min-height: 100vh;
+  padding: var(--esp-5) var(--esp-4);
+  display: flex;
+  justify-content: center;
+}
+
+.card {
+  background: var(--superficie);
+  border-radius: var(--radio-lg);
+  box-shadow: var(--sombra-3);
+  width: 100%;
+  max-width: 720px;
+  overflow: hidden;
+}
+
+/* --- Cabecera ------------------------------------------------------------ */
+.header {
+  background: linear-gradient(135deg, var(--azul-oscuro), var(--azul));
+  color: var(--texto-inverso);
+  padding: var(--esp-5) var(--esp-6);
+  display: flex;
+  align-items: center;
+  gap: var(--esp-4);
+}
+.header img {
+  height: 44px; width: 44px;
+  object-fit: contain;
+  background: var(--superficie);
+  border-radius: var(--radio-md);
+  padding: var(--esp-1);
+  flex-shrink: 0;
+}
+.header h1 { font-size: var(--texto-lg); margin: 0; }
+.header p { font-size: var(--texto-sm); opacity: .85; margin: var(--esp-1) 0 0; }
+
+.body { padding: var(--esp-6); }
+
+/* --- Bloques -------------------------------------------------------------
+   Separacion por filete, no por tarjeta dentro de tarjeta: el ritmo lo marca
+   el espaciado y una linea de un pixel, que es la gramatica editorial de la
+   direccion elegida. */
+.bloque { margin-bottom: var(--esp-5); }
+.bloque__cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--esp-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--esp-2);
+}
+.bloque__cabecera .etiqueta { margin: 0; }
+h2.etiqueta { font-size: var(--texto-xs); font-weight: var(--peso-medio); }
+#ciudades-count { color: var(--azul); font-weight: var(--peso-fuerte); }
+
+.filters {
+  background: var(--azul-tenue-2);
+  border-left: 3px solid var(--azul);
+  border-radius: 0 var(--radio-md) var(--radio-md) 0;
+  padding: var(--esp-3) var(--esp-4);
+  margin-bottom: var(--esp-5);
+  font-size: var(--texto-sm);
+  color: var(--texto);
+}
+.filters strong { color: var(--azul); }
+
+/* --- Controles compactos -------------------------------------------------
+   componentes.css da ancho completo a `input` y `select` porque es lo correcto
+   en un formulario; estos dos son filtros al lado de un titulo. */
+.control--compacto {
+  width: auto;
+  padding: var(--esp-2) var(--esp-3);
+  font-size: var(--texto-sm);
+  border-radius: var(--radio-md);
+}
+#region-filter { max-width: 200px; }
+#ciudad-filter { max-width: 160px; }
+.filtros-ciudad { display: flex; gap: var(--esp-2); flex-wrap: wrap; }
+
+/* --- Categorias ---------------------------------------------------------- */
+.cats { display: flex; gap: var(--esp-2); flex-wrap: wrap; }
+.cat-badge {
+  padding: var(--esp-1) var(--esp-3);
+  border-radius: var(--radio-completo);
+  font-size: var(--texto-xs);
+  font-weight: var(--peso-medio);
+  background: var(--azul-tenue);
+  color: var(--gris-600);
+  transition: background-color var(--dur-normal) var(--curva-estandar),
+              color var(--dur-normal) var(--curva-estandar);
+}
+.cat-badge.active { background: var(--azul); color: var(--texto-inverso); }
+.cat-badge.done { background: var(--exito); color: var(--texto-inverso); }
+
+/* --- Ciudades ------------------------------------------------------------
+   606 municipios. Sin agrupacion es un muro; agrupadas por macro-region, con
+   el conteo del grupo en su cabecera, se leen. */
+.chips-resumen {
+  margin: 0 0 var(--esp-2);
+  font-size: var(--texto-xs);
+  color: var(--texto-suave);
+  font-variant-numeric: tabular-nums;
+  /* Reserva su linea: el texto cambia con cada pulsacion del buscador y sin
+     esto la caja de chips subiria y bajaria (CE4). */
+  min-height: 1.4em;
+}
+.chips-ayuda {
+  margin: var(--esp-2) 0 0;
+  font-size: var(--texto-xs);
+  color: var(--texto-suave);
+}
+
+.chips-caja {
+  min-height: 240px;
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--esp-1) var(--esp-2) var(--esp-3);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-md);
+  background: var(--superficie-2);
+}
+
+.grupo + .grupo { margin-top: var(--esp-2); }
+.grupo__cabecera {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--esp-2);
+  padding: var(--esp-2) var(--esp-1);
+  margin-bottom: var(--esp-1);
+  background: var(--superficie-2);
+  border-bottom: 1px solid var(--borde);
+  font-size: var(--texto-xs);
+  font-weight: var(--peso-fuerte);
+  letter-spacing: var(--track-etiqueta);
+  text-transform: uppercase;
+  color: var(--texto);
+}
+.grupo__conteo {
+  font-weight: var(--peso-normal);
+  /* --gris-600 y no --texto-suave: sobre --superficie-2 el suave da 4.55:1,
+     que pasa AA por dos centesimas y se rompe con cualquier retoque del
+     fondo. Es la misma regla que componentes.css ya se dio para
+     .estado--vacio. */
+  color: var(--gris-600);
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.grupo__chips { display: flex; flex-wrap: wrap; gap: var(--esp-2); }
+
+.chip-ciudad {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-1);
+  max-width: 100%;
+  padding: var(--esp-1) var(--esp-3);
+  border: 1px solid var(--borde-control);
+  border-radius: var(--radio-completo);
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: var(--texto-xs);
+  font-weight: var(--peso-medio);
+  cursor: pointer;
+  /* El nombre largo se recorta DENTRO del chip en vez de empujar la caja: es
+     lo que desbordaba a 320 px. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background-color var(--dur-rapida) var(--curva-estandar),
+              color var(--dur-rapida) var(--curva-estandar),
+              border-color var(--dur-rapida) var(--curva-estandar),
+              transform var(--dur-rapida) var(--curva-estandar);
+}
+.chip-ciudad:hover { background: var(--azul); color: var(--texto-inverso); border-color: var(--azul); }
+.chip-ciudad:active { transform: translateY(1px); }
+.chip-ciudad[aria-selected="true"] {
+  background: var(--azul);
+  color: var(--texto-inverso);
+  border-color: var(--azul);
+}
+/* Las tres primeras del pais. El borde usa `--exito` y NO `--exito-vivo`:
+   contra el fondo real de este chip (`--exito-tinte`) el vivo da 2.1:1, por
+   debajo del 3:1 que WCAG 1.4.11 pide para el borde de un control. No es el
+   caso de `.stat--exito`, donde la franja es decorativa y el borde normal
+   sigue estando: aqui el borde de color SUSTITUYE al del chip. */
+.chip-ciudad.top { border-color: var(--exito); background: var(--exito-tinte); color: var(--exito-fuerte); }
+.chip-ciudad.top:hover,
+.chip-ciudad.top[aria-selected="true"] { background: var(--exito); color: var(--texto-inverso); border-color: var(--exito); }
+
+/* El conteo del chip. Sin `opacity`, y es un arreglo, no un capricho: `--texto`
+   al 55 % sobre blanco da 2.97:1 y no lo atrapa ningun guarda de tokens,
+   porque el color declarado si es un token — lo que rompe el contraste es la
+   opacidad. Se usa el token que ya esta medido para texto secundario. */
+.chip-ciudad .pct { font-size: .9em; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.chip-ciudad.top .pct { color: var(--exito-fuerte); }
+.chip-ciudad:hover .pct,
+.chip-ciudad[aria-selected="true"] .pct,
+.chip-ciudad.top:hover .pct,
+.chip-ciudad.top[aria-selected="true"] .pct { color: var(--texto-inverso); }
+
+#chips-sin-resultados { padding: var(--esp-4) 0; }
+
+/* Avisos del catalogo: contactos cuya ciudad no casa (ambar) y el catalogo que
+   el servidor no pudo leer (rojo). Son dos problemas distintos y se ven
+   distintos. */
+.aviso-catalogo {
+  margin-bottom: var(--esp-2);
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-md);
+  background: var(--buzon-banda);
+  color: var(--buzon-fuerte);
+  font-size: var(--texto-xs);
+}
+.aviso-catalogo--error { background: var(--negado-banda); color: var(--negado-fuerte); }
+
+/* --- Arranque ------------------------------------------------------------ */
+.input-row {
+  display: flex;
+  gap: var(--esp-2);
+  flex-wrap: wrap;
+  margin: var(--esp-5) 0 var(--esp-2);
+}
+.input-row input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  width: auto;
+}
+.input-row input:focus { border-color: var(--azul); }
+
+.btn-blue { background: var(--azul); color: var(--texto-inverso); }
+.btn-blue:hover:not(:disabled) { background: var(--azul-oscuro); }
+.btn-blue:disabled { opacity: .55; cursor: not-allowed; }
+.btn-detener {
+  background: var(--superficie);
+  border: 1px solid var(--borde-control);
+  color: var(--texto);
+}
+.btn-detener:hover:not(:disabled) { background: var(--gris-100); }
+
+.aviso-inicio:empty { display: none; }
+.aviso-inicio { margin-bottom: var(--esp-4); }
+/* La confirmacion de "Detener" lleva dos botones en linea. Envuelven a 320 px
+   en vez de desbordar. */
+.aviso-inicio .estado__accion {
+  display: flex;
+  gap: var(--esp-2);
+  flex-wrap: wrap;
+}
+
+/* --- Progreso ------------------------------------------------------------ */
+.progress-box { margin: var(--esp-4) 0 var(--esp-5); }
+.progress-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3);
+  margin-bottom: var(--esp-2);
+}
+#prog-pct { font-size: var(--texto-lg); font-weight: var(--peso-fuerte); color: var(--texto-fuerte); }
+.progress-bar {
+  height: 10px;
+  background: var(--azul-tenue);
+  border-radius: var(--radio-completo);
+  overflow: hidden;
+}
+/* scaleX y no width: animar el ancho recalcula layout en cada cuadro, y una
+   corrida son minutos de barra moviendose. */
+.progress-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--azul);
+  border-radius: var(--radio-completo);
+  transform-origin: left center;
+  transform: scaleX(var(--avance, 0));
+  transition: transform var(--dur-lenta) var(--curva-salida);
+}
+#prog-label { margin: var(--esp-2) 0 0; font-size: var(--texto-sm); color: var(--texto-suave); }
+
+/* --- Contadores ----------------------------------------------------------
+   Jerarquia real: `nuevos_en_sheet` -las filas REALMENTE escritas- ocupa la
+   fila entera y usa --texto-3xl; los otros tres son secundarios. Antes los
+   cuatro pesaban casi igual (38.4 px contra 28.8 px) y el numero grande no
+   era el que importaba. */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--esp-3);
+  margin-bottom: var(--esp-3);
+}
+.stats-row .stat--principal { grid-column: 1 / -1; }
+.progreso-row { margin-bottom: var(--esp-4); }
+
+@media (max-width: 540px) {
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* --- Medidor de gasto ---------------------------------------------------- */
+.medidor {
+  margin: 0 0 var(--esp-5);
+  padding: var(--esp-2) var(--esp-3);
+  background: var(--gris-50);
+  border-left: 3px solid var(--borde-fuerte);
+  border-radius: 0 var(--radio-md) var(--radio-md) 0;
+  font-size: var(--texto-xs);
+  color: var(--gris-600);   /* ver .grupo__conteo: --texto-suave aqui roza AA */
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Consola -------------------------------------------------------------
+   Lo mas honesto de la pantalla. Se conserva su caracter -mono sobre fondo
+   oscuro- y se declara la pila mono en vez de dejar `monospace` a secas. */
+.log-box {
+  max-height: 200px;
+  color: var(--consola-texto);
+  background: var(--consola-fondo);
+  padding: var(--esp-3) var(--esp-4);
+  font-size: var(--texto-xs);
+}
+.log-box .entry { margin-bottom: var(--esp-1); line-height: var(--linea-normal); }
+.log-box .entry::before { content: "› "; opacity: .6; }
+
+/* --- Resultado -----------------------------------------------------------
+   Cuatro finales distintos, y solo UNO celebra. La banda de color y el titulo
+   dicen cual es antes de leer el texto: detenido a mano y tope de gasto son
+   estados de primera clase, no fallos. */
+.resultado {
+  margin-top: var(--esp-5);
+  padding: var(--esp-5);
+  border-radius: var(--radio-md);
+  border-left: 4px solid var(--borde-fuerte);
+  background: var(--gris-50);
+  text-align: center;
+}
+.resultado__icono { font-size: var(--texto-2xl); line-height: 1; margin-bottom: var(--esp-2); }
+.resultado h2 { color: var(--texto-fuerte); margin-bottom: var(--esp-2); }
+.resultado p { color: var(--texto); font-size: var(--texto-sm); margin-bottom: var(--esp-4); }
+
+.resultado--exito { background: var(--exito-tinte); border-left-color: var(--exito); }
+.resultado--exito h2 { color: var(--exito-fuerte); }
+.resultado--detenido { background: var(--gris-100); border-left-color: var(--gris-500); }
+.resultado--detenido h2 { color: var(--texto-fuerte); }
+.resultado--tope { background: var(--aviso-tinte); border-left-color: var(--aviso); }
+.resultado--tope h2 { color: var(--aviso-fuerte); }
+.resultado--error { background: var(--error-tinte); border-left-color: var(--error); }
+.resultado--error h2 { color: var(--error-fuerte); }
+
+.link-panel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  background: var(--superficie);
+  border: 1px solid var(--azul-borde);
+  color: var(--azul);
+  padding: var(--esp-2) var(--esp-4);
+  border-radius: var(--radio-md);
+  text-decoration: none;
+  font-weight: var(--peso-medio);
+  font-size: var(--texto-sm);
+  transition: background-color var(--dur-rapida) var(--curva-estandar),
+              color var(--dur-rapida) var(--curva-estandar);
+}
+.link-panel:hover { background: var(--azul); color: var(--texto-inverso); text-decoration: none; }
