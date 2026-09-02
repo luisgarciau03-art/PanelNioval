@@ -1,6 +1,12 @@
 const _ventanasAbiertas = [];
 function abrirVentana(url) {
-  const w = window.open(url, '_blank', 'width=1000,height=700,left=100,top=80');
+  // `noopener` no es opcional: sin el, la pestana que se abre conserva
+  // `window.opener` y puede redirigir la del panel a donde quiera. Un sitio
+  // que imite el login del panel, con el operador convencido de que su pestana
+  // de siempre sigue ahi, es una via de robo de credenciales bastante barata.
+  // La URL sale de la hoja, que edita gente y alimenta el importador.
+  const w = window.open(url, '_blank',
+    'noopener,noreferrer,width=1000,height=700,left=100,top=80');
   if (w) _ventanasAbiertas.push(w);
 }
 function cerrarVentanasContacto() {
@@ -19,7 +25,19 @@ const O = {
   opcionesP1: [],
 };
 
-const PASOS = ['loading','contacto','p0','p1','p2','p3','p4','p5','p6','p7','guardando','siguiente','fin','error'];
+// El nombre de la tienda, la ciudad y la categoria vienen de la hoja. Se
+// interpolaban crudos en `innerHTML`: un `<img src=x onerror=...>` en el
+// nombre de una tienda ejecutaba en la pantalla del operador. Se reutiliza el
+// escapador del sistema de estados, que ya carga esta pagina.
+function esc(s) {
+  return (window.Estados && Estados.escapar)
+    ? Estados.escapar(s)
+    : String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+const PASOS = ['loading','contacto','p0','p1','p2','p3','p4','p5','p6','p7','guardando','siguiente','fin','error','guardado-error'];
 const TOTAL_PREGUNTAS = 7;
 
 function showStep(name) {
@@ -27,7 +45,85 @@ function showStep(name) {
     const el = document.getElementById('step-' + p);
     if (el) el.classList.toggle('active', p === name);
   });
+  prepararPaso(document.getElementById('step-' + name));
 }
+
+// Los botones de cada paso, en orden de lectura. Se excluyen los enlaces del
+// contacto (Maps, Sitio Web, Llamar): no son respuestas, son herramientas.
+function opcionesDelPaso(paso) {
+  if (!paso) return [];
+  // Se numeran TAMBIEN los deshabilitados. En el paso p1 el boton "Continuar"
+  // nace deshabilitado y se habilita al marcar una opcion: si se numerara solo
+  // lo habilitado, ese boton se quedaria sin digito, o peor, renumeraria todo
+  // a media pregunta y el operador veria cambiar los numeros bajo el dedo.
+  // El manejador de teclado ya ignora los deshabilitados.
+  return Array.prototype.filter.call(
+    paso.querySelectorAll('button'),
+    b => !b.classList.contains('link-btn'));
+}
+
+// Dos cosas que el formulario no hacia y que cuestan una jornada entera:
+//
+// 1. **El foco no viajaba.** Al ocultar el paso anterior con `display:none`,
+//    el foco caia a <body>, asi que para responder con teclado habia que
+//    tabular desde el principio del documento EN CADA UNA de las siete
+//    preguntas, llamada tras llamada.
+//
+// 2. **Los atajos no existian.** Las etiquetas decian "1 — Respondio",
+//    "2 — Buzon", "0 — Telefono Incorrecto", pero no habia un solo manejador
+//    de teclado en el archivo: los numeros eran decoracion. Ahora cada opcion
+//    del paso lleva su digito, se ve en la propia etiqueta y funciona.
+function prepararPaso(paso) {
+  const opciones = opcionesDelPaso(paso);
+  opciones.forEach((btn, i) => {
+    if (i < 9) {
+      const digito = String(i + 1);
+      btn.dataset.atajo = digito;
+      if (!btn.querySelector('.tecla')) {
+        // El texto del boton se guarda ANTES de meterle la pastilla: despues
+        // ya no se puede distinguir el digito del nombre de la opcion.
+        btn.dataset.etiqueta = (btn.textContent || '').trim();
+        const kbd = document.createElement('kbd');
+        kbd.className = 'tecla';
+        kbd.setAttribute('aria-hidden', 'true');   // no se lee dos veces
+        kbd.textContent = digito;
+        btn.prepend(kbd);
+      }
+      btn.setAttribute('aria-keyshortcuts', digito);
+      // Y el digito va TAMBIEN en el nombre accesible. `aria-keyshortcuts` es
+      // metadata que la mayoria de lectores no anuncia por defecto, asi que
+      // sin esto los tres botones de p0 -que antes llevaban el numero escrito
+      // en el texto visible, "1 — Respondio"- se lo habrian quedado quien ve
+      // la pantalla y perdido quien la escucha. Sale peor de lo que estaba.
+      const etiqueta = btn.dataset.etiqueta || (btn.textContent || '').trim();
+      if (etiqueta) btn.setAttribute('aria-label', digito + '. ' + etiqueta);
+    }
+  });
+  // El foco va a la primera opcion USABLE: la numeracion incluye las
+  // deshabilitadas, pero enfocar una deshabilitada deja al operador con el
+  // foco en la nada.
+  const primera = opciones.find(b => !b.disabled);
+  // `preventScroll` porque el formulario cabe en pantalla y un salto de scroll
+  // aqui solo desorienta.
+  if (primera) primera.focus({ preventScroll: true });
+}
+
+// Un digito activa su opcion. Se ignora si el foco esta en un campo de texto:
+// el modal de correo y el de telefono se escriben con numeros.
+document.addEventListener('keydown', (ev) => {
+  if (ev.ctrlKey || ev.altKey || ev.metaKey) return;
+  const activo = document.activeElement;
+  if (activo && /^(INPUT|TEXTAREA|SELECT)$/.test(activo.tagName)) return;
+  // Con un modal abierto manda el modal, no el paso de debajo.
+  const modalAbierto = Array.prototype.some.call(
+    document.querySelectorAll('[id^="modal-"]'),
+    m => m.style.display && m.style.display !== 'none');
+  if (modalAbierto) return;
+  if (!/^[1-9]$/.test(ev.key)) return;
+  const paso = document.querySelector('.step.active');
+  const btn = paso && paso.querySelector('button[data-atajo="' + ev.key + '"]:not([disabled])');
+  if (btn) { ev.preventDefault(); btn.click(); }
+});
 
 function setProgress(stepId, actual, total) {
   const el = document.getElementById(stepId);
@@ -103,13 +199,20 @@ function renderContacto(c) {
   ].filter(x => x.v);
 
   document.getElementById('info-grid').innerHTML = campos.map(f =>
-    `<div class="info-item ${f.full?'full':''}"><div class="lbl">${f.l}</div><div class="val">${f.v}</div></div>`
+    `<div class="info-item ${f.full?'full':''}"><div class="lbl">${esc(f.l)}</div><div class="val">${esc(f.v)}</div></div>`
   ).join('');
 
+  // La URL viaja por `data-url`, nunca dentro de un atributo de codigo: el
+  // `replace` de comillas anterior solo tapaba un caracter y dejaba pasar el
+  // resto. Y se exige http(s) explicitamente para cerrar `javascript:`.
   const links = [];
-  if (maps && maps.startsWith('http')) links.push(`<button class="link-btn" onclick="abrirVentana('${maps.replace(/'/g,"\\'")}')">🗺️ Google Maps</button>`);
-  if (link && link.startsWith('http')) links.push(`<button class="link-btn" onclick="abrirVentana('${link.replace(/'/g,"\\'")}')">🌐 Sitio Web</button>`);
-  if (tel) links.push(`<a class="link-btn" href="tel:${tel}">📞 Llamar</a>`);
+  const seguro = u => /^https?:\/\//i.test(u);
+  if (seguro(maps)) links.push(
+    `<button type="button" class="link-btn" data-url="${esc(maps)}">🗺️ Google Maps</button>`);
+  if (seguro(link)) links.push(
+    `<button type="button" class="link-btn" data-url="${esc(link)}">🌐 Sitio Web</button>`);
+  if (tel) links.push(
+    `<a class="link-btn" href="tel:${encodeURIComponent(tel)}">📞 Llamar</a>`);
   document.getElementById('links-contacto').innerHTML = links.join('');
 
   showStep('contacto');
@@ -143,10 +246,28 @@ function resp0(v) {
 function renderP1() {
   const opciones = ['Entregas Rápidas','Líneas de Crédito','Contra Entrega','Envío Gratis','Precio Preferente','Evaluar Calidad'];
   O.opcionesP1 = [];
+  // Estas seis opciones son CONSTANTES del codigo, no vienen de la hoja: se
+  // escapan igual porque el patron tiene que ser el mismo en todo el archivo,
+  // pero que nadie las de por "ya cubiertas" si algun dia pasan a leerse de
+  // fuera. Lo que si cambia es que la opcion viaja por `data-opcion` en vez de
+  // interpolarse dentro de un `onclick`.
   document.getElementById('sel-p1').innerHTML = opciones.map(op =>
-    `<button class="btn btn-blue" style="opacity:.7;font-size:.82em" onclick="toggleP1(this,'${op}')">${op}</button>`
+    `<button type="button" class="btn btn-blue btn--opcion" data-opcion="${esc(op)}">${esc(op)}</button>`
   ).join('');
 }
+
+document.addEventListener('click', (ev) => {
+  const enlace = ev.target.closest('.link-btn[data-url]');
+  if (enlace) { abrirVentana(enlace.dataset.url); return; }
+  const opcion = ev.target.closest('#sel-p1 .btn--opcion');
+  if (opcion) { toggleP1(opcion, opcion.dataset.opcion); return; }
+  const corregir = ev.target.closest('.btn--corregir');
+  if (corregir) {
+    const caja = corregir.closest('.envio-problema');
+    try { abrirCorregir(JSON.parse(caja.dataset.envio)); }
+    catch (e) { console.error('envio con problema ilegible:', e); }
+  }
+});
 
 function toggleP1(btn, op) {
   const idx = O.opcionesP1.indexOf(op);
@@ -185,6 +306,18 @@ function abrirValidadorCatalogo() {
   validarValCat();
   inp.focus();
 }
+// Enter confirma, Escape cancela — el mismo trato que el modal de correo.
+// Sin esto el operador tenia que TABULAR desde el campo hasta el boton en cada
+// pedido, que es de las conclusiones mas frecuentes.
+function valCatKeydown(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (validarValCat()) confirmarEnviarCatalogo();
+  } else if (e.key === 'Escape') {
+    cerrarValidadorCatalogo();
+  }
+}
+
 function validarValCat() {
   const v = document.getElementById('val-cat-tel').value;
   const dig = (v.match(/\d/g) || []).length;
@@ -280,18 +413,26 @@ function encNoDisp() { O.resultado='Enc No Disponible'; O.r0='Respondio'; O.r7='
 function saltarContacto() { O.skip++; cargarContacto(); }
 
 let _guardando = false;
-async function guardar() {
+
+// `guardar()` ARMA el payload; `enviarGuardado()` lo MANDA. Separarlos es lo
+// que hace posible reintentar con exactamente lo mismo que fallo, en vez de
+// obligar al operador a rehacer la llamada de memoria.
+function guardar() {
   if (_guardando) return;  // guard de reentrancia: evita filas duplicadas por doble envío
-  _guardando = true;
-  showStep('guardando');
   const tienda = O.contacto ? (O.contacto.TIENDA || O.contacto.Tienda || O.contacto.Nombre || '') : '';
-  const payload = {
+  return enviarGuardado({
     row: O.contacto ? O.contacto._row : null,
     col_respuesta: O.contacto ? (O.contacto._col_respuesta || 6) : 6,
     tienda, resultado: O.resultado,
     r0: O.r0, r1: O.r1, r2: O.r2, r3: O.r3,
     r4: O.r4, r5: O.r5, r6: O.r6, r7: O.r7,
-  };
+  });
+}
+
+async function enviarGuardado(payload) {
+  if (_guardando) return;
+  _guardando = true;
+  showStep('guardando');
   try {
     const r = await fetch('/api/formulario/guardar', {
       method: 'POST',
@@ -300,25 +441,50 @@ async function guardar() {
     });
     const d = await r.json();
     if (!d.ok) {
-      _guardando = false;
-      showStep('contacto');
-      alert('⚠️ Error al guardar: ' + (d.error || 'No se pudo guardar en la hoja. Intenta de nuevo.'));
+      fallarGuardado(d.error || 'La hoja no aceptó la respuesta.', payload);
       return;
     }
     O.procesados++;
     document.getElementById('stat-procesados').textContent = O.procesados;
+    // La confirmacion tiene que ser inequivoca: en una llamada no hay tiempo
+    // de dudar si se guardo. Dice QUE se guardo y CON QUE conclusion.
     document.getElementById('resumen-guardado').textContent =
-      `${tienda} → ${O.resultado}${O.r0 && O.r0 !== 'Respondio' ? ' ('+O.r0+')' : ''}`;
+      `${payload.tienda} → ${payload.resultado}` +
+      (payload.r0 && payload.r0 !== 'Respondio' ? ' (' + payload.r0 + ')' : '');
     document.getElementById('catalogo-nota').textContent = '';
     showStep('siguiente');
     // Plan 3: si la conclusión dispara catálogo (Pedido / Revisará el Catálogo), encolar el envío.
-    encolarCatalogo(tienda);
+    encolarCatalogo(payload.tienda);
     _guardando = false;
   } catch(e) {
-    _guardando = false;
-    showStep('contacto');
-    alert('⚠️ Error de conexión al guardar. Verifica tu internet e intenta de nuevo.');
+    fallarGuardado('Sin conexión con el panel. Revisa la red.', payload);
   }
+}
+
+// `alert()` era la peor forma posible de contar esto. Bloquea la pagina, roba
+// el foco, no se puede leer con calma y -lo importante- al aceptarlo devolvia
+// al paso de contacto SIN las respuestas: el operador tenia que rehacer la
+// llamada entera de memoria. Perder una respuesta capturada es perder una
+// llamada.
+//
+// Ahora las respuestas se conservan y el reintento reenvia EXACTAMENTE el
+// mismo payload.
+let _ultimoPayload = null;
+
+function fallarGuardado(motivo, payload) {
+  _guardando = false;
+  _ultimoPayload = payload;
+  document.getElementById('guardado-error-detalle').textContent =
+    motivo + ' Tus respuestas siguen aquí: al reintentar se envían tal cual.';
+  showStep('guardado-error');
+}
+
+async function reintentarGuardado() {
+  if (!_ultimoPayload) { showStep('contacto'); return; }
+  const payload = _ultimoPayload;
+  _ultimoPayload = null;
+  _guardando = false;   // `fallarGuardado` ya lo libero; se reafirma por si acaso
+  await enviarGuardado(payload);
 }
 
 // Conclusiones elegibles (mismo criterio que nucleo_catalogo.CONCLUSIONES_ELEGIBLES).
@@ -374,13 +540,24 @@ async function abrirEnviosProblema() {
       fetch('/api/catalogo/envios?estado=FALLO').then(r=>r.json()),
     ]);
     const envios = [].concat(inv.envios||[], fall.envios||[]);
-    if (!envios.length) { cont.innerHTML = '<p style="color:var(--gray)">Sin envíos con problema. 🎉</p>'; return; }
+    // Sin confeti: "no hay envios con problema" puede significar que todo
+    // salio bien o que el worker lleva horas caido, y esta pantalla no sabe
+    // cual de las dos (regla de celebracion del ADR).
+    if (!envios.length) {
+      cont.innerHTML = '<p style="color:var(--gray)">Ningún envío con problema en este momento.</p>';
+      return;
+    }
+    // El envio viaja por el `dataset` del contenedor, no interpolado dentro de
+    // un atributo `onclick`. No era explotable —el `replace` de comillas
+    // aguantaba— pero es el patron que este mismo commit retiro de la ficha de
+    // contacto y de las opciones, y dejarlo aqui es dejar una excepcion que el
+    // siguiente copiara.
     cont.innerHTML = envios.map(e =>
-      `<div style="border:1px solid var(--borde);border-radius:8px;padding:8px;margin-bottom:6px">
+      `<div class="envio-problema" data-envio="${escHtml(JSON.stringify(e))}"
+            style="border:1px solid var(--borde);border-radius:8px;padding:8px;margin-bottom:6px">
         <b>${escHtml(e.tienda)}</b> — <span style="color:var(--red)">${escHtml(e.estado)}</span><br>
         <span style="color:var(--gray);font-size:.85em">${escHtml(e.telefono)} · intentos: ${escHtml(e.intentos)}</span><br>
-        <button class="btn btn-blue" style="margin-top:4px;font-size:.82em;padding:6px 10px"
-          onclick='abrirCorregir(${JSON.stringify(e).replace(/'/g,"&#39;")})'>✏️ Corregir número</button>
+        <button type="button" class="btn btn-blue btn--corregir" style="margin-top:4px;font-size:.82em;padding:6px 10px">✏️ Corregir número</button>
       </div>`
     ).join('');
   } catch(e) { cont.textContent = 'Error cargando envíos.'; }
@@ -436,6 +613,8 @@ function cargarSiguiente() {
 // cuelan las comillas.
 document.getElementById('btn-reintentar-contacto')
   .addEventListener('click', cargarContacto);
+document.getElementById('btn-reintentar-guardado')
+  .addEventListener('click', reintentarGuardado);
 
 // Iniciar
 cargarContacto();

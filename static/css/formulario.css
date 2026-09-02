@@ -15,6 +15,15 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,var(--a
 .info-item.full{grid-column:1/-1}
 .section-title{font-size:.8em;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid var(--azul-tenue)}
 .btn-group{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+/* La tecla del atajo, dentro del propio boton. Va DELANTE del texto
+   porque es lo que el operador busca con la vista cuando ya sabe que va a
+   contestar: primero el numero, luego confirma leyendo. Es `aria-hidden`
+   porque el atajo se anuncia con `aria-keyshortcuts`, no leyendo el
+   caracter suelto. */
+.tecla{display:inline-flex;align-items:center;justify-content:center;min-width:1.4em;height:1.4em;margin-right:8px;padding:0 .3em;border-radius:var(--radio-sm);background:rgba(255,255,255,.22);font-family:var(--fuente-mono);font-size:.82em;font-weight:var(--peso-fuerte);line-height:1}
+/* Sobre los botones claros la pastilla blanca no se ve: se invierte. */
+.btn--secundario .tecla,.link-btn .tecla{background:var(--gris-200);color:var(--texto)}
+
 .btn-group .btn{flex:1;min-width:120px}
 .btn:active{transform:scale(.97)}
 .btn-green{background:var(--green);color:var(--texto-inverso)}.btn-green:hover{filter:brightness(.88)}

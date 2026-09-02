@@ -55,9 +55,9 @@
       <div class="progress" id="prog0"></div>
       <div class="section-title">¿Qué sucedió con la llamada?</div>
       <div class="btn-group" style="flex-direction:column">
-        <button class="btn btn-green"  onclick="resp0('Respondio')">📞 1 — Respondió</button>
-        <button class="btn btn-orange" onclick="resp0('Buzon')">📬 2 — Buzón</button>
-        <button class="btn btn-gray"   onclick="resp0('Telefono Incorrecto')">✗ 0 — Teléfono Incorrecto</button>
+        <button class="btn btn-green"  onclick="resp0('Respondio')">📞 Respondió</button>
+        <button class="btn btn-orange" onclick="resp0('Buzon')">📬 Buzón</button>
+        <button class="btn btn-gray"   onclick="resp0('Telefono Incorrecto')">✗ Teléfono Incorrecto</button>
       </div>
     </div>
 
@@ -169,8 +169,8 @@
 
     <!-- SIGUIENTE CONTACTO -->
     <div class="step" id="step-siguiente">
-      <div class="fin">
-        <div class="icon">✅</div>
+      <div class="fin" role="status">
+        <div class="icon" aria-hidden="true">✅</div>
         <h2>Contacto Guardado</h2>
         <p id="resumen-guardado"></p>
         <p id="catalogo-nota" style="margin-top:8px;font-size:.9em;color:var(--blue)"></p>
@@ -225,10 +225,23 @@
         <label style="font-size:.82em;color:var(--texto);font-weight:600">Número de WhatsApp (10 dígitos; la lada 52 se añade sola)</label>
         <input id="val-cat-tel" type="tel" inputmode="numeric" placeholder="555 123 4567"
                style="width:100%;padding:11px;border:1px solid var(--borde-control);border-radius:8px;font-size:1em;margin-top:4px"
-               oninput="validarValCat()">
+               oninput="validarValCat()" onkeydown="valCatKeydown(event)">
         <p id="val-cat-error" style="color:var(--red);font-size:.82em;min-height:16px;margin:4px 0"></p>
         <button id="val-cat-btn" class="btn btn-green" style="width:100%" onclick="confirmarEnviarCatalogo()">✅ Confirmar y enviar catálogo</button>
         <button class="btn btn-gray" style="width:100%;margin-top:8px" onclick="cerrarValidadorCatalogo()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- ERROR AL GUARDAR: las respuestas siguen en memoria y el reintento
+         reenvia el mismo payload. Perder una respuesta capturada es perder
+         una llamada. -->
+    <div class="step" id="step-guardado-error">
+      <div class="estado estado--error" role="alert">
+        <div class="estado__titulo">No se pudo guardar la respuesta</div>
+        <div class="estado__detalle" id="guardado-error-detalle"></div>
+        <div class="estado__accion">
+          <button type="button" class="btn btn-blue" id="btn-reintentar-guardado">Reintentar el guardado</button>
+        </div>
       </div>
     </div>
 
@@ -247,7 +260,7 @@
     <!-- FIN TOTAL -->
     <div class="step" id="step-fin">
       <div class="fin">
-        <div class="icon">🎉</div>
+        <div class="icon" aria-hidden="true">🎉</div>
         <h2>¡Lista completada!</h2>
         <p>No hay más contactos pendientes por llamar.</p>
         <div class="stat-row">
