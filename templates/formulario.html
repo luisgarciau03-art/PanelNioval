@@ -11,14 +11,14 @@
 </head>
 <body>
 <div class="card">
-  <div class="header">
-    <img src="https://res.cloudinary.com/dipt3jq6r/image/upload/v1764307686/NIOVAL-05_xhfrrh.jpg" onerror="this.style.display='none'">
+  <header class="header">
+    <img src="https://res.cloudinary.com/dipt3jq6r/image/upload/f_auto,q_auto,w_96,h_96,c_fit/v1764307686/NIOVAL-05_xhfrrh.jpg" alt="NIOVAL" width="44" height="44" onerror="this.style.display='none'">
     <div>
       <h1>NIOVAL — Formulario de Llamadas</h1>
       <p id="header-sub">Cargando contacto...</p>
     </div>
-  </div>
-  <div class="body">
+  </header>
+  <main class="body">
 
     <!-- CARGA: esqueleto con la forma de la ficha, para que al llegar el
          contacto la botonera no se mueva bajo el dedo del operador. -->
@@ -184,9 +184,9 @@
     </div>
 
     <!-- MODAL: envíos de catálogo con problema + corrección de número (Plan 3) -->
-    <div id="modal-catalogo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:16px">
+    <div id="modal-catalogo" role="dialog" aria-modal="true" aria-label="Envíos de catálogo con problema" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:16px">
       <div style="background:var(--superficie);border-radius:16px;max-width:520px;width:100%;max-height:85vh;overflow:auto;padding:22px">
-        <h3 style="margin-bottom:12px;color:var(--blue2)">📖 Envíos de catálogo con problema</h3>
+        <h2 style="margin-bottom:12px;color:var(--blue2)">📖 Envíos de catálogo con problema</h2>
         <div id="envios-lista" style="font-size:.9em"></div>
         <div id="corregir-box" style="display:none;margin-top:14px;border-top:1px solid var(--borde);padding-top:12px">
           <p style="font-size:.9em;margin-bottom:6px">Corregir número de <b id="corregir-tienda"></b>:</p>
@@ -196,39 +196,39 @@
           <p id="corregir-error" style="color:var(--red);font-size:.82em;min-height:16px;margin:4px 0"></p>
           <button id="corregir-btn" class="btn btn-green" style="width:100%" disabled onclick="guardarCorreccion()">Guardar y reintentar</button>
         </div>
-        <button class="btn btn-gray" style="width:100%;margin-top:12px" onclick="cerrarModalCatalogo()">Cerrar</button>
+        <button class="btn btn-gray" style="width:100%;margin-top:12px" onclick="cerrarModalCatalogo()" data-cerrar>Cerrar</button>
       </div>
     </div>
 
     <!-- MODAL: captura de correo (Plan 4, conclusión "Correo") -->
-    <div id="modal-correo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:16px">
+    <div id="modal-correo" role="dialog" aria-modal="true" aria-label="Correo del cliente" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:16px">
       <div style="background:var(--superficie);border-radius:16px;max-width:460px;width:100%;padding:22px">
-        <h3 style="margin-bottom:6px;color:var(--blue2)">📧 Correo del cliente</h3>
+        <h2 style="margin-bottom:6px;color:var(--blue2)">📧 Correo del cliente</h2>
         <p style="font-size:.88em;color:var(--gray);margin-bottom:12px">Captura el correo o continúa sin correo.</p>
-        <input id="correo-input" type="email" autocomplete="off" placeholder="cliente@dominio.com"
+        <input id="correo-input" aria-label="Correo del cliente" type="email" autocomplete="off" placeholder="cliente@dominio.com"
                style="width:100%;padding:11px;border:1px solid var(--borde-control);border-radius:8px;font-size:1em"
                oninput="validarCorreo()" onkeydown="correoKeydown(event)">
         <p id="correo-error" style="color:var(--red);font-size:.82em;min-height:16px;margin:4px 0"></p>
         <button id="correo-btn" class="btn btn-green" style="width:100%" disabled onclick="guardarCorreo()">Guardar correo</button>
-        <button class="btn btn-gray" style="width:100%;margin-top:8px" onclick="continuarSinCorreo()">Continuar sin correo</button>
+        <button class="btn btn-gray" style="width:100%;margin-top:8px" onclick="continuarSinCorreo()" data-cerrar>Continuar sin correo</button>
       </div>
     </div>
 
     <!-- MODAL: validador PRE-envío de catálogo (confirmar/corregir número) -->
-    <div id="modal-validar-catalogo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:16px">
+    <div id="modal-validar-catalogo" role="dialog" aria-modal="true" aria-label="Confirmar envío de catálogo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;padding:16px">
       <div style="background:var(--superficie);border-radius:16px;max-width:480px;width:100%;padding:22px">
-        <h3 style="margin-bottom:6px;color:var(--blue2)">📦 Confirmar envío de catálogo</h3>
+        <h2 style="margin-bottom:6px;color:var(--blue2)">📦 Confirmar envío de catálogo</h2>
         <p style="font-size:.9em;color:var(--gray);margin-bottom:12px">
           <b id="val-cat-tienda"></b> — conclusión: <b id="val-cat-conclusion"></b>.<br>
           Verifica que el <b>número de WhatsApp</b> sea correcto antes de enviar. Si lo corriges, se actualiza en LISTA DE CONTACTOS.
         </p>
         <label style="font-size:.82em;color:var(--texto);font-weight:600">Número de WhatsApp (10 dígitos; la lada 52 se añade sola)</label>
-        <input id="val-cat-tel" type="tel" inputmode="numeric" placeholder="555 123 4567"
+        <input id="val-cat-tel" aria-label="Teléfono para el envío de catálogo" type="tel" inputmode="numeric" placeholder="555 123 4567"
                style="width:100%;padding:11px;border:1px solid var(--borde-control);border-radius:8px;font-size:1em;margin-top:4px"
                oninput="validarValCat()" onkeydown="valCatKeydown(event)">
         <p id="val-cat-error" style="color:var(--red);font-size:.82em;min-height:16px;margin:4px 0"></p>
         <button id="val-cat-btn" class="btn btn-green" style="width:100%" onclick="confirmarEnviarCatalogo()">✅ Confirmar y enviar catálogo</button>
-        <button class="btn btn-gray" style="width:100%;margin-top:8px" onclick="cerrarValidadorCatalogo()">Cancelar</button>
+        <button class="btn btn-gray" style="width:100%;margin-top:8px" onclick="cerrarValidadorCatalogo()" data-cerrar>Cancelar</button>
       </div>
     </div>
 
@@ -270,9 +270,10 @@
       </div>
     </div>
 
-  </div>
+  </main>
 </div>
 
+<script src="{{ url_for('static', filename='js/dialogo.js') }}"></script>
 <script src="{{ url_for('static', filename='js/estados.js') }}"></script>
 <script src="{{ url_for('static', filename='js/formulario.js') }}"></script>
 </body>

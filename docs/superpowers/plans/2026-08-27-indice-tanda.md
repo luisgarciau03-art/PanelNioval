@@ -237,7 +237,7 @@ Detectadas al leer el código. Estado **reverificado en disco el 2026-08-28**.
 |---|---|---|---|
 | **M13** | El escape de HTML faltaba en el importador. | ✅ **OBSOLETA** — el Plan 3 lo introdujo (`app.py:5810`). T4.3 solo elimina la duplicación | Plan 4 |
 | **M14** | `_escapar_formula` (`app.py:5037`) se usa **solo** en `app.py:5115`. Las demás rutas que escriben a Sheets no lo pasan. | 🔴 **ABIERTA y confirmada hoy** | ✅ **Plan 5 · T5.2** |
-| **M15** | El logo de Cloudinary sin `width`/`height` → salto de layout. **Tres** sitios: `app.py:1172`, `3736`, `5594`. | 🔴 ABIERTA | **Plan 4 · T4.10** |
+| **M15** | El logo de Cloudinary sin `width`/`height` → salto de layout. **Tres** sitios. | ✅ **CERRADA** en T4.10: dimensiones y `alt` en las tres, y además se pide del tamaño que se pinta (44.8 KB → 0.6 KB) | Plan 4 · T4.10 |
 | **M16** ⭐ | **Nueva.** `Nuevo documento de texto.txt` vacío en la raíz, sin versionar, sobreviviente de la limpieza M11. | 🟡 Cruft | Se **aparta** al respaldo fechado (regla 4), no se borra |
 
 ### 4.5 Secuencia recomendada, con las mejoras dentro
@@ -292,10 +292,10 @@ archivo" sino "añadirle cinco nombres"; el bloque exacto está en §7.
 | Plan 0 — Integración continua ⭐ | 4 | ✅ **COMPLETADO** | **4 / 4** |
 | Plan 2 — Optimización del gasto de Places | 9 | ✅ **COMPLETADO** | **9 / 9** |
 | Plan 1 — Relevancia de ciudades nacional | 10 | ✅ **COMPLETADO** | **10 / 10** |
-| Plan 4 — Rediseño profesional del panel | 12 | EN CURSO | **10 / 12** |
+| Plan 4 — Rediseño profesional del panel | 12 | EN CURSO | **11 / 12** |
 | Plan 5 — Endurecimiento del panel ⭐ | 8 | PENDIENTE | 0 / 8 |
 
-**PROGRESO GLOBAL: 43 / 53 tareas (81 %) · 4 de 6 planes completados**
+**PROGRESO GLOBAL: 44 / 53 tareas (83 %) · 4 de 6 planes completados**
 
 > Sobre el alcance original de 4 planes (41 tareas), el avance es **21 / 41 (51 %)**. El
 > denominador subió porque se redactaron dos planes que el §4 recomendaba y nadie había

@@ -19,6 +19,7 @@ from wsgiref.simple_server import make_server
 
 # El script vive en tools/; la app esta en la raiz del proyecto.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 # El panel es fail-closed; para capturar en local se usa el bypass explicito.
 os.environ.setdefault("PANEL_AUTH_DESACTIVADA", "1")
@@ -53,13 +54,20 @@ def verificar_sin_credenciales() -> None:
         "GOOGLE_CREDENTIALS_FILE antes de volver a correr."
     )
 
-ANCHOS = [320, 768, 1440]
+# Los cinco de CE10 desde la T4.10: el desborde del tablero aparecia entre
+# 768 y 1024 px, o sea justo en el hueco que dejaban tres anchos.
+ANCHOS = [320, 375, 768, 1024, 1440]
 SUPERFICIES = [("dashboard", "/"), ("formulario", "/formulario"), ("importador", "/importador")]
 PUERTO = 5099
 
 
 def main() -> int:
-    destino = Path(sys.argv[1] if len(sys.argv) > 1 else "docs/diseno/antes")
+    argumentos = [a for a in sys.argv[1:] if not a.startswith("--")]
+    # Con `--sinteticos` las pantallas se capturan CON datos inventados en vez de
+    # en su estado de error. Para comparar el rediseno da igual; para ensenar
+    # como responde la maquetacion a cada ancho, no: una tabla vacia no desborda.
+    sinteticos = "--sinteticos" in sys.argv
+    destino = Path(argumentos[0] if argumentos else "docs/diseno/antes")
     destino.mkdir(parents=True, exist_ok=True)
 
     import app as panel  # import lento en frio (~1-5 min): googleapiclient + Defender
@@ -78,8 +86,20 @@ def main() -> int:
         try:
             for ancho in ANCHOS:
                 pagina = navegador.new_page(viewport={"width": ancho, "height": 900})
+                if sinteticos:
+                    import json as _json
+                    import medir_cls
+                    pagina.route("**/api/**", lambda r: r.fulfill(
+                        status=200, content_type="application/json",
+                        body=_json.dumps(medir_cls._cuerpo(r.request.url),
+                                         ensure_ascii=False)))
                 for nombre, ruta in SUPERFICIES:
-                    pagina.goto(f"http://127.0.0.1:{PUERTO}{ruta}", wait_until="load")
+                    # `domcontentloaded` y no `load`: `load` espera TAMBIEN a los
+                    # recursos de terceros -el logo de Cloudinary- y una peticion
+                    # lenta ahi fuera tumbaba las quince capturas. La espera de
+                    # abajo es la que garantiza que la pantalla esta asentada.
+                    pagina.goto(f"http://127.0.0.1:{PUERTO}{ruta}",
+                                wait_until="domcontentloaded")
                     # Margen para que corran los fetch y se pinte el estado de carga/error.
                     pagina.wait_for_timeout(2500)
                     archivo = destino / f"{nombre}-{ancho}.png"

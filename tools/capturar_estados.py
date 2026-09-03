@@ -14,7 +14,9 @@ Los cuatro:
     vacio    ``/api/*`` responde bien y sin filas.
     error    ``/api/*`` responde 500.
     parcial  los datos llegan, pero Chart.js no: se bloquea el CDN. Es un caso
-             real, no inventado — el script viene de jsdelivr sin SRI.
+             real, no inventado: hasta la T4.10 el script venia de jsdelivr
+             sin SRI, y ahora se sirve desde `static/` — pero que no llegue
+             sigue siendo posible (un despliegue a medias, una cache rota).
 
 Como ``capturar_superficies.py``: la app arranca **sin credenciales de Google**,
 comprobado en la dirección útil, así que ninguna captura puede llevar datos de
@@ -40,7 +42,10 @@ import medir_cls  # noqa: E402  (reutiliza las cargas sinteticas y el chequeo)
 
 PUERTO = 5059
 ANCHO = 1440
-CDN_CHART = "**cdn.jsdelivr.net**"
+# T4.10: Chart.js dejo de venir de jsdelivr y se sirve desde `static/`.
+# Bloquear el archivo local simula lo mismo que antes simulaba bloquear el CDN:
+# que la libreria no llegue, venga de donde venga.
+CDN_CHART = "**/js/vendor/chart*"
 
 
 def _capturar(navegador, destino, nombre, ruta, preparar, espera, seccion=None):
@@ -89,7 +94,8 @@ def main():
 
     def prep_parcial(pagina):
         # Los datos llegan; la libreria de graficas no. Es lo que pasa cuando
-        # jsdelivr no responde, que hoy nadie puede descartar: el script se
+        # Chart.js no llega, que sigue siendo posible tras auto-hospedarlo
+        # (un despliegue a medias, una cache rota): el script se
         # carga sin SRI y sin copia local (deuda anotada para el Plan 5).
         pagina.route(CDN_CHART, lambda r: r.abort())
         pagina.route("**/api/**", lambda r: json_de(r, medir_cls._cuerpo(r.request.url)))

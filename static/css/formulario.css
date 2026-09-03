@@ -10,7 +10,10 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,var(--a
 .body{padding:24px 28px}
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
 .info-item{background:var(--azul-tenue-2);border-radius:10px;padding:12px;border-left:3px solid var(--blue)}
-.info-item .lbl{font-size:.68em;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
+/* --gris-600 y no --texto-suave: sobre --azul-tenue-2 el suave da 4.33:1 y no
+   llega al 4.5:1 (medido por tools/verificar_accesibilidad.py). Es el mismo
+   par fragil que la T4.9 corrigio en el importador. */
+.info-item .lbl{font-size:.68em;color:var(--gris-600);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
 .info-item .val{font-size:.95em;font-weight:600;color:var(--texto-fuerte);word-break:break-word}
 .info-item.full{grid-column:1/-1}
 .section-title{font-size:.8em;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid var(--azul-tenue)}

@@ -469,6 +469,31 @@ function pintarGraficasDashboard(stats, res) {
       scales: ejesDelSistema(),
     }
   });
+  describirGraficas();
+}
+
+// Una grafica en <canvas> no tiene contenido que un lector pueda recorrer: sin
+// nombre accesible se anuncia como "canvas" y ya. El nombre base viene del
+// marcado; aqui se le anaden las CIFRAS, que es lo que hace util la grafica
+// para quien no la ve. Se llama tras dibujar, porque hasta entonces no hay
+// datos que describir.
+function describirGrafica(id) {
+  const grafica = charts[id];
+  const lienzo = document.getElementById(id);
+  if (!grafica || !lienzo) return;
+  const base = (lienzo.getAttribute('aria-label') || '').split(':')[0];
+  const etiquetas = grafica.data.labels || [];
+  const datos = (grafica.data.datasets && grafica.data.datasets[0]
+                 && grafica.data.datasets[0].data) || [];
+  // Ocho como mucho: una lista de cincuenta pares no la escucha nadie.
+  const pares = etiquetas.slice(0, 8)
+    .map((l, i) => `${l}: ${datos[i]}`).join(', ');
+  const resto = etiquetas.length > 8 ? ` y ${etiquetas.length - 8} más` : '';
+  lienzo.setAttribute('aria-label', pares ? `${base}: ${pares}${resto}` : base);
+}
+
+function describirGraficas() {
+  Object.keys(charts).forEach(describirGrafica);
 }
 
 // ─── FRECUENTES ─────────────────────────────────────────────────────────────
@@ -506,7 +531,7 @@ async function loadFrecuentes() {
       <td><strong>${r['Cliente']}</strong></td>
       <td><span class="tag default">${r['Esquema'] || '—'}</span></td>
       <td style="text-align:center;font-weight:700">${r['Pedidos']}</td>
-      <td style="text-align:right;font-weight:800;color:var(--green)">$${fmtMonto(r['Total Monto'])}</td>
+      <td style="text-align:right;font-weight:800;color:var(--exito-fuerte)">$${fmtMonto(r['Total Monto'])}</td>
       <td style="color:var(--texto-suave);font-size:.85em">${r['Ultimo Pedido'] || '—'}</td>
     </tr>`;
   });
@@ -614,6 +639,7 @@ function pintarGraficasVentas(labels, montos, pedidos, tickets) {
       }
     }
   });
+  describirGraficas();
 }
 
 async function loadVentasDash() {
@@ -677,8 +703,8 @@ async function loadVentasDash() {
       .join(' ');
     const isMejor = m.mes === d.mejor_mes;
     html += `<tr ${isMejor ? 'style="background:var(--exito-tinte)"' : ''}>
-      <td><strong ${isMejor ? 'style="color:var(--green)"' : ''}>${m.mes} ${isMejor ? '⭐' : ''}</strong></td>
-      <td style="text-align:right;font-weight:800;color:var(--green)">$${fmtMonto(m.monto)}</td>
+      <td><strong ${isMejor ? 'style="color:var(--exito-fuerte)"' : ''}>${m.mes} ${isMejor ? '⭐' : ''}</strong></td>
+      <td style="text-align:right;font-weight:800;color:var(--exito-fuerte)">$${fmtMonto(m.monto)}</td>
       <td style="text-align:center;font-weight:700">${m.pedidos}</td>
       <td style="text-align:center">${m.clientes}</td>
       <td style="text-align:right;color:var(--texto-suave)">$${fmtMonto(m.ticket_prom)}</td>
@@ -1089,7 +1115,7 @@ function renderCiudades(data) {
   const cols = [
     { key: 'ciudad',        label: 'Ciudad',        fmt: (v,c) => `<strong>${escCiudad(v)}</strong>` },
     { key: 'prioridad',     label: '★ Prioridad',    fmt: v => v == null
-        ? '<span style="opacity:.45" title="No esta en el catalogo nacional">sin catalogo</span>'
+        ? '<span class="dato-ausente" title="No esta en el catalogo nacional">sin catalogo</span>'
         : `<strong style="color:var(--blue)">${v}</strong>` },
     { key: 'potencial_mercado', label: 'Mercado',    fmt: v => v == null ? '—' : v },
     { key: 'desempeno_nioval',  label: 'Ajuste',     fmt: v => v == null ? '—' : `x${v}` },
@@ -1102,11 +1128,11 @@ function renderCiudades(data) {
       const w = Math.round((v / maxAprob) * 80);
       return `${v} <span class="interes-bar" style="width:${w}px"></span>`;
     }},
-    { key: 'interes_pct',   label: '% Interés',      fmt: v => `<strong style="color:var(--green)">${v}%</strong>` },
+    { key: 'interes_pct',   label: '% Interés',      fmt: v => `<strong style="color:var(--exito-fuerte)">${v}%</strong>` },
     { key: 'negados',       label: '✗ Negados',      fmt: v => v || 0 },
     { key: 'no_compatible', label: '⊘ No Compat.',   fmt: v => v || 0 },
     { key: 'marca_unica',   label: '◈ M.Única',      fmt: v => v || 0 },
-    { key: 'pedido',        label: '📦 Pedido',      fmt: v => v ? `<strong style="color:var(--green)">${v}</strong>` : 0 },
+    { key: 'pedido',        label: '📦 Pedido',      fmt: v => v ? `<strong style="color:var(--exito-fuerte)">${v}</strong>` : 0 },
     { key: 'catalogo',      label: '📖 Catálogo',    fmt: v => v || 0 },
     { key: 'correo',        label: '📧 Correo',      fmt: v => v || 0 },
     { key: 'avance',        label: '📅 Avance',      fmt: v => v || 0 },
@@ -1120,7 +1146,10 @@ function renderCiudades(data) {
   let html = `<table><thead><tr>
     <th style="cursor:default">#</th>
     ${cols.map(c =>
-      `<th style="cursor:pointer;white-space:nowrap" onclick="sortCiudades('${c.key}')">${c.label}${arrow(c.key)}</th>`
+      // Boton dentro del <th>, como el resto de las tablas desde la T4.7: un
+      // <th> con onclick no entra en el orden de tabulacion ni responde a Enter.
+      `<th scope="col" style="white-space:nowrap"><button type="button" class="tabla__orden"`
+      + ` onclick="sortCiudades('${c.key}')">${c.label}${arrow(c.key)}</button></th>`
     ).join('')}
   </tr></thead><tbody>`;
 
@@ -1193,7 +1222,16 @@ async function loadSeguimiento() {
     const count = (_segGroups[k] || []).length;
     const icon  = k === 'todos' ? '🔄' : segIcon(k);
     const label = k === 'todos' ? 'Todos' : k;
-    return `<div class="seg-tab${k==='todos'?' active':''}" data-tab="${k.replace(/"/g,'&quot;')}" onclick="switchSegTab(this)">${icon} ${label} <span class="tab-count">(${count})</span></div>`;
+    // `<button role="tab">` y no `<div onclick>`: un div no entra en el orden de
+    // tabulacion ni responde a Enter/Espacio, asi que las pestanas de
+    // Seguimiento estaban fuera del alcance de quien no usa raton. Es el mismo
+    // defecto que la T4.7 corrigio en `.nav-item`, que aqui sobrevivio porque
+    // vive en una seccion que no es la que abre por defecto.
+    const activa = k === 'todos';
+    return `<button type="button" role="tab" class="seg-tab${activa?' active':''}"`
+      + ` data-tab="${k.replace(/"/g,'&quot;')}" aria-selected="${activa}"`
+      + ` onclick="switchSegTab(this)">${icon} ${label}`
+      + ` <span class="tab-count">(${count})</span></button>`;
   }).join('');
 
   _segActiveTab = 'todos';
@@ -1202,8 +1240,12 @@ async function loadSeguimiento() {
 
 function switchSegTab(el) {
   _segActiveTab = el.dataset.tab;
-  document.querySelectorAll('#seg-tabs .seg-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#seg-tabs .seg-tab').forEach(t => {
+    t.classList.remove('active');
+    t.setAttribute('aria-selected', 'false');
+  });
   el.classList.add('active');
+  el.setAttribute('aria-selected', 'true');
   document.getElementById('seg-search').value = '';
   renderSegTab();
 }
@@ -1288,11 +1330,15 @@ function openEdit(ctx, rowNum) {
   if (isSeg) {
     const curColor = _segColorMap[row._row] || '';
     document.getElementById('edit-color-picker').innerHTML = Object.entries(SEG_COLORS).map(([code, c]) =>
-      `<div class="color-opt${code===curColor?' selected':''}" data-color="${code}" onclick="selectEditColor(this)"
-           title="${c.label}"
+      // Botones `role="radio"`, no divs: el color de fila es una eleccion
+      // entre opciones excluyentes y tenia que poder hacerse con teclado.
+      // `aria-label` porque el unico contenido es color, que no se lee.
+      `<button type="button" role="radio" class="color-opt${code===curColor?' selected':''}"
+           data-color="${code}" onclick="selectEditColor(this)"
+           aria-checked="${code===curColor}" aria-label="${c.label}" title="${c.label}"
            style="background:var(${c.tono});border:3px solid ${code===curColor?'var(--gris-800)':'transparent'}">
-         ${code===curColor?'<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--texto-inverso);font-size:.75em;font-weight:900">✓</span>':''}
-       </div>`).join('');
+         ${code===curColor?'<span aria-hidden="true" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--texto-inverso);font-size:.75em;font-weight:900">✓</span>':''}
+       </button>`).join('');
     document.getElementById('edit-color-label').textContent = SEG_COLORS[curColor]?.label || '';
     colorSection.style.display = 'flex';
     modal._color = curColor;
@@ -1347,10 +1393,12 @@ function selectEditColor(el) {
   const code = el.dataset.color;
   document.querySelectorAll('#edit-color-picker .color-opt').forEach(d => {
     d.style.border = '3px solid transparent';
+    d.setAttribute('aria-checked', 'false');
     d.innerHTML = '';
   });
   el.style.border = '3px solid var(--gris-800)';
-  el.innerHTML = '<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--texto-inverso);font-size:.75em;font-weight:900">✓</span>';
+  el.setAttribute('aria-checked', 'true');
+  el.innerHTML = '<span aria-hidden="true" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--texto-inverso);font-size:.75em;font-weight:900">✓</span>';
   document.getElementById('edit-seg-modal')._color = code;
   document.getElementById('edit-color-label').textContent = SEG_COLORS[code]?.label || '';
 }
@@ -1846,7 +1894,10 @@ function renderBruceTable(data) {
       <td>${r['Teléfono'] || ''}</td>
       <td>${r['Tipo de Interés'] || ''}</td>
       <td style="text-align:center">
-        <span class="bruce-casilla" onclick="toggleContactadoBruce(${r._row}, this)" title="Marcar/desmarcar">
+        <button type="button" class="bruce-casilla" role="switch"
+                aria-checked="${casilla ? 'true' : 'false'}"
+                onclick="toggleContactadoBruce(${r._row}, this)"
+                aria-label="Marcar como contactado">
           ${casilla ? '✅' : '⬜'}
         </span>
       </td>
@@ -1888,6 +1939,9 @@ async function toggleContactadoBruce(rowNum, el) {
   const actual = el.textContent.trim() === '✅';
   const nuevo  = actual ? '' : '✓';
   el.textContent = nuevo ? '✅' : '⬜';
+  // El estado del interruptor va tambien al arbol de accesibilidad: sin esto
+  // cambia el emoji -que un lector no interpreta- y nada mas.
+  el.setAttribute('aria-checked', nuevo ? 'true' : 'false');
   await fetch('/api/bruce/actualizar', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ _row: rowNum, 'Contactado': nuevo })

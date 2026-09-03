@@ -106,7 +106,7 @@ def main():
 
             # ── 2. El aviso de graficas no destruye los <canvas> ────────────
             pagina = navegador.new_page(viewport={"width": ANCHO, "height": 1000})
-            pagina.route("**cdn.jsdelivr.net**", lambda ruta: ruta.abort())
+            pagina.route("**/js/vendor/chart*", lambda ruta: ruta.abort())
             pagina.route("**/api/**", lambda ruta: ruta.fulfill(
                 status=200, content_type="application/json",
                 body=json.dumps(medir_cls._cuerpo(ruta.request.url))))
