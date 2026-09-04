@@ -115,6 +115,11 @@ EXIT=0
 
 **Baseline de esta rama: 388 passed, 1 skipped.**
 
+⚠️ **Este 388 es el de Windows local.** En el runner Linux del CI salen **389 passed**: el
+test que aquí se salta necesita `fcntl`, que no existe en Windows. Al leer el check de CI no
+hay que confundir ese +1 con un test añadido. El gate de CE10 se evalúa **contra el baseline
+de la misma plataforma** donde se mide.
+
 ⚠️ El criterio **CE10** del Plan 5 dice «≥ 357 passed». Ese 357 es el baseline de
 `perf/gasto-places-importador` (rama del Plan 2), no un número universal. Desde esta rama el
 gate correcto es **≥ 388**, y se reescribe así en T5.6.
