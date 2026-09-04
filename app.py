@@ -3089,7 +3089,7 @@ def guardar_respuesta_formulario(datos):
         col_b = ws.col_values(2)
         ultima_fila = len(col_b) + 1
 
-        fecha_hora = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        fecha_hora = nc.ahora_mexico().strftime('%d/%m/%Y %H:%M:%S')
         tienda     = datos.get('tienda', '')
         r0         = datos.get('r0', '')
         r1         = datos.get('r1', '')
@@ -3199,7 +3199,7 @@ def api_bruce_agregar():
         return jsonify({'error': 'Nombre requerido'}), 400
     try:
         ws = get_bruce_ws()
-        fecha = datetime.now().strftime('%d/%m/%Y %H:%M')
+        fecha = nc.ahora_mexico().strftime('%d/%m/%Y %H:%M')
         ws.append_row([fecha, nombre, telefono, tipo, '', nota])
         _cache_pop('bruce')
         return jsonify({'ok': True})
@@ -3518,7 +3518,7 @@ def catalogo_corregir_numero():
         if not nc.transicion_valida(estado_actual, nc.PENDIENTE):
             return jsonify({'ok': False, 'error': f'No se puede corregir desde {estado_actual}'}), 400
         tel_norm = nc.normalizar_telefono(nuevo_tel)
-        ahora = datetime.now().strftime(nc.FMT_TIMESTAMP)
+        ahora = nc.ahora_mexico().strftime(nc.FMT_TIMESTAMP)
         try:
             intentos_actual = int(_valor_fila(filas, col, envio_row, 'intentos') or 0)
         except (TypeError, ValueError):
@@ -3591,7 +3591,7 @@ def catalogo_reintentar():
         estado_actual = str(_valor_fila(filas, col, envio_row, 'estado')).strip().upper()
         if not nc.transicion_valida(estado_actual, nc.PENDIENTE):
             return jsonify({'ok': False, 'error': f'No se puede reintentar desde {estado_actual}'}), 400
-        ahora = datetime.now().strftime(nc.FMT_TIMESTAMP)
+        ahora = nc.ahora_mexico().strftime(nc.FMT_TIMESTAMP)
         ws.batch_update([
             {'range': gsu.rowcol_to_a1(envio_row, col['estado']), 'values': [[nc.PENDIENTE]]},
             {'range': gsu.rowcol_to_a1(envio_row, col['timestamp_estado']), 'values': [[ahora]]},
@@ -5076,8 +5076,8 @@ def _exportar_a_sheets(resultados, categoria, ciudad, claves_existentes=None):
         claves_existentes.update(frescas)
         nombres_existentes = claves_existentes
 
-    fecha  = datetime.now().strftime('%d/%m/%Y')
-    semana = datetime.now().isocalendar()[1]
+    fecha  = nc.ahora_mexico().strftime('%d/%m/%Y')
+    semana = nc.ahora_mexico().isocalendar()[1]
     nuevos = []
     claves_nuevas = set()   # se vuelcan al conjunto compartido solo si se escribe
 

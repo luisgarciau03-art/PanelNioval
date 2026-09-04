@@ -2,6 +2,17 @@ FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
 
+# Zona horaria del contenedor (Plan 5 T5.3, M2). python:3.11-slim corre en UTC
+# y Mexico es UTC-6: sin esto, los logs y cualquier `date` del contenedor van
+# seis horas adelantados respecto a lo que ve el owner.
+#
+# Es la SEGUNDA capa, no la unica. El codigo usa ZoneInfo explicito
+# (nucleo_catalogo.ahora_mexico), porque confiar solo en esta variable dejaria
+# el resultado dependiendo del despliegue: en la maquina del owner (Windows,
+# hora local) y en el runner de CI (UTC) los tests darian resultados distintos.
+# La variable arregla los logs; el codigo arregla los datos.
+ENV TZ=America/Mexico_City
+
 WORKDIR /app
 
 COPY requirements.txt .

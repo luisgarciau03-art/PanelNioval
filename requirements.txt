@@ -15,6 +15,14 @@ gunicorn>=21.0.0
 # deja de arrancar sin que nadie haya tocado nada.
 requests>=2.31.0
 
+# tzdata: base de zonas horarias (Plan 5 T5.3). python:3.11-slim NO la trae, y
+# sin ella zoneinfo.ZoneInfo('America/Mexico_City') lanza ZoneInfoNotFoundError
+# al importar nucleo_catalogo.py: el panel no arranca. En Windows tampoco existe
+# la base del sistema, asi que tambien hace falta en local. No es opcional ni
+# "por si acaso": es el riesgo R3 del plan, cuyo impacto es una caida en
+# produccion.
+tzdata>=2024.1
+
 # RETIRADOS (no los importa nadie, comprobado con ast sobre todos los .py y con
 # sys.modules tras importar app.py):
 #   pandas      - el mas pesado de la lista; ni pandas ni numpy se cargan.
