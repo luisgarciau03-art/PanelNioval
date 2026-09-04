@@ -458,13 +458,13 @@ va al respaldo fechado.
 | T5.0 | Tarea Cero: rama, respaldo, baseline y los 5 grep | ✅ **HECHA** | Rama `fix/endurecimiento-panel` desde `main` @ `82995c3` (decisión E5 del owner). Respaldo: 5 XLSX + `huellas.json`, 65 hojas, ninguno vacío. Baseline **388 passed, 1 skipped**. Los 5 grep con salida pegada en [`docs/auditoria/2026-09-04-t50-estado-de-partida.md`](../../auditoria/2026-09-04-t50-estado-de-partida.md) | 2026-09-04 |
 | T5.1 | Rate limiting en todas las rutas (M5) | PENDIENTE | | |
 | T5.2 | Escapado de fórmulas en todas las escrituras (M14) | PENDIENTE | | |
-| T5.3 | Zona horaria explícita, dos capas (M2) | PENDIENTE | | |
+| T5.3 | Zona horaria explícita, dos capas (M2) | ✅ **HECHA** | `fe907b0` + `bdfa5cb`. Helper `nc.ahora_mexico()` (ZoneInfo) + `ENV TZ` + `tzdata`. 24 tests nuevos; suite **412 passed, 1 skipped**. Reviews: code-reviewer APPROVE, python-reviewer Warning, silent-failure-hunter 2 HIGH — todos resueltos. Histórico medido y NO corregido: 2 de 2,662 filas del panel (0.1 %) | 2026-09-04 |
 | T5.4 | Healthcheck del contenedor (M9) | PENDIENTE | | |
 | T5.5 | Cierre ordenado del hilo del importador (M3) | PENDIENTE | | |
 | T5.6 | Verificación integral | PENDIENTE | | |
 | T5.7 | Cierre: docs, PR, handoff | PENDIENTE | | |
 
-**Avance del plan: 1 / 8 tareas (13 %)**
+**Avance del plan: 2 / 8 tareas (25 %)**
 
 **Gates del owner asociados (reportar, no intentar):** rotar `TELEGRAM_TOKEN` (M7) y apagar
 el despliegue de Railway (M6). Ninguno lo cierra este plan, y ambos siguen siendo el riesgo
