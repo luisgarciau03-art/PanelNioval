@@ -943,7 +943,7 @@ def _sheet_update_row(ws_key, row_num, fields, cache_key=None):
             a1 = gsu.rowcol_to_a1(int(row_num), col_idx)
             # El body no tiene allowlist: cualquier clave que coincida con un
             # encabezado llega a una celda, y esto escribe con USER_ENTERED.
-            updates.append({'range': a1, 'values': [[_escapar_formula(str(value))]]})
+            updates.append({'range': a1, 'values': [[_valor_para_celda(value)]]})
     if updates:
         ws.batch_update(updates, value_input_option='USER_ENTERED')
     _cache_pop(cache_key or ws_key)
@@ -3245,7 +3245,7 @@ def api_bruce_actualizar():
                 col = headers.index(field) + 1
                 a1  = gsu.rowcol_to_a1(int(row_num), col)
                 # Mismo caso que seguimiento: sin allowlist y con USER_ENTERED.
-                updates.append({'range': a1, 'values': [[_escapar_formula(str(value))]]})
+                updates.append({'range': a1, 'values': [[_valor_para_celda(value)]]})
         if updates:
             ws.batch_update(updates, value_input_option='USER_ENTERED')
         _cache_pop('bruce')
@@ -5067,10 +5067,39 @@ def _escapar_formula(valor):
     parte del valor almacenado. Solo se toca lo que es cadena: los numeros
     (calificacion, resenas, latitud, longitud) y las fechas deben seguir
     entrando como numero y fecha, que es justo lo que RAW habria roto.
+
+    Se mira el primer caracter NO EN BLANCO, no el primero a secas. Mirar solo
+    el primero es el bypass clasico de este control: " =SUM(A1:A9)" con un
+    espacio delante no casaba, y Excel recorta ese espacio al importar el CSV y
+    ejecuta la formula igual. Lo mismo con tabulador, salto de linea, BOM y
+    espacio de ancho cero, que ademas son invisibles al revisar la hoja.
+
+    El apostrofo se antepone al valor ORIGINAL, no al recortado: los espacios
+    de delante son parte del dato del usuario y no se tiran.
     """
-    if isinstance(valor, str) and valor[:1] in ('=', '+', '-', '@'):
+    if not isinstance(valor, str):
+        return valor
+    sin_blancos = valor.lstrip(' \t\r\n\v\f﻿​‌‍⁠')
+    if sin_blancos[:1] in ('=', '+', '-', '@'):
         return "'" + valor
     return valor
+
+
+def _valor_para_celda(valor):
+    """Prepara un valor de body JSON para escribirlo en una celda.
+
+    El orden importa y ya se hizo mal una vez: envolver en `str()` ANTES de
+    escapar anula el paso limpio de numeros que `_escapar_formula` tiene por
+    diseno, y un -50 legitimo acaba guardado como texto "'-50", rompiendo en
+    silencio cualquier SUM de esa columna. Los numeros se escapan primero como
+    numeros (o sea, no se tocan) y solo lo demas se convierte a texto.
+
+    `bool` se excluye a proposito: en Python es subclase de `int`, y escribir
+    True/False como numero en la hoja no es lo que espera nadie.
+    """
+    if isinstance(valor, (int, float)) and not isinstance(valor, bool):
+        return valor
+    return _escapar_formula(valor if isinstance(valor, str) else str(valor))
 
 
 def _exportar_a_sheets(resultados, categoria, ciudad, claves_existentes=None):

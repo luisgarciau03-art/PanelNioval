@@ -63,16 +63,62 @@ class TestSupuestosSobreGspread:
         )
 
     @pytest.mark.parametrize("metodo", ["update", "batch_update"])
-    def test_sin_opcion_explicita_es_user_entered(self, metodo):
-        """`value_input_option=None` NO significa "el defecto seguro": gspread
-        lo resuelve a USER_ENTERED salvo que se pase `raw=True`."""
-        f = getattr(Worksheet, metodo)
-        assert inspect.signature(f).parameters["value_input_option"].default is None
-        cuerpo = inspect.getsource(f)
-        assert "if not value_input_option:" in cuerpo
-        assert "user_entered" in cuerpo, (
-            f"{metodo} ya no cae en USER_ENTERED sin opcion: revisa T5.2"
+    def test_sin_opcion_explicita_resuelve_a_raw(self, metodo):
+        """`update`/`batch_update` sin opcion mandan RAW, no USER_ENTERED.
+
+        La primera version de este test afirmaba lo contrario y PASABA, porque
+        comprobaba que la cadena "user_entered" apareciera en el fuente de
+        gspread. Aparece — pero en la rama que exige `raw=False`, que nadie
+        pasa. Con los defectos reales (`raw: bool = True`) gana RAW.
+
+        Es el ejemplo exacto de un test que pasa por la razon equivocada: leia
+        el codigo en vez de EJECUTARLO. Ahora se comprueba el valor que sale
+        por la peticion, con una worksheet falsa y sin red.
+        """
+        assert inspect.signature(getattr(Worksheet, metodo)).parameters[
+            "value_input_option"].default is None
+        assert _opcion_que_manda_gspread(metodo) == "RAW", (
+            f"{metodo} ya no resuelve a RAW sin opcion explicita: la "
+            "clasificacion de _opcion_efectiva en CE5 deja de ser valida"
         )
+
+    @pytest.mark.parametrize("metodo", ["insert_row", "insert_rows"])
+    def test_insert_por_defecto_es_raw(self, metodo):
+        """No se usan hoy en `app.py`, pero estan en METODOS_ESCRITURA. Si
+        alguien anade una, debe clasificarse como RAW: darla por USER_ENTERED
+        haria que CE5 exigiera escaparla, y escapar una RAW corrompe el dato."""
+        p = inspect.signature(getattr(Worksheet, metodo)).parameters["value_input_option"]
+        assert str(p.default).upper().endswith("RAW")
+
+
+def _opcion_que_manda_gspread(metodo: str) -> str:
+    """El `valueInputOption` que sale de verdad por la peticion, ejecutando.
+
+    Sin red: se construye una Worksheet con un cliente falso que captura los
+    parametros. Es la unica forma honesta de fijar este invariante; leer el
+    fuente ya dio una respuesta equivocada una vez.
+    """
+    capturado = {}
+
+    class ClienteFalso:
+        def values_update(self, sid, rango, params=None, body=None):
+            capturado["opcion"] = params.get("valueInputOption")
+            return {}
+
+        def values_batch_update(self, sid, body):
+            capturado["opcion"] = body.get("valueInputOption")
+            return {}
+
+    ws = Worksheet.__new__(Worksheet)
+    ws.client = ClienteFalso()
+    ws._properties = {"title": "H", "sheetId": 0}
+    ws.spreadsheet_id = "X"
+
+    if metodo == "update":
+        ws.update([["=SUM(A1)"]], "A1")
+    else:
+        ws.batch_update([{"range": "A1", "values": [["=SUM(A1)"]]}])
+    return str(capturado["opcion"]).upper().rsplit(".", 1)[-1].strip("'>")
 
 
 # ───────────────── CE5: el inventario de escrituras, comprobado solo ─────────────────
@@ -134,10 +180,95 @@ def _opcion_efectiva(nodo):
     for kw in nodo.keywords:
         if kw.arg == "value_input_option" and isinstance(kw.value, ast.Constant):
             return str(kw.value.value).upper()
-    metodo = nodo.func.attr
-    if metodo in ("append_row", "append_rows"):
-        return "RAW"
-    return "USER_ENTERED"
+        if kw.arg == "value_input_option":
+            # Pasado como variable: no se puede resolver estaticamente. Se
+            # asume el caso que exige escape, que es el error en la direccion
+            # segura (escapar de mas se nota; escapar de menos, no).
+            return "USER_ENTERED"
+    # Sin opcion explicita. RAW para todo menos update_cell/update_acell, que
+    # NO admiten el parametro y lo fijan a USER_ENTERED en su propio cuerpo.
+    #
+    # Esta rama decia USER_ENTERED para update/batch_update/insert_*, y era al
+    # reves: `raw: bool = True` gana cuando no hay opcion. Lo fija por ejecucion
+    # TestSupuestosSobreGspread. Importa la direccion del error: clasificar una
+    # RAW como USER_ENTERED haria que CE5 exigiera escaparla, y escapar una RAW
+    # guarda el apostrofo en la celda — el guarda forzaria la corrupcion que el
+    # resto de la suite dice evitar.
+    if nodo.func.attr in ("update_cell", "update_acell"):
+        return "USER_ENTERED"
+    return "RAW"
+
+
+ESCAPES = {"_escapar_formula", "_valor_para_celda"}
+
+
+def _hay_escape(nodo) -> bool:
+    return any(
+        isinstance(n, ast.Name) and n.id in ESCAPES for n in ast.walk(nodo)
+    )
+
+
+def _expresiones_de_celda(llamada, fn):
+    """Las expresiones que acaban DENTRO de una celda en esta llamada.
+
+    La version anterior preguntaba si la FUNCION mencionaba el escape en
+    cualquier parte, y eso lo enganaba un senuelo: bastaba con escapar una
+    variable que no se escribe para que la funcion entera contara como
+    protegida. En `_sheet_update_row` y `api_bruce_actualizar`, que construyen
+    `updates` en un bucle, ese punto ciego es facil de pisar sin querer.
+
+    Ahora se resuelve por sitio: se toma el argumento que lleva los valores y,
+    si es un nombre (el acumulador `updates`), se buscan los `.append(...)` de
+    ese nombre dentro de la funcion.
+    """
+    metodo = llamada.func.attr
+    if metodo in ("update_cell", "update_acell"):
+        return llamada.args[2:3]           # (fila, col, VALOR)
+    if not llamada.args:
+        return []
+    primero = llamada.args[0]
+    if not isinstance(primero, ast.Name) or fn is None:
+        return [primero]
+    # Acumulador: seguir los append() de esa lista dentro de la funcion.
+    acumulado = []
+    for n in ast.walk(fn):
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and n.func.attr == "append"
+                and isinstance(n.func.value, ast.Name)
+                and n.func.value.id == primero.id):
+            acumulado.extend(n.args)
+    return acumulado or [primero]
+
+
+def _reasignaciones_que_escapan(llamada, fn) -> bool:
+    """¿Se reescribe entera la lista aplicando el escape antes de escribirla?
+
+    Es el patron de `_exportar_a_sheets`: las filas se acumulan crudas con
+    `append` y justo antes de escribir se hace
+    `nuevos = [[_escapar_formula(v) for v in fila] for fila in nuevos]`.
+    Siguiendo solo los `append` esa funcion salia como desprotegida, que es un
+    falso positivo: el escape se aplica a TODO en la reasignacion.
+
+    Se exige que la asignacion apunte a ESE nombre, no a cualquiera, para que
+    un senuelo sobre otra variable no la marque como protegida.
+    """
+    if not llamada.args or not isinstance(llamada.args[0], ast.Name) or fn is None:
+        return False
+    objetivo = llamada.args[0].id
+    for n in ast.walk(fn):
+        if isinstance(n, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == objetivo for t in n.targets
+        ):
+            if _hay_escape(n.value):
+                return True
+    return False
+
+
+def _escapa_lo_que_escribe(llamada, fn) -> bool:
+    if _reasignaciones_que_escapan(llamada, fn):
+        return True
+    exprs = _expresiones_de_celda(llamada, fn)
+    return bool(exprs) and all(_hay_escape(e) for e in exprs)
 
 
 def _funciones_con_escrituras():
@@ -173,10 +304,7 @@ def _funciones_con_escrituras():
         )
         fn = funcion_de(nodo)
         nombre = fn.name if fn else "<modulo>"
-        usa_escape = fn is not None and any(
-            isinstance(n, ast.Name) and n.id == "_escapar_formula"
-            for n in ast.walk(fn)
-        )
+        usa_escape = _escapa_lo_que_escribe(nodo, fn)
         salida.append((nombre, nodo.func.attr, nodo.lineno, _opcion_efectiva(nodo), usa_escape))
     return salida
 
@@ -365,3 +493,163 @@ class TestMensajesUpdate:
         assert r.status_code == 200, r.get_json()
         assert capturado["range"] == "C2"
         assert capturado["values"] == [["hola"]]
+
+
+# ───────────────── Los hallazgos de los reviewers, fijados ─────────────────
+
+class TestBypassDelEscape:
+    """security-reviewer, HIGH: el escape miraba `valor[:1]` sin recortar.
+
+    Un espacio delante del operador lo evadia. Excel recorta ese espacio al
+    importar el CSV y ejecuta la formula igual, asi que era un bypass real del
+    control, no una sutileza.
+    """
+
+    @pytest.mark.parametrize("prefijo", [
+        " ", "  ", "\t", "\n", "\r\n", "\v", "\f",
+        "﻿",   # BOM
+        "​",   # espacio de ancho cero
+        "‌", "‍", "⁠",
+    ])
+    @pytest.mark.parametrize("operador", ["=", "+", "-", "@"])
+    def test_un_blanco_delante_no_evade_el_escape(self, prefijo, operador):
+        valor = f"{prefijo}{operador}SUM(A1:A9)"
+        assert app._escapar_formula(valor) == "'" + valor
+
+    def test_el_apostrofo_va_sobre_el_valor_original(self):
+        """No se recorta el dato: los espacios de delante son del usuario."""
+        assert app._escapar_formula("  =1+1") == "'  =1+1"
+
+    def test_un_texto_normal_con_espacio_delante_sigue_intacto(self):
+        assert app._escapar_formula("  Ferreteria Chavez") == "  Ferreteria Chavez"
+
+
+class TestNumerosNoSeVuelvenTexto:
+    """security-reviewer, MEDIUM: regresion introducida por T5.2.
+
+    Envolver en `str()` ANTES de escapar anulaba el paso limpio de numeros que
+    `_escapar_formula` tenia por diseno, y un -50 legitimo acababa guardado
+    como texto "'-50", rompiendo en silencio cualquier SUM de esa columna.
+    """
+
+    @pytest.mark.parametrize("numero", [-50, -99.1332, 0, 4.5, 100])
+    def test_un_numero_sigue_siendo_numero(self, numero):
+        r = app._valor_para_celda(numero)
+        assert r == numero and isinstance(r, type(numero))
+
+    def test_un_booleano_se_escribe_como_texto(self):
+        """bool es subclase de int en Python; escribir True como numero en la
+        hoja no es lo que espera nadie."""
+        assert app._valor_para_celda(True) == "True"
+
+    @pytest.mark.parametrize("formula", FORMULAS)
+    def test_una_formula_en_texto_sigue_escapandose(self, formula):
+        assert app._valor_para_celda(formula) == "'" + formula
+
+    def test_un_telefono_con_lada_se_escapa_como_texto(self):
+        """Empieza por '+', asi que se escapa. Es el efecto deseado: evita que
+        Sheets se coma el '+' al interpretarlo."""
+        assert app._valor_para_celda("+52 81 1234 5678") == "'+52 81 1234 5678"  # barrido-ok: telefono sintetico de prueba
+
+
+class TestElGuardaNoSeDejaEnganar:
+    """silent-failure-hunter, HIGH: `usa_escape` miraba la FUNCION entera.
+
+    Bastaba con que `_escapar_formula` apareciera en cualquier parte del cuerpo
+    —sobre una variable que nunca llega a la celda— para que la funcion contara
+    como protegida.
+    """
+
+    def _clasificar(self, fuente):
+        arbol = ast.parse(fuente)
+        fn = arbol.body[0]
+        llamada = next(
+            n for n in ast.walk(fn)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+            and n.func.attr in METODOS_ESCRITURA
+        )
+        return _escapa_lo_que_escribe(llamada, fn)
+
+    def test_un_senuelo_no_cuenta_como_proteccion(self):
+        """El caso exacto que el reviewer construyo para romper el guarda."""
+        assert not self._clasificar(
+            "def f(ws, valor):\n"
+            "    decoy = _escapar_formula('otra cosa')\n"
+            "    ws.batch_update([{'range': 'A1', 'values': [[str(valor)]]}],\n"
+            "                    value_input_option='USER_ENTERED')\n"
+        )
+
+    def test_escapar_el_valor_que_se_escribe_si_cuenta(self):
+        assert self._clasificar(
+            "def f(ws, valor):\n"
+            "    ws.batch_update([{'range': 'A1', 'values': [[_escapar_formula(valor)]]}],\n"
+            "                    value_input_option='USER_ENTERED')\n"
+        )
+
+    def test_el_acumulador_se_sigue_por_sus_append(self):
+        assert self._clasificar(
+            "def f(ws, campos):\n"
+            "    updates = []\n"
+            "    for v in campos:\n"
+            "        updates.append({'range': 'A1', 'values': [[_valor_para_celda(v)]]})\n"
+            "    ws.batch_update(updates, value_input_option='USER_ENTERED')\n"
+        )
+
+    def test_un_append_sin_escape_entre_varios_lo_delata(self):
+        """El punto ciego concreto: una funcion que escapa un campo y deja otro
+        sin escapar seguia contando como protegida."""
+        assert not self._clasificar(
+            "def f(ws, campos, especial):\n"
+            "    updates = []\n"
+            "    for v in campos:\n"
+            "        updates.append({'range': 'A1', 'values': [[_escapar_formula(v)]]})\n"
+            "    updates.append({'range': 'B1', 'values': [[str(especial)]]})\n"
+            "    ws.batch_update(updates, value_input_option='USER_ENTERED')\n"
+        )
+
+    def test_la_reasignacion_que_escapa_entera_si_cuenta(self):
+        """Patron real de `_exportar_a_sheets`: acumula crudo y escapa todo al
+        final. Seguir solo los append lo daba por desprotegido."""
+        assert self._clasificar(
+            "def f(ws, filas):\n"
+            "    nuevos = []\n"
+            "    for fila in filas:\n"
+            "        nuevos.append(fila)\n"
+            "    nuevos = [[_escapar_formula(v) for v in fila] for fila in nuevos]\n"
+            "    ws.append_rows(nuevos, value_input_option='USER_ENTERED')\n"
+        )
+
+
+class TestClasificacionPorDefecto:
+    """silent-failure-hunter, HIGH: `_opcion_efectiva` daba USER_ENTERED por
+    defecto a update/batch_update/insert_*, y la realidad es RAW.
+
+    La direccion del error importaba: clasificar una RAW como USER_ENTERED hace
+    que CE5 EXIJA escaparla, y escapar una RAW guarda el apostrofo en la celda.
+    El guarda habria forzado la corrupcion que el resto de la suite evita.
+    """
+
+    def _opcion(self, fuente):
+        llamada = next(
+            n for n in ast.walk(ast.parse(fuente))
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+        )
+        return _opcion_efectiva(llamada)
+
+    @pytest.mark.parametrize("metodo", [
+        "update", "batch_update", "append_row", "append_rows",
+        "insert_row", "insert_rows",
+    ])
+    def test_sin_opcion_explicita_se_clasifica_raw(self, metodo):
+        assert self._opcion(f"ws.{metodo}(datos)") == "RAW"
+
+    @pytest.mark.parametrize("metodo", ["update_cell", "update_acell"])
+    def test_update_cell_es_user_entered_aunque_no_lo_diga(self, metodo):
+        """No admite el parametro: lo fija en su propio cuerpo. Leyendo app.py
+        parece el caso seguro y es el contrario."""
+        assert self._opcion(f"ws.{metodo}(1, 2, valor)") == "USER_ENTERED"
+
+    def test_una_opcion_por_variable_se_asume_user_entered(self):
+        """No se puede resolver estaticamente: se asume el caso que exige
+        escape, que es el error en la direccion segura."""
+        assert self._opcion("ws.batch_update(d, value_input_option=opcion)") == "USER_ENTERED"

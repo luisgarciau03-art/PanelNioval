@@ -36,10 +36,24 @@ Medido sobre **gspread 6.2.1** (lo instalado; `requirements.txt` pide `gspread>=
 | Llamada | Opción efectiva | ¿Inyectable? |
 |---|---|---|
 | `append_row` / `append_rows` sin opción | **RAW** (defecto de gspread) | No |
-| `update_cell` | **USER_ENTERED** | **Sí** |
-| `update` / `batch_update` sin opción | **USER_ENTERED** | **Sí** |
+| `insert_row` / `insert_rows` sin opción | **RAW** | No |
+| `update` / `batch_update` **sin opción** | **RAW** | No |
+| `update_cell` / `update_acell` | **USER_ENTERED** | **Sí** |
 | Explícito `'RAW'` | RAW | No |
 | Explícito `'USER_ENTERED'` | USER_ENTERED | **Sí** |
+
+⚠️ **Esta tabla dijo primero que `update`/`batch_update` sin opción eran `USER_ENTERED`. Era
+falso.** `raw: bool = True` es el defecto del parámetro y gana cuando no se pasa
+`value_input_option`, así que resuelven a **RAW**. El error venía de *leer* el fuente de
+gspread —donde la cadena `user_entered` aparece, pero en la rama que exige `raw=False`— en
+vez de ejecutarlo. El invariante se comprueba ahora **ejecutando** una escritura contra una
+worksheet falsa y mirando el `valueInputOption` que sale.
+
+No cambia ninguna de las 17 escrituras reales, porque todas las `update`/`batch_update` de
+`app.py` pasan la opción explícita. Sí cambiaba la clasificación de una escritura *futura*:
+darla por `USER_ENTERED` habría hecho que CE5 **exigiera escaparla**, y escapar una `RAW`
+guarda el apóstrofo en la celda — el guarda habría forzado la corrupción que el resto de la
+suite existe para evitar.
 
 ⚠️ **`update_cell` es la trampa.** No admite `value_input_option`: lo fija a `USER_ENTERED`
 en su propio cuerpo. Leyendo `app.py` no se ve ninguna opción, lo que hace parecer que es
@@ -103,6 +117,26 @@ criterio CE4 («toda escritura a Sheets escapa fórmulas») habría quedado cump
 sobre una ruta muerta. El test usa una worksheet falsa que **impone la firma real de
 gspread 6**; con un `MagicMock` cualquiera el orden daría igual y el test no mediría nada.
 
+## 4.1 Riesgo residual de las escrituras RAW — no está «cerrado»
+
+`security-reviewer` señaló que decir «las RAW ya son inmunes» **sobreclama**, y tiene razón.
+RAW es seguro *en el punto de escritura*. El texto sigue guardado, y se reactiva si algo
+aguas abajo lo reinterpreta:
+
+- **Exportar a CSV o XLSX y reabrir en Excel.** El CSV no lleva metadato de «esto es texto»,
+  así que un campo que empiece por `=`, `+`, `-` o `@` se ejecuta al abrirlo. La hoja
+  `Respuestas de formulario 1` la escribe `/api/formulario/guardar` con RAW y texto de
+  usuario sin sanear, y el personal la abre a diario.
+- **Un ciclo RAW → `USER_ENTERED` dentro del propio panel.** El patrón ya existe:
+  `/api/bruce/agregar` escribe con RAW y `/api/bruce/actualizar` con `USER_ENTERED`,
+  **sobre las mismas columnas de la misma hoja**. Un valor guardado como texto plano se
+  convierte en fórmula viva en cuanto alguien lo edita desde la segunda ruta.
+
+O sea que la asimetría de `/api/bruce/*` no es solo fea: es la prueba de que ese camino
+existe dentro del código, no una hipótesis. Sigue siendo correcto **no** aplicar el escape en
+RAW (guardaría el apóstrofo en el dato), pero la mitigación real es sanear en la entrada, y
+eso no lo hace T5.2.
+
 ## 5. Lo que este inventario deja abierto
 
 - **Inconsistencia en `/api/bruce/*`:** `agregar` (#8) escribe con `RAW` y `actualizar` (#9)
@@ -116,3 +150,31 @@ gspread 6**; con un `MagicMock` cualquiera el orden daría igual y el test no me
 - **Ningún módulo importado por `app.py` escribe a Sheets.** `worker_catalogo.py` y
   `envio_catalogo.py` sí escriben, pero solo se importan desde `worker_catalogo_run.py`, que
   corre en la PC del owner.
+
+### 5.1 Dos CRITICAL preexistentes que T5.2 **no** cierra — necesitan tarea propia
+
+`security-reviewer` los marcó CRITICAL y no son de este cambio: ya estaban. El escape impide
+la **fórmula**, no la **escritura arbitraria**. Se reportan aquí porque el inventario es el
+sitio donde constan, y porque el contexto de amenaza es real: el token del panel es
+compartido y el panel está expuesto en internet.
+
+1. **Sin allowlist de columnas ni cota superior de fila** — `/api/seguimiento/update`
+   (`app.py:946`) y `/api/bruce/actualizar` (`app.py:3248`). Escriben *cualquier* clave del
+   body que coincida con un encabezado, y `_row` no tiene tope. Con el token se puede:
+   - **Sobrescribir la fila 1 (los encabezados).** Todo el sistema resuelve columnas por
+     `headers.index(nombre)`, así que romper la fila 1 rompe en silencio cada lectura y
+     escritura futura de esa hoja, para todo el personal.
+   - Escribir columnas que la interfaz no expone, con solo acertar el nombre del encabezado.
+   - Escribir en una fila absurdamente alta y expandir la grilla. `seguimiento` y `bruce`
+     comparten spreadsheet, y el límite de celdas es del archivo entero: inflar una pestaña
+     puede romper los `append_row` de las demás.
+
+2. **`/api/mensajes/update` (`app.py:992`) es una primitiva de escritura de celda
+   arbitraria.** `_row` y `_col` son índices crudos del body, sin cota y sin pasar siquiera
+   por nombre de encabezado. Y esa hoja es la que alimenta **los teléfonos y plantillas que
+   `envio_catalogo.py` envía por WhatsApp a clientes reales**.
+
+**Corrección propuesta** (fuera de T5.2): allowlist explícita de columnas editables por ruta,
+y cota `2 <= fila <= ws.row_count` / `1 <= col <= ws.col_count`, con 400 fuera de rango.
+Encaja de forma natural con **T5.1**, que ya va a tocar todas las rutas para el rate
+limiting. **Decisión del owner:** ampliar T5.1 o abrir una tarea T5.8.
