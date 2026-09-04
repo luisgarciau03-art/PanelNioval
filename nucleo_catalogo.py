@@ -70,9 +70,18 @@ TZ_MEXICO = ZoneInfo("America/Mexico_City")
 def ahora_mexico() -> datetime:
     """Instante actual en hora de Mexico, con `tzinfo` explicito.
 
-    Unica fuente de "ahora" del proyecto. No usar `datetime.now()` a secas:
+    Fuente de "ahora" de todo lo que corre EN EL CONTENEDOR: `app.py`,
+    `nucleo_catalogo` y `worker_catalogo`. No usar `datetime.now()` a secas ahi:
     hay un guarda en `tests/test_endurecimiento_zona_horaria.py` que falla si
     reaparece.
+
+    NO es la unica fuente de "ahora" del repo, y decirlo seria falso:
+    `envio_catalogo.py` conserva tres `datetime.now()` desnudos y escribe en la
+    MISMA hoja ('Respuestas de formulario 1'). Hoy no es un bug porque ese
+    script corre en la PC del owner, donde el reloj ya esta en hora de Mexico.
+    Se vuelve un bug el dia que se elija el transporte "C = Selenium headless"
+    para WhatsApp, porque entonces correria en un contenedor UTC. Queda como
+    deuda anotada y con tripwire en el test, atada a esa decision del owner.
     """
     return datetime.now(TZ_MEXICO)
 

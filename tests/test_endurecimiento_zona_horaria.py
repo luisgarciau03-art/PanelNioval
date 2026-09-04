@@ -16,6 +16,7 @@ import io
 import pathlib
 import tokenize
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -28,6 +29,20 @@ RAIZ = pathlib.Path(__file__).resolve().parents[1]
 
 
 # ───────────────────────── utilidades del barrido ─────────────────────────
+
+# Que tokens se borran antes de buscar el patron. FSTRING_MIDDLE solo existe en
+# 3.12+ (PEP 701): ahi las partes literales de un f-string son tokens propios,
+# no STRING, asi que sin incluirlo el guarda marcaba el texto literal de un
+# f-string que solo MENCIONA el patron. En 3.11 no existe y no hace falta,
+# porque el f-string entero ya viene como un unico STRING.
+#
+# Las dos versiones importan de verdad: el CI y el Dockerfile corren 3.11 y la
+# maquina de desarrollo 3.14. Un guarda afinado para una sola de las dos miente
+# en la otra, y la que decide el merge es la de CI.
+_TIPOS_BORRABLES = {tokenize.COMMENT, tokenize.STRING}
+if hasattr(tokenize, "FSTRING_MIDDLE"):
+    _TIPOS_BORRABLES.add(tokenize.FSTRING_MIDDLE)
+
 
 def solo_codigo(ruta: pathlib.Path) -> str:
     """Devuelve el fuente con comentarios Y cadenas borrados, sin mover lineas.
@@ -45,20 +60,68 @@ def solo_codigo(ruta: pathlib.Path) -> str:
     cadena no abre un comentario.
     """
     texto = ruta.read_text(encoding="utf-8")
-    lineas = texto.splitlines()
+    inicio_de_linea = [0]
+    for linea in texto.splitlines(keepends=True):
+        inicio_de_linea.append(inicio_de_linea[-1] + len(linea))
+
+    def absoluto(pos):
+        fila, col = pos
+        return inicio_de_linea[fila - 1] + col
+
+    salida = list(texto)
     for tok in tokenize.generate_tokens(io.StringIO(texto).readline):
-        if tok.type not in (tokenize.COMMENT, tokenize.STRING):
+        if tok.type not in _TIPOS_BORRABLES:
             continue
-        (fila_i, col_i), (fila_f, col_f) = tok.start, tok.end
-        if fila_i == fila_f:
-            fila = fila_i - 1
-            lineas[fila] = lineas[fila][:col_i] + " " * (col_f - col_i) + lineas[fila][col_f:]
-        else:
-            lineas[fila_i - 1] = lineas[fila_i - 1][:col_i]
-            for fila in range(fila_i, fila_f - 1):
-                lineas[fila] = ""
-            lineas[fila_f - 1] = lineas[fila_f - 1][col_f:]
-    return "\n".join(lineas)
+        i, f = absoluto(tok.start), absoluto(tok.end)
+        for j, c in enumerate(_enmascarar(tok.string), start=i):
+            if j < len(salida):
+                salida[j] = c
+    return "".join(salida)
+
+
+def _es_fstring(texto: str) -> bool:
+    prefijo = texto[: len(texto) - len(texto.lstrip("fFrRbBuU"))]
+    return "f" in prefijo.lower()
+
+
+def _enmascarar(texto: str) -> str:
+    """Borra el token conservando longitud, saltos de linea y —si es f-string—
+    las expresiones de dentro de las llaves.
+
+    Lo ultimo NO es un detalle. En Python 3.11, que es lo que corren el
+    `Dockerfile` y el CI, un f-string entero tokeniza como UN SOLO token STRING,
+    llaves incluidas. Borrandolo completo, un
+    `logging.info(f"guardado {datetime.now()}")` reintroducido —la forma mas
+    probable de que vuelva el bug— quedaba invisible para el guarda: verde en
+    CI con un reloj desnudo ejecutandose en produccion.
+
+    En 3.12+ (PEP 701) la expresion ya tokeniza aparte, asi que ahi el problema
+    no existia. O sea que el guarda funcionaba en la maquina de desarrollo
+    (3.14) y era ciego justo donde decide el merge.
+    """
+    if not _es_fstring(texto):
+        return "".join("\n" if c == "\n" else " " for c in texto)
+
+    salida = ["\n" if c == "\n" else " " for c in texto]
+    profundidad = 0
+    i = 0
+    while i < len(texto):
+        c = texto[i]
+        if c == "{":
+            if profundidad == 0 and texto[i + 1:i + 2] == "{":
+                i += 2                      # '{{' es una llave literal
+                continue
+            profundidad += 1
+        elif c == "}":
+            if profundidad > 0:
+                profundidad -= 1
+            elif texto[i + 1:i + 2] == "}":
+                i += 2                      # '}}' literal
+                continue
+        elif profundidad > 0 and c != "\n":
+            salida[i] = c                   # dentro de {...}: es codigo real
+        i += 1
+    return "".join(salida)
 
 
 def relojes_desnudos(fuente: str) -> list:
@@ -175,6 +238,37 @@ class TestSinRelojesDesnudos:
             restantes = relojes_desnudos(solo_codigo(RAIZ / modulo))
             assert restantes == [], f"{modulo}: {restantes}"
 
+    def test_envio_catalogo_sigue_siendo_deuda_conocida_y_acotada(self):
+        """`envio_catalogo.py` escribe en la MISMA hoja y conserva relojes desnudos.
+
+        NO se arregla en T5.3 y los tres reviewers coincidieron en dejarlo fuera:
+        corre en la PC del owner, donde la hora local ya es la de Mexico, asi que
+        hoy no hay defecto que corregir. Meterlo mezclaria dos superficies con
+        duenos de despliegue distintos (contenedor vs PC local).
+
+        Pero no puede quedar solo en un comentario. Si alguien elige el
+        transporte "C = Selenium headless", ese script pasa a un contenedor UTC
+        y reintroduce el mismo bug en la hoja que T5.3 acaba de arreglar.
+
+        Este test fija el numero conocido: si sube, alguien anadio un reloj
+        desnudo mas; si baja a cero, se migro y hay que retirar la deuda de la
+        documentacion de `nucleo_catalogo.ahora_mexico`.
+
+        Son CINCO, no tres. Los reviewers citaron 121, 722 y 787, que son los que
+        tocan datos: dos comparan "¿es de hoy?" contra la fecha que escribe el
+        panel y uno escribe el timestamp de ENVIADO_WA en la hoja. Los otros dos
+        (341 y 387) solo componen el nombre de un screenshot de depuracion y no
+        llegan a ninguna hoja. El guarda cuenta los cinco porque cuenta codigo,
+        no intenciones.
+        """
+        restantes = relojes_desnudos(solo_codigo(RAIZ / "envio_catalogo.py"))
+        assert len(restantes) == 5, (
+            "cambio el numero de relojes desnudos de envio_catalogo.py "
+            f"(esperados 5, hay {len(restantes)}): {restantes}. "
+            "Si se migraron a nc.ahora_mexico(), actualiza tambien el docstring "
+            "de ahora_mexico, que declara esta deuda."
+        )
+
     def test_el_guarda_detecta_una_reintroduccion(self):
         """Verificacion en la direccion util: el barrido encuentra un positivo
         que sabemos que esta ahi. Un guarda que solo se ha visto en verde no
@@ -193,6 +287,42 @@ class TestSinRelojesDesnudos:
             "# antes esto usaba datetime.now() y guardaba mal la fecha\n"
             "import nucleo_catalogo as nc\n"
             "x = nc.ahora_mexico()\n",
+            encoding="utf-8",
+        )
+        assert relojes_desnudos(solo_codigo(f)) == []
+
+    def test_el_guarda_ve_un_reloj_dentro_de_un_fstring(self, tmp_path):
+        """El agujero mas peligroso que tuvo este guarda, y el mas silencioso.
+
+        En Python 3.11 —el del Dockerfile y el del CI— un f-string tokeniza
+        como UN SOLO token STRING con las llaves dentro. La primera version de
+        `solo_codigo` borraba el token entero, asi que un
+        `logging.info(f"... {datetime.now()}")` reintroducido quedaba invisible
+        y el guarda pasaba EN VERDE con el reloj desnudo corriendo en
+        produccion.
+
+        En 3.12+ la expresion tokeniza aparte y el problema no se ve: el guarda
+        funcionaba en la maquina de desarrollo y era ciego en CI, que es justo
+        donde decide el merge.
+        """
+        f = tmp_path / "ejemplo.py"
+        f.write_text(
+            'def guardar():\n'
+            '    logging.info(f"guardado a las {datetime.now()}")\n',
+            encoding="utf-8",
+        )
+        assert relojes_desnudos(solo_codigo(f)) != []
+
+    def test_el_texto_literal_de_un_fstring_no_dispara(self, tmp_path):
+        """La contraria: solo cuenta lo que hay DENTRO de las llaves.
+
+        Un f-string que MENCIONA el patron en su parte literal no es codigo y
+        no debe marcar.
+        """
+        f = tmp_path / "ejemplo.py"
+        f.write_text(
+            'def aviso(x):\n'
+            '    return f"no uses datetime.now() aqui: {x}"\n',
             encoding="utf-8",
         )
         assert relojes_desnudos(solo_codigo(f)) == []
@@ -234,6 +364,73 @@ class TestContenedorYDependencias:
         df = (RAIZ / "Dockerfile").read_text(encoding="utf-8")
         assert "America/Mexico_City" in df
         assert "TZ" in df
+
+
+# ─────────────── CE6/CE7 sobre la ruta de escritura REAL ───────────────
+
+class TestRutaDeEscrituraReal:
+    """Los dos reviewers senalaron el mismo hueco por separado: `TestFechaGuardada`
+    y `TestSemanaISO` prueban la aritmetica de zona, no que `app.py` la USE. El
+    unico lazo con el sitio real era el barrido lexico, que detecta el literal
+    `datetime.now()` pero no un `date.today()` ni un envoltorio equivalente.
+
+    Esta clase congela el reloj y comprueba lo que `_exportar_a_sheets` escribe
+    de verdad en la fila.
+    """
+
+    # Domingo 19:00 en Mexico == lunes 01:00 UTC. Elegido asi para que fallen
+    # LAS DOS cosas a la vez si se usara UTC: el dia Y la semana ISO.
+    #
+    # La fecha es del pasado A PROPOSITO. Con un instante de "hoy", un app.py
+    # que ignorara el helper y leyera el reloj real escribiria igualmente la
+    # fecha de hoy y el test pasaria sin probar nada.
+    INSTANTE = datetime(2026, 3, 15, 19, 0, tzinfo=ZoneInfo("America/Mexico_City"))
+
+    def test_el_instante_elegido_sirve_para_distinguir(self):
+        """El test no puede volverse vacio en silencio: si el instante dejara de
+        tener la propiedad (mismo dia y semana en UTC que en Mexico), los dos
+        tests de abajo pasarian aunque el codigo usara UTC."""
+        en_utc = self.INSTANTE.astimezone(timezone.utc)
+        assert en_utc.date() != self.INSTANTE.date()
+        assert en_utc.isocalendar()[1] != self.INSTANTE.isocalendar()[1]
+        assert self.INSTANTE.date() != datetime.now(nc.TZ_MEXICO).date(), (
+            "el instante congelado no puede ser el de hoy"
+        )
+
+    def _fila_escrita(self, monkeypatch):
+        import app
+
+        monkeypatch.setattr(nc, "ahora_mexico", lambda: self.INSTANTE)
+        monkeypatch.setattr(app, "_claves_de_la_hoja", lambda ws: set())
+
+        capturado = {}
+
+        class WSFalsa:
+            def append_rows(self, filas, value_input_option=None):
+                capturado["filas"] = filas
+
+        monkeypatch.setattr(app, "get_worksheet", lambda clave: WSFalsa())
+        monkeypatch.setattr(app, "_cache_pop", lambda clave: None)
+
+        negocio = {
+            "Nombre": "Ferreteria Ejemplo", "Dirección": "Calle 1",
+            "Teléfono": "", "Calificación": 4.5, "Núm. de Reseñas": 10,
+            "Google Maps Link": "", "Sitio Web": "", "Horarios": "",
+            "Estado": "NL", "Latitud": 25.6, "Longitud": -100.3,
+            "Tamaño": "", "Tipo Cliente": "",
+        }
+        app._exportar_a_sheets([negocio], "Ferreteria", "Monterrey")
+        assert capturado.get("filas"), "no se escribio ninguna fila"
+        return capturado["filas"][0]
+
+    def test_la_fecha_escrita_es_la_de_mexico(self, monkeypatch):
+        """CE6 sobre el sitio real: la fecha va en la ultima columna."""
+        assert self._fila_escrita(monkeypatch)[-1] == "15/03/2026"
+
+    def test_la_semana_escrita_es_la_de_mexico(self, monkeypatch):
+        """CE7 sobre el sitio real: NUM SEMANA es la primera columna."""
+        esperada = self.INSTANTE.isocalendar()[1]
+        assert self._fila_escrita(monkeypatch)[0] == esperada
 
 
 # ─────────────── Un solo reloj para las dos columnas ───────────────

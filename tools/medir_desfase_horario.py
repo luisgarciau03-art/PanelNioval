@@ -13,11 +13,13 @@ red y no puede alterar nada por accidente.
 
 Uso:  python tools/medir_desfase_horario.py docs/auditoria/respaldos/2026-09-04
 """
+from __future__ import annotations
+
 import collections
-import glob
 import pathlib
 import re
 import sys
+from typing import Optional
 
 import openpyxl
 
@@ -39,36 +41,60 @@ OBJETIVOS = {
     "PROSPECTOS BRUCE": ["fecha"],
 }
 
+# Hojas donde ADEMAS del panel escribe alguien mas. Solo esta: la columna A de
+# 'Respuestas de formulario 1' la comparten Google Forms (que deja una celda de
+# fecha real y NO sufre este bug) y el panel (que escribe TEXTO con
+# value_input_option='RAW').
+#
+# La distincion por tipo de celda vale unicamente aqui. En ENVIOS_CATALOGO y
+# PROSPECTOS BRUCE escriben solo el panel y el worker, asi que dar por "de otro
+# origen" una celda de fecha en esas hojas la sacaria del numerador Y del
+# denominador y produciria un 0 % que significa "no las conte", no "no hay
+# riesgo". Si aparece una celda de fecha ahi (por ejemplo porque el respaldo
+# paso por Excel y auto-tipifico el texto), se cuenta como del panel y se avisa.
+HOJAS_CON_OTRO_ORIGEN = {"Respuestas de formulario 1"}
+
 # dd/mm/aaaa hh:mm[:ss]  — el formato que escriben app.py y nucleo_catalogo.
 PATRON = re.compile(r"^\s*(\d{1,2})/(\d{1,2})/(\d{4})[ ,]+(\d{1,2}):(\d{2})")
 
 
-def hora_de(valor):
-    """Devuelve (hora 0-23, escrita_por_el_panel) o (None, _) si no lleva hora.
+def hora_de(valor: object, hoja: str) -> tuple[Optional[int], bool, bool]:
+    """Devuelve (hora 0-23, la_escribio_el_panel, tipo_inesperado).
 
-    El segundo dato importa mas que el primero. La columna A de 'Respuestas de
-    formulario 1' la escriben DOS fuentes: Google Forms, cuya marca temporal
-    llega como celda de fecha real y NO la toca este bug, y el panel, que
-    escribe una CADENA con `value_input_option='RAW'`. Contar las dos juntas
-    diluye el porcentaje y da un numero tranquilizador que no responde a la
-    pregunta: solo las filas del panel pudieron guardarse desplazadas.
+    `tipo_inesperado` marca una celda de fecha en una hoja donde solo escriben
+    el panel y el worker: se sigue contando como del panel, pero se reporta,
+    porque significa que el respaldo no conserva el tipo original y la
+    clasificacion por tipo dejo de ser fiable ahi.
     """
     if valor is None:
-        return None, False
-    if hasattr(valor, "hour") and hasattr(valor, "year"):
-        return valor.hour, False           # celda de fecha: la puso Google Forms
+        return None, False, False
+
+    es_celda_de_fecha = hasattr(valor, "hour") and hasattr(valor, "year")
+    if es_celda_de_fecha:
+        if hoja in HOJAS_CON_OTRO_ORIGEN:
+            return valor.hour, False, False      # la puso Google Forms
+        return valor.hour, True, True            # aqui solo escribe el panel
+
     m = PATRON.match(str(valor))
     if not m:
-        return None, False
-    return int(m.group(4)), True           # texto: lo escribio el panel
+        return None, False, False
+    return int(m.group(4)), True, False          # texto: lo escribio el panel
 
 
 def medir(directorio: pathlib.Path) -> int:
-    total_general = collections.Counter()
+    total = collections.Counter()
     hubo_columna = False
+    avisos: list[str] = []
 
-    for ruta in sorted(glob.glob(str(directorio / "*.xlsx"))):
-        wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+    for ruta in sorted(directorio.glob("*.xlsx")):
+        try:
+            wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+        except Exception as e:                   # xlsx corrupto o que no lo es
+            # Se avisa y se sigue con los demas: tumbar la corrida entera por un
+            # archivo ilegible daria menos informacion, no mas.
+            avisos.append(f"no se pudo abrir {ruta.name}: {type(e).__name__}: {e}")
+            continue
+
         for hoja, columnas in OBJETIVOS.items():
             if hoja not in wb.sheetnames:
                 continue
@@ -79,71 +105,97 @@ def medir(directorio: pathlib.Path) -> int:
             except StopIteration:
                 continue
 
-            indices = {
-                col: encabezados.index(col)
-                for col in columnas
-                if col in encabezados
-            }
+            indices = {c: encabezados.index(c) for c in columnas if c in encabezados}
             if not indices:
                 continue
             hubo_columna = True
 
-            conteo = collections.Counter()
+            cuenta = collections.Counter()
             for fila in filas:
                 for col, i in indices.items():
                     if i >= len(fila):
                         continue
-                    h, del_panel = hora_de(fila[i])
+                    celda = fila[i]
+                    if celda is None or (isinstance(celda, str) and not celda.strip()):
+                        continue
+                    cuenta[(col, "no_vacias")] += 1
+
+                    h, del_panel, inesperado = hora_de(celda, hoja)
                     if h is None:
                         continue
-                    conteo[(col, "con_hora")] += 1
+                    cuenta[(col, "con_hora")] += 1
+                    if inesperado:
+                        cuenta[(col, "tipo_inesperado")] += 1
                     if del_panel:
-                        conteo[(col, "del_panel")] += 1
-                    if HORA_DESDE <= h < HORA_HASTA:
-                        conteo[(col, "sospechosa")] += 1
-                        if del_panel:
-                            conteo[(col, "sospechosa_panel")] += 1
+                        cuenta[(col, "del_panel")] += 1
+                        if HORA_DESDE <= h < HORA_HASTA:
+                            cuenta[(col, "sospechosa")] += 1
 
             for col in indices:
-                con_hora = conteo[(col, "con_hora")]
+                no_vacias = cuenta[(col, "no_vacias")]
+                con_hora = cuenta[(col, "con_hora")]
+
+                # "Columna encontrada pero nada legible" NO es lo mismo que
+                # "columna vacia", y callarlo daria un cero de los que este
+                # proyecto ya se ha comido varias veces.
+                if no_vacias and not con_hora:
+                    avisos.append(
+                        f"{hoja} :: {col}: {no_vacias} celdas con dato y NINGUNA "
+                        f"con hora reconocible. ¿Cambio el formato de fecha? "
+                        f"El cero de esta columna no es un cero valido."
+                    )
                 if not con_hora:
                     continue
-                panel = conteo[(col, "del_panel")]
-                sosp_panel = conteo[(col, "sospechosa_panel")]
-                otras = con_hora - panel
-                pct = (100.0 * sosp_panel / panel) if panel else 0.0
+
+                panel = cuenta[(col, "del_panel")]
+                sosp = cuenta[(col, "sospechosa")]
+                inesperado = cuenta[(col, "tipo_inesperado")]
+                pct = (100.0 * sosp / panel) if panel else 0.0
+
                 print(f"  {hoja} :: {col}")
                 print(f"      filas con hora            : {con_hora}")
                 print(f"      escritas por el panel     : {panel}"
-                      f"   (otras fuentes: {otras})")
-                print(f"      del panel, 00:00-05:59    : {sosp_panel}  ({pct:.1f} %)")
-                total_general["con_hora"] += con_hora
-                total_general["del_panel"] += panel
-                total_general["sospechosa"] += sosp_panel
+                      f"   (otro origen: {con_hora - panel})")
+                print(f"      del panel, 00:00-05:59    : {sosp}  ({pct:.1f} %)")
+                if inesperado:
+                    print(f"      OJO: {inesperado} celdas de tipo fecha en una hoja "
+                          f"donde solo escribe el panel (se cuentan como suyas)")
+
+                total["con_hora"] += con_hora
+                total["del_panel"] += panel
+                total["sospechosa"] += sosp
         wb.close()
 
     if not hubo_columna:
         print("ERROR: no se encontro ninguna columna de timestamp conocida.")
         print("El barrido no puede devolver 0 valido si no alcanza el dato.")
+        for a in avisos:
+            print(f"  aviso: {a}")
         return 2
 
-    con_hora = total_general["con_hora"]
-    panel = total_general["del_panel"]
-    sosp = total_general["sospechosa"]
+    panel = total["del_panel"]
+    sosp = total["sospechosa"]
     pct = (100.0 * sosp / panel) if panel else 0.0
     print()
-    print(f"TOTAL filas con hora        : {con_hora}")
+    print(f"TOTAL filas con hora        : {total['con_hora']}")
     print(f"TOTAL escritas por el panel : {panel}   <- el universo en riesgo")
     print(f"TOTAL sospechosas           : {sosp}  ({pct:.1f} % de las del panel)")
+
+    if avisos:
+        print()
+        print("AVISOS (el resultado de arriba puede estar incompleto):")
+        for a in avisos:
+            print(f"  - {a}")
+
     print()
     print("Sospechosa = escrita por el panel entre 00:00 y 05:59, la ventana")
     print("donde caen las capturas de 18:00-23:59 hora de Mexico. NO es prueba")
     print("de desfase fila a fila: una captura real de madrugada cae igual ahi.")
     print()
-    print("Y es una COTA SUPERIOR flojo por arriba en otro sentido: solo las")
-    print("filas escritas desde el contenedor (UTC) pudieron desplazarse. Las")
-    print("escritas desde la PC del owner ya estaban en hora de Mexico, y el")
-    print("respaldo no distingue que proceso escribio cada fila.")
+    print("Y es una cota floja por arriba en otro sentido: solo las filas")
+    print("escritas desde el contenedor (UTC) pudieron desplazarse. Las escritas")
+    print("desde la PC del owner ya estaban en hora de Mexico, y el respaldo no")
+    print("distingue que proceso escribio cada fila.")
     print()
     print("NO se corrige nada. La decision sobre el historico es del owner.")
     return 0
