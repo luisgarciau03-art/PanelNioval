@@ -4,7 +4,9 @@
 **Proyecto:** PanelNioval — `C:\Users\PC 1\PanelNioval`
 **Superficies:** rutas Flask de `app.py`, `Dockerfile`, `despliegue/docker-compose.yml`
 **Rama de trabajo:** `fix/endurecimiento-panel` (desde `main` actualizado — **NUNCA `main`**)
-**Baseline verificado en disco el 2026-08-28:** `python -m pytest tests/` → **357 passed, 1 skipped**, exit 0
+**Baseline verificado en disco el 2026-09-04 en la rama de trabajo:** `python -m pytest tests/` →
+**388 passed, 1 skipped**, exit 0. (El «357 passed» que este encabezado daba el 2026-08-28 era
+el de `perf/gasto-places-importador`, rama del Plan 2, no el de la base de este plan.)
 **Origen:** mejoras **M5**, **M14**, **M2**, **M3** y **M9** del índice de la tanda
 2026-08-27 (§4.2–§4.4). Todas identificadas y ninguna asignada a un plan.
 
@@ -133,7 +135,7 @@ que hoy no existe — afecta Plan 5, Tarea T5.1.` Ver **D5** en DECISIONES PENDI
 | CE7 | La semana ISO es la correcta | Test en un cambio de semana |
 | CE8 | El healthcheck detecta un panel colgado | Se levanta el contenedor con la ruta de salud rota; `docker ps` lo marca `unhealthy` |
 | CE9 | `SIGTERM` no parte una escritura | Test: la señal a media corrida deja el estado en `interrumpido` y ninguna fila a medias |
-| CE10 | Baseline sin regresiones | `python -m pytest tests/` → ≥ 357 passed |
+| CE10 | Baseline sin regresiones | `python -m pytest tests/` → **≥ 388 passed** (baseline de `main`, medido en T5.0 el 2026-09-04). ⚠️ **Corregido:** el «≥ 357» original era el baseline de `perf/gasto-places-importador` (rama del Plan 2), no un número universal — un gate absoluto es inalcanzable desde otra rama base. Si esta rama se rebasa sobre un `main` con el PR #43 dentro, el gate sube al baseline de ese `main` |
 
 ---
 
@@ -332,7 +334,7 @@ cooperativa que se traga la señal deja el hilo corriendo y **parece** que funci
 **Depende de:** T5.1–T5.5.
 
 **Qué hacer.**
-1. `python -m pytest tests/` → ≥ 357 passed, sin regresiones.
+1. `python -m pytest tests/` → **≥ 388 passed** (baseline de esta rama, T5.0), sin regresiones.
 2. Los cinco `grep` de T5.0, repetidos: el de rate limiting pasa de 0 a > 0; el de
    `_escapar_formula` cubre todas las escrituras; `HEALTHCHECK` aparece; las
    `datetime.now()` desnudas desaparecen.
@@ -426,7 +428,7 @@ canónicas. Se reporta tal cual y **no cuenta** para el mínimo de diversidad.
 | T5.3 | ✅ TDD, 3 tests con reloj congelado | python-reviewer | ✅ | — (constancia en T5.3) | ✅ sin regresiones |
 | T5.4 | ✅ TDD, 3 tests + contenedor `unhealthy` real | — | ✅ | ✅ **ruta sin auth** | ✅ sin regresiones |
 | T5.5 | ✅ TDD, 3 tests + `silent-failure-hunter` | python-reviewer | ✅ | — | ✅ sin regresiones |
-| T5.6 | ✅ suite + 5 grep + contenedor construido | ✅ `security-auditor` | ✅ | ✅ | ✅ ≥ 357 passed |
+| T5.6 | ✅ suite + 5 grep + contenedor construido | ✅ `security-auditor` | ✅ | ✅ | ✅ ≥ 388 passed |
 | T5.7 | ✅ suite completa antes del merge | — | ✅ | — | ✅ verde para mergear |
 
 ---
@@ -453,7 +455,7 @@ va al respaldo fechado.
 
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
-| T5.0 | Tarea Cero: rama, respaldo, baseline y los 5 grep | PENDIENTE | | |
+| T5.0 | Tarea Cero: rama, respaldo, baseline y los 5 grep | ✅ **HECHA** | Rama `fix/endurecimiento-panel` desde `main` @ `82995c3` (decisión E5 del owner). Respaldo: 5 XLSX + `huellas.json`, 65 hojas, ninguno vacío. Baseline **388 passed, 1 skipped**. Los 5 grep con salida pegada en [`docs/auditoria/2026-09-04-t50-estado-de-partida.md`](../../auditoria/2026-09-04-t50-estado-de-partida.md) | 2026-09-04 |
 | T5.1 | Rate limiting en todas las rutas (M5) | PENDIENTE | | |
 | T5.2 | Escapado de fórmulas en todas las escrituras (M14) | PENDIENTE | | |
 | T5.3 | Zona horaria explícita, dos capas (M2) | PENDIENTE | | |
@@ -462,7 +464,7 @@ va al respaldo fechado.
 | T5.6 | Verificación integral | PENDIENTE | | |
 | T5.7 | Cierre: docs, PR, handoff | PENDIENTE | | |
 
-**Avance del plan: 0 / 8 tareas (0 %)**
+**Avance del plan: 1 / 8 tareas (13 %)**
 
 **Gates del owner asociados (reportar, no intentar):** rotar `TELEGRAM_TOKEN` (M7) y apagar
 el despliegue de Railway (M6). Ninguno lo cierra este plan, y ambos siguen siendo el riesgo
