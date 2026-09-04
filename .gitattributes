@@ -1,0 +1,26 @@
+# Saltos de linea, explicitos y no a merced de la config de cada maquina.
+#
+# Hasta ahora el repositorio no tenia .gitattributes y el comportamiento
+# dependia de `core.autocrlf` local. En la maquina del owner vale `true`, asi
+# que los archivos estan en CRLF en disco pero los blobs que git guarda son
+# 100% LF. Eso es lo que reciben el runner de GitHub Actions y el VPS.
+#
+# Sin esta declaracion, alguien con `core.autocrlf=false` commitearia blobs con
+# CRLF y el repositorio acabaria mezclando los dos, con diffs enteros que solo
+# cambian el final de linea.
+#
+# `text=auto` = git decide que es texto y lo normaliza a LF **al commitear**.
+# El checkout sigue respetando la config local, asi que en Windows los archivos
+# se siguen viendo en CRLF y la advertencia de CLAUDE.md sobre reemplazos por
+# patron sigue vigente: en disco, en Windows, son CRLF.
+* text=auto
+
+# Binarios: que git no intente normalizarlos nunca.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.xlsx binary
+*.zip binary

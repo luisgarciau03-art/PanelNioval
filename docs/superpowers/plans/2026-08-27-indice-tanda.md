@@ -237,7 +237,7 @@ Detectadas al leer el código. Estado **reverificado en disco el 2026-08-28**.
 |---|---|---|---|
 | **M13** | El escape de HTML faltaba en el importador. | ✅ **OBSOLETA** — el Plan 3 lo introdujo (`app.py:5810`). T4.3 solo elimina la duplicación | Plan 4 |
 | **M14** | `_escapar_formula` (`app.py:5037`) se usa **solo** en `app.py:5115`. Las demás rutas que escriben a Sheets no lo pasan. | 🔴 **ABIERTA y confirmada hoy** | ✅ **Plan 5 · T5.2** |
-| **M15** | El logo de Cloudinary sin `width`/`height` → salto de layout. **Tres** sitios: `app.py:1172`, `3736`, `5594`. | 🔴 ABIERTA | **Plan 4 · T4.10** |
+| **M15** | El logo de Cloudinary sin `width`/`height` → salto de layout. **Tres** sitios. | ✅ **CERRADA** en T4.10: dimensiones y `alt` en las tres, y además se pide del tamaño que se pinta (44.8 KB → 0.6 KB) | Plan 4 · T4.10 |
 | **M16** ⭐ | **Nueva.** `Nuevo documento de texto.txt` vacío en la raíz, sin versionar, sobreviviente de la limpieza M11. | 🟡 Cruft | Se **aparta** al respaldo fechado (regla 4), no se borra |
 
 ### 4.5 Secuencia recomendada, con las mejoras dentro
@@ -291,13 +291,13 @@ archivo" sino "añadirle cinco nombres"; el bloque exacto está en §7.
 | Plan 3 — Bug de conteo y pantallas de carga | 10 | ✅ **COMPLETADO** | **10 / 10** |
 | Plan 0 — Integración continua ⭐ | 4 | ✅ **COMPLETADO** | **4 / 4** |
 | Plan 2 — Optimización del gasto de Places | 9 | ✅ **COMPLETADO** | **9 / 9** |
-| Plan 1 — Relevancia de ciudades nacional | 10 | PENDIENTE | 0 / 10 |
-| Plan 4 — Rediseño profesional del panel | 12 | PENDIENTE | 0 / 12 |
+| Plan 1 — Relevancia de ciudades nacional | 10 | ✅ **COMPLETADO** | **10 / 10** |
+| Plan 4 — Rediseño profesional del panel | 12 | ✅ **COMPLETADO** | **12 / 12** |
 | Plan 5 — Endurecimiento del panel ⭐ | 8 | PENDIENTE | 0 / 8 |
 
-**PROGRESO GLOBAL: 23 / 53 tareas (43 %) · 3 de 6 planes completados**
+**PROGRESO GLOBAL: 45 / 53 tareas (85 %) · 5 de 6 planes completados**
 
-> Sobre el alcance original de 4 planes (41 tareas), el avance es **17 / 41 (41 %)**. El
+> Sobre el alcance original de 4 planes (41 tareas), el avance es **21 / 41 (51 %)**. El
 > denominador subió porque se redactaron dos planes que el §4 recomendaba y nadie había
 > escrito, no porque se haya perdido trabajo.
 
@@ -435,7 +435,11 @@ Cinco. Todas cerradas, ancladas a una tarea, con opción recomendada e impacto d
 - **Impacto:** si B, T1.7 necesita paginación o render virtualizado **además** del filtro por
   región, y el Plan 4 · T4.9 hereda ese requisito. Si C, CE4 (*"≥1 ciudad de cada una de las
   32 entidades"*) puede no cumplirse sin forzar la lista.
-- Mientras no respondas, el plan asume **A**.
+- **RESUELTA POR LOS DATOS (2026-08-29).** Se ejecutó **A**, y el corte dejó de ser una
+  estimación: DENUE da **589 municipios con ≥20 ferreterías** y **443 con ≥30**. El catálogo
+  final tiene **606** porque además conserva las plazas del array viejo que no llegan al
+  corte —quitarle al operador una ciudad que ya podía elegir es irreversible para él— y
+  rescata las entidades que se quedarían sin ninguna. Seis por encima del rango, y se dice.
 
 ### D4 — Dónde entra el Plan 0 (CI) · afecta: **Índice §2 y Plan 0 completo**
 

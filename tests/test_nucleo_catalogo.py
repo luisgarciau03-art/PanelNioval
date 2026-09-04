@@ -35,7 +35,7 @@ class TestNormalizarTelefono:
         ("5512345678", "+525512345678"),          # nacional de 10 -> con lada
         ("+52 55 1234 5678", "+525512345678"),    # ya la trae
         ("(55) 1234-5678", "+525512345678"),      # con separadores
-        ("662 353 4185", "+526623534185"),        # como lo guarda la hoja
+        ("555 123 4567", "+525551234567"),        # como lo guarda la hoja
         ("5215512345678", "+525512345678"),       # el '1' de movil que MX retiro
         ("", ""),
         ("sin numero", ""),
@@ -45,8 +45,8 @@ class TestNormalizarTelefono:
 
     def test_no_duplica_la_lada(self):
         """Normalizar dos veces debe ser estable: la cola puede reprocesar."""
-        una = nc.normalizar_telefono("6623534185")
-        assert nc.normalizar_telefono(una) == una == "+526623534185"
+        una = nc.normalizar_telefono("5551234567")
+        assert nc.normalizar_telefono(una) == una == "+525551234567"
 
     def test_no_inventa_lada_en_longitudes_raras(self):
         """Solo se asume nacional en 10 digitos: adivinar en otras longitudes
@@ -56,8 +56,8 @@ class TestNormalizarTelefono:
 
     def test_la_fila_de_la_cola_lleva_lada(self):
         """Lo que de verdad importa: el valor que el worker usa para enviar."""
-        fila = nc.nueva_fila_envio("Ferreteria X", "662 353 4185", 42, "Pedido")
-        assert fila[2] == "+526623534185"
+        fila = nc.nueva_fila_envio("Ferreteria X", "555 123 4567", 42, "Pedido")
+        assert fila[2] == "+525551234567"
 
 
 class TestValidarNumero:

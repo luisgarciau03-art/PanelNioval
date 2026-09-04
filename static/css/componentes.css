@@ -1,0 +1,568 @@
+/* ============================================================================
+   NIOVAL - Componentes compartidos
+   Plan 4 - T4.4. Los que usan las tres superficies: boton, tarjeta, chip,
+   recuadro de estadistica, tabla, campo de formulario, insignia y barra de
+   progreso.
+
+   Cada elemento interactivo trae sus CUATRO estados: hover, focus, active y
+   disabled. Antes solo existia `transition: all .2s` y algun `:hover`.
+
+   Depende de tokens.css y base.css. Ni un color literal.
+   ============================================================================ */
+
+/* --- Boton ---------------------------------------------------------------
+   El movimiento va solo en transform y en color, nunca en propiedades que
+   fuercen layout. Nada de `transition: all`, que anima tambien lo que provoca
+   recalculo. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--esp-2);
+  padding: var(--esp-3) var(--esp-5);
+  border: 1px solid transparent;
+  border-radius: var(--radio-md);
+  font-family: inherit;
+  font-size: var(--texto-sm);
+  font-weight: var(--peso-medio);
+  line-height: var(--linea-apretada);
+  cursor: pointer;
+  text-decoration: none;
+  background: var(--azul);
+  color: var(--texto-inverso);
+  transition: background-color var(--dur-rapida) var(--curva-estandar),
+              transform var(--dur-rapida) var(--curva-estandar),
+              box-shadow var(--dur-rapida) var(--curva-estandar);
+}
+
+.btn:hover:not(:disabled) { background: var(--azul-oscuro); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: .5;
+  cursor: not-allowed;
+  /* El estado deshabilitado no puede depender SOLO de la opacidad: quien no
+     distinga bien el contraste necesita otra senal. */
+  filter: grayscale(.4);
+}
+
+.btn--secundario {
+  background: var(--superficie);
+  color: var(--texto-enlace);
+  border-color: var(--borde-control);
+}
+.btn--secundario:hover:not(:disabled) { background: var(--azul-tenue-2); }
+
+.btn--fantasma {
+  background: transparent;
+  color: var(--texto);
+  border-color: transparent;
+}
+.btn--fantasma:hover:not(:disabled) { background: var(--gris-100); }
+
+/* Los de estado usan el token accesible, no el "vivo": llevan texto blanco
+   encima y el vivo daba 2.16:1. */
+.btn--exito { background: var(--exito); }
+.btn--exito:hover:not(:disabled) { filter: brightness(.9); }
+.btn--aviso { background: var(--aviso); }
+.btn--aviso:hover:not(:disabled) { filter: brightness(.9); }
+.btn--error { background: var(--error); }
+.btn--error:hover:not(:disabled) { filter: brightness(.9); }
+
+.btn--bloque { width: 100%; }
+.btn--grande { padding: var(--esp-4) var(--esp-6); font-size: var(--texto-base); }
+
+/* --- Tarjeta ------------------------------------------------------------- */
+.tarjeta {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-lg);
+  padding: var(--esp-5);
+  box-shadow: var(--sombra-1);
+}
+
+.tarjeta__titulo {
+  font-size: var(--texto-lg);
+  font-weight: var(--peso-fuerte);
+  color: var(--texto-fuerte);
+  margin: 0 0 var(--esp-4);
+}
+
+/* --- Recuadro de estadistica ---------------------------------------------
+   Jerarquia por contraste de escala: el dato que manda usa --texto-3xl y los
+   secundarios --texto-lg. Antes las ocho tarjetas de KPI pesaban igual, que es
+   lo mismo que no tener jerarquia. */
+.stat {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-left: 3px solid var(--azul);
+  border-radius: var(--radio-md);
+  padding: var(--esp-4);
+}
+
+.stat__etiqueta {
+  font-size: var(--texto-xs);
+  font-weight: var(--peso-medio);
+  letter-spacing: var(--track-etiqueta);
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+
+.stat__num {
+  font-size: var(--texto-xl);
+  font-weight: var(--peso-fuerte);
+  line-height: var(--linea-apretada);
+  color: var(--texto-fuerte);
+  font-variant-numeric: tabular-nums;
+}
+
+/* El dato principal de la pantalla. En el importador es `nuevos_en_sheet`:
+   las filas realmente escritas, no las encontradas. */
+.stat--principal .stat__num { font-size: var(--texto-3xl); }
+.stat--principal { border-left-width: 5px; }
+
+.stat--exito { border-left-color: var(--exito-vivo); }   /* franja, no texto */
+.stat--aviso { border-left-color: var(--aviso-vivo); }
+.stat--error { border-left-color: var(--error-vivo); }
+
+/* --- Chip ----------------------------------------------------------------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio-completo);
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: var(--texto-sm);
+  cursor: pointer;
+  transition: background-color var(--dur-rapida) var(--curva-estandar),
+              border-color var(--dur-rapida) var(--curva-estandar),
+              transform var(--dur-rapida) var(--curva-estandar);
+}
+.chip:hover { background: var(--azul-tenue-2); border-color: var(--azul-borde); }
+.chip:active { transform: translateY(1px); }
+
+.chip[aria-pressed="true"],
+.chip--activo {
+  background: var(--azul);
+  border-color: var(--azul);
+  color: var(--texto-inverso);
+}
+
+/* El conteo del chip: dato secundario, no compite con el nombre. */
+.chip__conteo {
+  font-size: var(--texto-xs);
+  color: var(--texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+.chip[aria-pressed="true"] .chip__conteo { color: var(--azul-tenue); }
+
+/* --- Insignia ------------------------------------------------------------- */
+.insignia {
+  display: inline-block;
+  padding: var(--esp-1) var(--esp-2);
+  border-radius: var(--radio-sm);
+  font-size: var(--texto-xs);
+  font-weight: var(--peso-medio);
+}
+.insignia--exito { background: var(--exito-tinte); color: var(--exito-fuerte); }
+.insignia--aviso { background: var(--aviso-tinte); color: var(--aviso-fuerte); }
+.insignia--error { background: var(--error-tinte); color: var(--error-fuerte); }
+.insignia--info  { background: var(--azul-tenue);  color: var(--azul); }
+
+/* --- Campo de formulario -------------------------------------------------
+   El borde usa --borde-control (3:1), no --borde: un control tiene que
+   distinguirse del fondo, que es WCAG 1.4.11. El anterior daba 1.4:1. */
+.campo { margin-bottom: var(--esp-4); }
+
+.campo__etiqueta {
+  display: block;
+  margin-bottom: var(--esp-2);
+  font-size: var(--texto-sm);
+  font-weight: var(--peso-medio);
+  color: var(--texto);
+}
+
+.campo__control,
+input[type="text"], input[type="tel"], input[type="email"],
+input[type="number"], input[type="search"], select, textarea {
+  width: 100%;
+  padding: var(--esp-3);
+  border: 1px solid var(--borde-control);
+  border-radius: var(--radio-md);
+  background: var(--superficie);
+  color: var(--texto-fuerte);
+  font-family: inherit;
+  font-size: var(--texto-base);
+  transition: border-color var(--dur-rapida) var(--curva-estandar),
+              box-shadow var(--dur-rapida) var(--curva-estandar);
+}
+
+.campo__control:hover:not(:disabled),
+input:hover:not(:disabled), select:hover:not(:disabled) {
+  border-color: var(--gris-500);
+}
+
+.campo__control:disabled,
+input:disabled, select:disabled, textarea:disabled {
+  background: var(--gris-100);
+  color: var(--texto-suave);
+  cursor: not-allowed;
+}
+
+.campo__error {
+  margin-top: var(--esp-1);
+  font-size: var(--texto-sm);
+  color: var(--error);
+  min-height: 1.2em;   /* reserva el hueco: sin esto el layout salta (CE4) */
+}
+
+.campo__control[aria-invalid="true"] { border-color: var(--error); }
+
+/* --- Tabla ---------------------------------------------------------------
+   Las tablas son el trabajo de verdad del dashboard: densidad legible,
+   cabecera fija y separacion que no canse. */
+.tabla { width: 100%; border-collapse: collapse; font-size: var(--texto-sm); }
+
+.tabla th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--gris-50);
+  padding: var(--esp-3);
+  text-align: left;
+  font-size: var(--texto-xs);
+  font-weight: var(--peso-medio);
+  letter-spacing: var(--track-etiqueta);
+  text-transform: uppercase;
+  color: var(--texto-suave);
+  border-bottom: 2px solid var(--borde-fuerte);
+  white-space: nowrap;
+}
+
+.tabla td {
+  padding: var(--esp-3);
+  border-bottom: 1px solid var(--borde);
+  color: var(--texto);
+}
+
+.tabla tbody tr:hover { background: var(--azul-tenue-2); }
+
+/* Cabecera ordenable: es un boton, y tiene que parecerlo y enfocarse. */
+.tabla th[aria-sort] { cursor: pointer; }
+.tabla th[aria-sort]:hover { color: var(--texto-enlace); }
+.tabla th[aria-sort="ascending"]::after  { content: " \2191"; }
+.tabla th[aria-sort="descending"]::after { content: " \2193"; }
+
+/* --- Barra de progreso ---------------------------------------------------
+   La T4.4 dejo aqui `transition: width` como "excepcion consciente". La T4.6
+   la retira: no hacia falta ninguna excepcion. Una barra se anima igual de
+   bien con `scaleX` sobre el ancho completo, y eso lo resuelve el compositor
+   sin recalcular layout en cada cuadro — que en el importador son minutos de
+   corrida actualizandose sin parar.
+
+   El avance se escribe en la propiedad `--avance` (0 a 1), no en el ancho. */
+.progreso {
+  height: 10px;
+  background: var(--gris-200);
+  border-radius: var(--radio-completo);
+  overflow: hidden;
+}
+
+.progreso__barra {
+  height: 100%;
+  width: 100%;
+  background: var(--azul);
+  border-radius: var(--radio-completo);
+  transform-origin: left center;
+  transform: scaleX(var(--avance, 0));
+  transition: transform var(--dur-lenta) var(--curva-salida);
+}
+
+.progreso__etiqueta {
+  margin-top: var(--esp-2);
+  font-size: var(--texto-sm);
+  color: var(--texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Consola de log ------------------------------------------------------
+   Lo mas honesto de la pantalla del importador: dice que esta pasando, en
+   orden y sin adornos. Se conserva su funcion, dentro del sistema. */
+.consola {
+  background: var(--gris-900);
+  color: var(--gris-100);
+  padding: var(--esp-4);
+  border-radius: var(--radio-md);
+  max-height: 320px;
+  overflow-y: auto;
+  font-family: var(--fuente-mono);
+  font-size: var(--texto-sm);
+  line-height: var(--linea-normal);
+}
+
+/* ==========================================================================
+   ESTADOS DE CARGA  ·  Plan 4 - T4.5
+   ==========================================================================
+   Antes habia UN estado no-feliz: `.loading` con un spinner, que sustituia el
+   contenido. Dos consecuencias medidas:
+
+     - Al llegar los datos el bloque pasaba de ~100 px a varios cientos, y todo
+       lo de abajo saltaba (CE4 pide CLS < 0.1).
+     - Un spinner se ve identico mientras carga, cuando no hay nada que cargar
+       y cuando la peticion ya murio. Son tres cosas distintas.
+
+   Aqui viven las dos piezas del sistema:
+
+     .esqueleto*  la forma del contenido que viene, con SU altura, para que
+                  nada se mueva cuando llegue.
+     .estado*     los tres finales: vacio, error y parcial. Cada uno con su
+                  propio vocabulario de color; el ADR de direccion visual lo
+                  exige explicitamente porque hoy vacio y error se ven igual.
+
+   Ni un color literal: todo sale de tokens.css.
+   ========================================================================== */
+
+/* --- Esqueleto ------------------------------------------------------------
+   El brillo se desplaza con `transform` sobre un pseudo-elemento. La
+   alternativa habitual —animar `background-position` de un degradado— repinta
+   el bloque entero en cada cuadro, y aqui puede haber catorce esqueletos de
+   tabla a la vez. */
+.esqueleto {
+  position: relative;
+  overflow: hidden;
+  height: var(--esp-4);
+  border-radius: var(--radio-sm);
+  background: var(--gris-200);
+}
+
+.esqueleto::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--superficie),
+    transparent
+  );
+  opacity: .55;
+  transform: translateX(-100%);
+  animation: esqueleto-brillo 1.4s ease-in-out infinite;
+}
+
+@keyframes esqueleto-brillo {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+/* Variantes por forma. La altura de cada una es la del elemento real que
+   sustituye, no un valor decorativo. */
+.esqueleto--titulo { height: var(--esp-5); width: 40%; }
+.esqueleto--texto  { height: var(--esp-3); }
+.esqueleto--num    { height: var(--esp-6); width: 55%; }
+.esqueleto--corto  { width: 30%; }
+.esqueleto--medio  { width: 60%; }
+
+/* Tarjeta de indicador: replica el alto de `.card` del tablero y de `.stat`
+   del sistema (etiqueta + cifra + padding). */
+.esqueleto-tarjeta {
+  height: 92px;
+  padding: var(--esp-4);
+  border-radius: var(--radio-lg);
+  border-left: 4px solid var(--gris-200);
+  background: var(--superficie);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--esp-2);
+}
+
+/* Tabla: cabecera de color pleno mas filas del alto real de una `td`. */
+.esqueleto-tabla { width: 100%; }
+
+.esqueleto-tabla__cabecera {
+  height: 34px;
+  border-radius: var(--radio-sm) var(--radio-sm) 0 0;
+  background: var(--gris-300);
+  margin-bottom: var(--esp-1);
+}
+
+.esqueleto-tabla__fila {
+  height: 33px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.esqueleto-chip {
+  height: 26px;
+  width: 96px;
+  border-radius: var(--radio-completo);
+}
+
+/* Campo de la ficha de contacto: alto de `.info-item` (etiqueta + valor). */
+.esqueleto-campo {
+  height: 60px;
+  border-radius: var(--radio-md);
+}
+
+/* Boton de resultado: alto de `.btn` con su padding vertical. */
+.esqueleto-boton {
+  height: 42px;
+  flex: 1;
+  min-width: 120px;
+  border-radius: var(--radio-md);
+}
+
+.esqueleto-botonera {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-3);
+}
+
+/* Rejillas de esqueleto: el mismo reparto que el contenido real, para que el
+   ancho tampoco cambie al sustituir. */
+.esqueleto-rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--esp-4);
+}
+
+.esqueleto-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+}
+
+/* Ficha de contacto del formulario: encabezado corto mas la rejilla de datos. */
+.esqueleto-ficha {
+  display: grid;
+  gap: var(--esp-4);
+}
+
+/* --- Estados finales ------------------------------------------------------
+   Vacio, error y parcial. Vocabulario distinto a proposito: el ADR reserva la
+   celebracion y el verde de exito a estados verificados de forma explicita, y
+   "no recibi datos" no es uno de ellos. */
+.estado {
+  padding: var(--esp-6) var(--esp-5);
+  border-radius: var(--radio-md);
+  text-align: center;
+  font-size: var(--texto-sm);
+  line-height: var(--linea-normal);
+}
+
+.estado__titulo {
+  font-size: var(--texto-base);
+  font-weight: var(--peso-medio);
+  margin-bottom: var(--esp-2);
+}
+
+.estado__detalle {
+  font-size: var(--texto-sm);
+  margin-bottom: var(--esp-4);
+}
+
+.estado__accion { margin-top: var(--esp-2); }
+
+/* Vacio: gris, sin alarma. No paso nada malo; simplemente no hay filas.
+   El texto NO usa `--texto-suave`: sobre `--gris-50` ese par da 4.55:1, que
+   pasa AA por dos centesimas y se rompe con cualquier retoque del fondo
+   (misma trampa que costo el anillo de foco en la T4.4). El tono apagado lo
+   pone el borde punteado, no el contraste del texto. */
+.estado--vacio {
+  background: var(--gris-50);
+  color: var(--texto);
+  border: 1px dashed var(--borde-fuerte);
+}
+
+/* Error: la lectura fallo. Banda roja, y siempre con salida (reintentar). */
+.estado--error {
+  background: var(--error-tinte);
+  color: var(--error-fuerte);
+  border-left: 4px solid var(--error);
+  text-align: left;
+}
+
+/* Parcial: lo demas cargo; esta pieza no. Es un aviso al margen, no un muro:
+   por eso va en linea y ocupa poco. */
+.estado--parcial {
+  background: var(--aviso-tinte);
+  color: var(--aviso-fuerte);
+  border-left: 4px solid var(--aviso);
+  text-align: left;
+  padding: var(--esp-3) var(--esp-4);
+  font-size: var(--texto-sm);
+}
+
+/* --- Movimiento reducido --------------------------------------------------
+   Accesibilidad, no preferencia. Con la preferencia activa el esqueleto sigue
+   reservando el espacio —que es su trabajo— pero deja de brillar. */
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto::after {
+    animation: none;
+    transform: none;
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   MOVIMIENTO  ·  Plan 4 - T4.6
+   ==========================================================================
+   Los tokens de duracion y curva viven en tokens.css desde la T4.4; aqui van
+   los dos unicos movimientos que el sistema anade, y ambos existen porque
+   ACLARAN algo, no porque decoren:
+
+     .fila-entra   la tabla llego: las filas aparecen de arriba abajo, asi que
+                   se ve que es contenido nuevo y en que orden viene.
+     .seccion-entra  al cambiar de seccion, la nueva entra desde abajo. Sin
+                   eso, catorce tablas parecidas se sustituyen sin transicion y
+                   cuesta saber si el clic hizo algo.
+
+   Los dos usan SOLO transform y opacity. Ninguno reserva espacio distinto del
+   final: el desplazamiento es de 6 px con transform, que no cuenta como salto
+   de layout (CE4 sigue midiendose igual).
+   ========================================================================== */
+
+.fila-entra {
+  animation: fila-entra var(--dur-normal) var(--curva-salida) backwards;
+  animation-delay: var(--retardo-fila, 0ms);
+}
+
+/* Sin `opacity`, y no es un descuido. Con `backwards`, la fila se queda en
+   el fotograma inicial durante TODO su retardo: hasta 275 ms para la fila 12,
+   mas los 200 ms de la animacion. Si ese fotograma llevaba `opacity: 0`, los
+   botones de esa fila -"Editar", "Subir comprobante"- eran enfocables con Tab
+   siendo completamente transparentes, anillo de foco incluido. Eso es un
+   incumplimiento de SC 2.4.7 (Focus Visible), y el criterio no admite
+   excepcion por ser breve.
+
+   El desplazamiento de 6 px basta para que la llegada se lea. */
+@keyframes fila-entra {
+  from { transform: translateY(6px); }
+  to   { transform: none; }
+}
+
+.seccion-entra {
+  animation: seccion-entra var(--dur-normal) var(--curva-salida);
+}
+
+@keyframes seccion-entra {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Accesibilidad, no preferencia. tokens.css ya lleva las duraciones a 1 ms de
+   forma global, pero eso deja la animacion CORRIENDO en un solo cuadro: aqui
+   se retira del todo, que es lo que pide el criterio ("sin movimiento no
+   esencial"), y ademas se anula el retardo escalonado — si no, las doce
+   primeras filas seguirian apareciendo en cascada aunque instantaneas. */
+@media (prefers-reduced-motion: reduce) {
+  .fila-entra,
+  .seccion-entra {
+    animation: none;
+    animation-delay: 0ms;
+  }
+}
