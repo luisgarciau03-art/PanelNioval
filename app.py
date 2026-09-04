@@ -468,7 +468,9 @@ def update_pago_url():
             return jsonify({'ok': False, 'error': 'columnas no encontradas'})
         for i, row in enumerate(rows[1:], start=2):
             if str(row[col_factura - 1]).strip() == num_factura:
-                ws.update_cell(i, col_pago, url)
+                # update_cell FUERZA USER_ENTERED (no admite value_input_option),
+                # asi que una URL que empiece por '=' se guardaria como formula.
+                ws.update_cell(i, col_pago, _escapar_formula(url))
                 _cache_pop('ventas')
                 return jsonify({'ok': True})
         return jsonify({'ok': False, 'error': 'factura no encontrada'})
@@ -529,7 +531,10 @@ def upload_pago():
             for i, row in enumerate(rows[1:], start=2):
                 val = row[col_factura - 1] if len(row) >= col_factura else ''
                 if str(val).strip() == num_factura:
-                    ws.update_cell(i, col_pago, url_drive)
+                    # Viene de la respuesta de ImgBB (tercero), no del usuario,
+                    # pero update_cell es USER_ENTERED igual: se escapa por lo
+                    # mismo que las demas.
+                    ws.update_cell(i, col_pago, _escapar_formula(url_drive))
                     fila_actualizada = i
                     break
 
@@ -936,7 +941,9 @@ def _sheet_update_row(ws_key, row_num, fields, cache_key=None):
         if col_name in headers:
             col_idx = headers.index(col_name) + 1
             a1 = gsu.rowcol_to_a1(int(row_num), col_idx)
-            updates.append({'range': a1, 'values': [[str(value)]]})
+            # El body no tiene allowlist: cualquier clave que coincida con un
+            # encabezado llega a una celda, y esto escribe con USER_ENTERED.
+            updates.append({'range': a1, 'values': [[_escapar_formula(str(value))]]})
     if updates:
         ws.batch_update(updates, value_input_option='USER_ENTERED')
     _cache_pop(cache_key or ws_key)
@@ -971,7 +978,19 @@ def api_mensajes_update():
         import gspread.utils as gsu
         ws = get_worksheet('mensajes')
         a1 = gsu.rowcol_to_a1(int(row_num), int(col_num))
-        ws.update(a1, [[str(contenido)]], value_input_option='USER_ENTERED')
+        # Dos arreglos en una linea, y el orden importa entenderlo:
+        #
+        # 1) La firma. Hasta gspread 5.x era update(range_name, values); en 6.x
+        #    es update(values, range_name). Esta llamada usaba el orden viejo,
+        #    asi que con la version instalada (6.2.1) pasaba la celda como
+        #    valores y la lista como rango. requirements.txt pide
+        #    `gspread>=5.12.0` sin fijar, o sea que un pip install nuevo trae 6.x
+        #    y esta ruta deja de escribir. Escapar formulas en una llamada rota
+        #    no habria protegido nada.
+        # 2) El escape. `contenido` es texto de usuario del body y esto escribe
+        #    con USER_ENTERED.
+        ws.update([[_escapar_formula(str(contenido))]], a1,
+                  value_input_option='USER_ENTERED')
         _cache_pop('mensajes')
         print(f"[mensajes] update col={col_num} row={row_num}")
         return jsonify({'ok': True})
@@ -3225,7 +3244,8 @@ def api_bruce_actualizar():
             if field in headers:
                 col = headers.index(field) + 1
                 a1  = gsu.rowcol_to_a1(int(row_num), col)
-                updates.append({'range': a1, 'values': [[str(value)]]})
+                # Mismo caso que seguimiento: sin allowlist y con USER_ENTERED.
+                updates.append({'range': a1, 'values': [[_escapar_formula(str(value))]]})
         if updates:
             ws.batch_update(updates, value_input_option='USER_ENTERED')
         _cache_pop('bruce')
