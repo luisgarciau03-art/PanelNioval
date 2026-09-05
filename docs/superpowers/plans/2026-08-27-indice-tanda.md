@@ -293,15 +293,20 @@ archivo" sino "añadirle cinco nombres"; el bloque exacto está en §7.
 | Plan 2 — Optimización del gasto de Places | 9 | ✅ **COMPLETADO** | **9 / 9** |
 | Plan 1 — Relevancia de ciudades nacional | 10 | PENDIENTE | 0 / 10 |
 | Plan 4 — Rediseño profesional del panel | 12 | PENDIENTE | 0 / 12 |
-| Plan 5 — Endurecimiento del panel ⭐ | 8 | **EN CURSO** | **1 / 8** |
+| Plan 5 — Endurecimiento del panel ⭐ | 8 | ✅ **COMPLETADO** | **8 / 8** |
 
-**PROGRESO GLOBAL EN ESTA RAMA: 24 / 53 tareas (45 %) · 3 de 6 planes completados**
+**PROGRESO GLOBAL EN ESTA RAMA: 31 / 53 tareas (58 %) · 4 de 6 planes completados**
 
 > ⚠️ **Esta copia del marcador está desfasada a propósito, y no hay que "arreglarla" aquí.**
 > La rama `fix/endurecimiento-panel` (Plan 5) sale de `main` @ `82995c3` por decisión **E5**
 > del owner, y en `main` los Planes 1 y 4 todavía figuran PENDIENTE porque su cierre vive en
-> los PRs **#42** y **#43**, aún sin mergear. El marcador real de la tanda es **46 / 53
-> (87 %) · 5 de 6 planes completados**: 45 de los PRs abiertos más T5.0 de este plan.
+> los PRs **#42** y **#43**, aún sin mergear. El marcador real de la tanda es **53 / 53
+> (100 %) · 6 de 6 planes completados**: 45 de los PRs abiertos más las 8 de este plan.
+>
+> **Plan 5 cerrado el 2026-09-04**, 8/8. Baseline **388 → 620 passed, 1 skipped** (+232
+> tests). Partida en [`…t50-estado-de-partida.md`](../../auditoria/2026-09-04-t50-estado-de-partida.md);
+> cierre en [`…t56-verificacion-integral.md`](../../auditoria/2026-09-04-t56-verificacion-integral.md).
+> **9 de 10 criterios cumplidos**; CE8 (ver el contenedor `unhealthy`) es el gate 5 del owner.
 >
 > **Al rebasar esta rama sobre un `main` que ya tenga #43 dentro**, este bloque y las filas
 > de los Planes 1, 4 y 5 se reconcilian en una sola edición: Planes 1 y 4 a ✅, y el total a

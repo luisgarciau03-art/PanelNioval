@@ -174,6 +174,84 @@ marca aparece en el diff y un revisor lo ve.
 Require status checks), el check **informa pero no impide el merge**. Requiere permisos de
 administrador del repositorio.
 
+## Endurecimiento del panel (desde 2026-09-04, Plan 5)
+
+### Si el panel responde 429
+
+Significa que se pasó el límite de peticiones, **no** que algo esté roto. El cuerpo llega en
+JSON con el motivo. Los límites, por si hay que ajustarlos (`app.py`, arriba del todo):
+
+| Ámbito | Límite | Por qué ese |
+|---|---|---|
+| Global (todas las rutas) | 600/hora y 60/min | Holgado para un panel de pocas personas |
+| `/api/importador/iniciar` | **6/hora** | Es la única ruta que gasta dinero (Google Places) |
+| `/api/catalogo/heartbeat` | 600/min | Lo llama el worker cada pocos segundos: un límite corto **lo tumba** |
+| `/api/importador/estado` | 240/min | El panel lo sondea cada 3 s mientras hay corrida |
+| `/salud` | 600/min | Docker lo sondea cada 30 s; un 429 marcaría el contenedor enfermo |
+
+El contador vive **en memoria del proceso** y se reinicia al reiniciar el panel. Es exacto
+porque gunicorn corre `--workers 1`; **si algún día se sube a 2 workers, el límite deja de
+serlo en silencio**, igual que ya pasa con el estado del importador.
+
+Si el límite estorba en el uso normal, se sube el número en `app.py` y se reinicia. No hace
+falta tocar nada más.
+
+### Cómo leer el healthcheck
+
+```
+docker ps                      # la columna STATUS dice (healthy) o (unhealthy)
+docker inspect --format '{{json .State.Health}}' panel | python -m json.tool
+```
+
+⚠️ **`unhealthy` no reinicia nada por sí solo.** `restart: unless-stopped` reacciona a que el
+proceso *muera*, no a que el healthcheck falle, y Caddy hace `reverse_proxy panel:8000` sin
+`health_uri`, así que sigue mandando tráfico a un contenedor enfermo. Hoy el healthcheck da
+**visibilidad**, no reparación. Para cerrarlo hay dos caminos, y es decisión del owner:
+
+- `reverse_proxy panel:8000 { health_uri /salud health_interval 10s }` en el fragmento de
+  Caddy, para que deje de enrutar al contenedor enfermo.
+- Un sidecar `autoheal` en `docker-compose.yml`, que sí lo reinicia.
+
+Comprobar la ruta a mano, desde el servidor:
+
+```
+curl -s https://panelnioval.duckdns.org/salud     # {"ok":true}
+```
+
+No pide token a propósito: Docker no lo tiene. Devuelve `{'ok': true}` y nada más, porque es
+la única ruta pública del panel.
+
+### Qué pasa ahora al reiniciar el contenedor a media corrida
+
+Antes, el hilo del importador moría donde estuviera. Ahora recibe `SIGTERM`, termina lo que
+tiene entre manos y deja la corrida marcada como **`interrumpido`** (no `cancelado`, que es
+lo que significa que el operador pulsó Detener). Lo ya escrito en la hoja sigue ahí y volver
+a correr la ciudad continúa sin repetir lo pagado.
+
+El margen para cerrar ordenadamente es `--graceful-timeout 120`. Si se baja, la parada
+vuelve a no llegar a tiempo y el hilo muere como antes.
+
+### Si aparece un apóstrofo al principio de una celda
+
+Es el escape de fórmulas y **es correcto**: marca "esto es texto" y Sheets no lo muestra ni
+lo cuenta como parte del valor. Solo se aplica a lo que empieza por `=`, `+`, `-` o `@`, que
+Sheets interpretaría como fórmula. Si aparece en una celda que **no** empieza por uno de
+esos, eso sí es un fallo: reportarlo.
+
+### ⚠️ Si el panel arranca sin pedir contraseña
+
+Buscar en los logs de arranque:
+
+```
+*** PANEL_AUTH_DESACTIVADA=1: panel SIN autenticacion NI rate limiting. ***
+```
+
+Esa variable apaga **las dos cosas a la vez**. Es correcta en desarrollo y en los tests; en
+un despliegue real significa que el panel está **abierto a internet**. Quitarla del entorno
+y reiniciar.
+
+---
+
 ## Importador de prospectos (desde 2026-08-27)
 
 ### Qué significa cada número
