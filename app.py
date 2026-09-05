@@ -1,10 +1,13 @@
 """
 Panel Principal NIOVAL
 Dashboard centralizado: Prospectos + Seguimiento
-Deploy: Railway  |  Auth: GOOGLE_CREDENTIALS_JSON env var o archivo .json local
+Deploy: VPS Vultr (Docker + Caddy)  |  Auth: GOOGLE_CREDENTIALS_JSON env var o archivo .json local
 """
 
 from flask import Flask, jsonify, render_template_string, request, session
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 import secrets, threading
 try:
     import googlemaps
@@ -17,7 +20,7 @@ from gspread.exceptions import WorksheetNotFound
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-import os, json, time, io, base64, re, hmac, tempfile, subprocess, requests as req_lib
+import os, sys, json, time, io, base64, re, hmac, signal, tempfile, subprocess, requests as req_lib
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
@@ -32,8 +35,10 @@ app.json.sort_keys = False
 # ruidosamente, en vez de publicar el panel abierto. Bypass explícito para
 # desarrollo local y tests: PANEL_AUTH_DESACTIVADA=1.
 # Lectura directa (no vía _auth_desactivada()): esta guarda corre antes de que
-# la función se defina más abajo; llamarla aquí sería un NameError. Es la
-# única lectura directa de la variable en todo el archivo.
+# la función se defina más abajo; llamarla aquí sería un NameError.
+# Son las ÚNICAS DOS lecturas directas del archivo: esta y la del limitador de
+# T5.1, que se construye a nivel de módulo por el mismo motivo. Todo lo demás
+# usa _auth_desactivada().
 if os.environ.get('PANEL_AUTH_DESACTIVADA') != '1':
     if not os.environ.get('PANEL_DASHBOARD_TOKEN'):
         raise RuntimeError(
@@ -51,6 +56,86 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
 app.config.update(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE='Lax', SESSION_COOKIE_HTTPONLY=True)
 
 
+# ─── RATE LIMITING (Plan 5 · T5.1, M5) ───────────────────────────────────────
+# El gate de token es fail-closed y funciona, pero un token filtrado da barra
+# libre. Entre lo que da acceso esta /api/importador/iniciar, que dispara
+# corridas de Google Places: la unica API FACTURABLE del proyecto. El tope de
+# presupuesto del Plan 2 acota UNA corrida; nada acotaba cuantas se lanzan.
+#
+# En memoria del proceso, no Redis (decision D5·A del owner). gunicorn corre
+# --workers 1 --threads 4, asi que el contador es exacto: no hay dos memorias.
+# Si algun dia se sube a --workers 2, este limite deja de ser exacto EN
+# SILENCIO — la misma consecuencia ya anotada para _import_job y _cache en
+# docs/adr/2026-08-27-estado-compartido-importador.md.
+LIMITES_POR_DEFECTO = ["600 per hour", "60 per minute"]
+
+# El importador va aparte y mucho mas estricto: cada corrida cuesta dinero.
+LIMITE_IMPORTADOR = "6 per hour"
+
+# El heartbeat va aparte y HOLGADO. Lo llama un proceso legitimo cada pocos
+# segundos, y un limite mal calibrado aqui no "protege": tumba el worker de
+# catalogo del owner, que es lo que envia los catalogos por WhatsApp (R1).
+LIMITE_HEARTBEAT = "600 per minute"
+
+# El sondeo del importador tambien va aparte. El frontend llama a
+# /api/importador/estado cada 3 s mientras hay una corrida (con backoff hasta
+# 15 s), o sea ~20/minuto de UNA sola persona con la pestana abierta: un tercio
+# del limite por defecto solo por mirar. La ruta lee estado EN MEMORIA — no
+# toca Sheets ni Places— asi que acotarla igual que a una escritura no protege
+# nada y si estorba al operador.
+LIMITE_SONDEO = "240 per minute"
+
+# El healthcheck del contenedor. Docker lo sondea cada pocos segundos y NO
+# puede recibir un 429 jamas: Docker lo leeria como "el panel no responde",
+# marcaria el contenedor unhealthy y lo reiniciaria. El limitador provocaria
+# justo la caida que el healthcheck existe para detectar. Holgado, pero NO
+# exento: CE1 exige que ninguna ruta lo este, y esta es la unica publica.
+LIMITE_SALUD = "600 per minute"
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    # OJO: NO se pasa `app=` aqui. El constructor registra el before_request del
+    # limitador, y Flask los ejecuta EN ORDEN DE REGISTRO, parando en cuanto uno
+    # devuelve respuesta. Registrandolo aqui corria ANTES del gate de token, asi
+    # que una peticion anonima consumia cuota igual: 60 peticiones sin token
+    # agotaban el cubo global y a partir de ahi el usuario legitimo CON token
+    # recibia 429. Un DoS pre-auth, medido: 401 x60, luego 429 para todos.
+    # El init_app va mas abajo, despues de _requiere_token_panel.
+    default_limits=LIMITES_POR_DEFECTO,
+    storage_uri="memory://",
+    # Se apaga con la MISMA variable que ya usan conftest.py y el desarrollo
+    # local. Con el limitador activo en la suite, cada test consume cuota del
+    # siguiente y los resultados dependen del orden de ejecucion.
+    # Se construye SIEMPRE habilitado y se apaga justo despues si toca. No es
+    # un rodeo: con enabled=False en el constructor, Flask-Limiter ni siquiera
+    # crea el almacenamiento, y encenderlo luego revienta con AssertionError al
+    # tocar `limiter.storage`. Asi la suite puede activarlo para el test que lo
+    # necesita y volver a apagarlo.
+    enabled=True,
+    # NO tragarse los errores: con swallow_errors un fallo del almacenamiento
+    # dejaria pasar TODAS las peticiones pareciendo que el limitador funciona.
+    # Es el modo fail-open, y este proyecto ya tuvo uno abierto a internet.
+    swallow_errors=False,
+)
+
+# El init_app() y el apagado van mas abajo, justo despues de registrar el gate
+# de token: ver la nota del constructor sobre el orden de los before_request.
+
+
+@app.errorhandler(429)
+def _limite_excedido(e):
+    """429 en JSON, coherente con el resto de la API.
+
+    Flask-Limiter devuelve por defecto una pagina HTML, y el frontend hace
+    r.json() en todas las rutas: recibiria un error de parseo en vez del motivo
+    real, que es exactamente cuando el operador necesita entender que pasa.
+    """
+    return jsonify({
+        'error': 'demasiadas peticiones',
+        'detalle': str(getattr(e, 'description', '')),
+    }), 429
+
+
 # ─── AUTENTICACIÓN DEL PANEL (fail-closed) ───────────────────────────────────
 # El panel exige PANEL_DASHBOARD_TOKEN en TODAS las rutas (header
 # X-Dashboard-Token, ?token=, o cookie de sesión tras el primer acceso con
@@ -61,7 +146,25 @@ app.config.update(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE='Lax', SES
 # SECRET_KEY) no tiene guarda de arranque a propósito: el heartbeat es
 # telemetría, no un dato de cliente, y su ausencia falla cerrado en la propia
 # ruta (401) en vez de bloquear el arranque de todo el panel.
-_RUTAS_EXENTAS_AUTH = ('/api/catalogo/heartbeat',)  # el worker usa su propio WORKER_TOKEN
+# Se comparan ENDPOINTS, no rutas. La version anterior comparaba `request.path`
+# contra cadenas, y eso funcionaba por una coincidencia: `Request.path` colapsa
+# las barras iniciales duplicadas igual que el enrutador de Werkzeug, asi que
+# `//salud` acababa en la misma vista. security-reviewer lo probo con barras
+# dobles y triples, mayusculas, %2f, barra final y `../`, y no encontro bypass
+# — pero el guarda dependia de que las dos normalizaciones siguieran
+# coincidiendo, no del diseno. Atarlo al endpoint lo ata a la vista que de
+# verdad se va a ejecutar.
+#
+# `request.endpoint` ya esta resuelto cuando corren los before_request: Flask
+# hace el enrutado al empujar el contexto de peticion.
+_ENDPOINTS_EXENTOS_AUTH = (
+    'catalogo_heartbeat',  # el worker usa su propio WORKER_TOKEN
+    # /salud es el healthcheck del contenedor (Plan 5 T5.4). Va sin auth a
+    # proposito: Docker no tiene el token del panel, y un healthcheck que lo
+    # necesitara no podria correr. Es la UNICA ruta publica del panel, y por eso
+    # su cuerpo es un {'ok': True} pelado: ni versiones, ni rutas, ni estado.
+    'salud',
+)
 
 
 def _auth_desactivada() -> bool:
@@ -73,8 +176,7 @@ def _auth_desactivada() -> bool:
 def _requiere_token_panel():
     if _auth_desactivada():
         return
-    path = request.path or ''
-    if path in _RUTAS_EXENTAS_AUTH:
+    if request.endpoint in _ENDPOINTS_EXENTOS_AUTH:
         return
     token = os.environ.get('PANEL_DASHBOARD_TOKEN')
     if not token:
@@ -87,6 +189,88 @@ def _requiere_token_panel():
             session['dashboard_token'] = token  # recordar para la sesión del navegador
         return
     return jsonify({'ok': False, 'error': 'no autorizado'}), 401
+
+
+# ─── EL LIMITADOR SE ENGANCHA AQUI, NO ANTES ─────────────────────────────────
+# Despues de _requiere_token_panel a proposito: Flask ejecuta los before_request
+# en orden de registro y para en cuanto uno responde, asi que el gate de token
+# corta la peticion anonima ANTES de que consuma cuota. Con el orden al reves,
+# 60 peticiones sin token agotaban el cubo global y dejaban fuera al usuario
+# legitimo (medido: 401 x60 y luego 429 para todos, con token incluido).
+limiter.init_app(app)
+
+# Detras de Caddy, request.remote_addr es la IP del CONTENEDOR del proxy, no la
+# del cliente: sin esto TODAS las peticiones comparten un solo cubo y cualquier
+# visitante anonimo agota el limite de todo el panel. x_for=1 = un unico salto
+# de confianza (Caddy); Werkzeug toma el valor a 1 posicion desde la DERECHA de
+# X-Forwarded-For, asi que lo que el cliente antepone por la izquierda se
+# ignora y esto no reintroduce suplantacion.
+# Solo x_for. El limitador es el unico consumidor; x_proto y x_host no los usa
+# nadie (no hay url_for(_external=True), ni redirect, ni request.host en todo
+# app.py) y harian falsificables el Host y el esquema desde la red `web`. El dia
+# que alguien anada un enlace absoluto, eso seria inyeccion de Host sin haber
+# tocado una linea de seguridad. Minimo privilegio: coste funcional cero.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=0, x_host=0)
+
+if os.environ.get('PANEL_AUTH_DESACTIVADA') == '1':
+    limiter.enabled = False
+    # RUIDOSO de verdad. El comentario del bypass decia "explicito y ruidoso" y
+    # era mudo: ni un log. Esta misma variable apaga la autenticacion Y el rate
+    # limiting, asi que si queda puesta por error en Railway o en el VPS el
+    # panel arranca abierto y sin limites, y la unica forma de enterarse era
+    # mirar las variables a mano. Es el patron exacto del incidente de las 38
+    # rutas expuestas que ya documenta CLAUDE.md.
+    print('*** PANEL_AUTH_DESACTIVADA=1: panel SIN autenticacion NI rate '
+          'limiting. Correcto en desarrollo y en tests; en un despliegue real '
+          'significa que el panel esta ABIERTO a internet. ***',
+          file=sys.stderr, flush=True)
+
+
+def _es_sonda_local():
+    """True si la peticion viene del propio contenedor, sin poder falsearlo.
+
+    Se mira la REMOTE_ADDR que habia ANTES de ProxyFix, que es la del socket y
+    no la cabecera. Usar `request.remote_addr` aqui seria el bug: es justo el
+    valor que ProxyFix deja escribir a quien manda X-Forwarded-For.
+
+    Existe por una interaccion que solo se ve mirando los cinco cambios juntos:
+    /salud es la unica ruta que un no autenticado empuja hasta el limitador, el
+    cubo es por IP, y la sonda de Docker corre DENTRO del contenedor, o sea con
+    clave 127.0.0.1. Sin esto, cualquiera de la red `web` podia mandar 600
+    peticiones con `X-Forwarded-For: 127.0.0.1`, agotar ESE cubo y hacer que la
+    sonda propia de Docker recibiera 429 -> contenedor `unhealthy`.
+
+    Hoy eso solo seria ruido, porque `unhealthy` no reinicia nada. Se cierra
+    AHORA porque las dos formas de arreglar eso (sidecar autoheal, o health_uri
+    en Caddy) lo convertirian en un boton de reinicio remoto que ademas corta
+    una corrida del importador — justo lo que M3 existe para evitar.
+    """
+    original = request.environ.get('werkzeug.proxy_fix.orig', {})
+    return original.get('REMOTE_ADDR') in ('127.0.0.1', '::1')
+
+
+@app.route('/salud')
+@limiter.limit(LIMITE_SALUD, exempt_when=_es_sonda_local)
+def salud():
+    """Healthcheck del contenedor (Plan 5 · T5.4, M9).
+
+    Responde 200 si el proceso esta vivo y sirviendo peticiones. Eso es TODO lo
+    que un healthcheck debe comprobar, y las tres cosas que NO hace importan
+    tanto como la que hace:
+
+    - **No toca Google.** Un healthcheck que llama a Sheets reportaria enfermo
+      un panel sano cada vez que Google tuviera un mal rato, y ademas gastaria
+      cuota en cada sondeo.
+    - **No mira el estado interno.** Si la respuesta cambiara segun haya o no
+      una corrida en curso, estaria filtrando operacion a cualquiera desde
+      internet, y ademas dejaria de ser una respuesta estable.
+    - **No dice nada mas.** Ni version, ni commit, ni hostname, ni rutas. Es la
+      unica ruta del panel sin autenticacion: todo lo que devuelva lo lee
+      cualquiera. Un `{'ok': True}` pelado no le sirve a nadie que no sea Docker.
+
+    Va exenta de la auth en `_ENDPOINTS_EXENTOS_AUTH`, no del limitador.
+    """
+    return jsonify({'ok': True})
 
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────
@@ -229,7 +413,7 @@ def _construir_pago_folder_id():
         'PAGO_FOLDER_ID no configurado. '
         'Crea una carpeta en tu Google Drive, compártela con '
         'maps-905@bubbly-subject-412101.iam.gserviceaccount.com (Editor) '
-        'y agrega el ID de la carpeta como variable PAGO_FOLDER_ID en Railway.'
+        'y agrega el ID de la carpeta como variable PAGO_FOLDER_ID en el entorno del VPS (/srv/panel/secretos/.env).'
     )
 
 
@@ -468,7 +652,9 @@ def update_pago_url():
             return jsonify({'ok': False, 'error': 'columnas no encontradas'})
         for i, row in enumerate(rows[1:], start=2):
             if str(row[col_factura - 1]).strip() == num_factura:
-                ws.update_cell(i, col_pago, url)
+                # update_cell FUERZA USER_ENTERED (no admite value_input_option),
+                # asi que una URL que empiece por '=' se guardaria como formula.
+                ws.update_cell(i, col_pago, _escapar_formula(url))
                 _cache_pop('ventas')
                 return jsonify({'ok': True})
         return jsonify({'ok': False, 'error': 'factura no encontrada'})
@@ -494,7 +680,7 @@ def upload_pago():
         # 1. Subir a ImgBB (hosting gratuito, evita limite de cuota de Drive)
         imgbb_key = os.environ.get('IMGBB_API_KEY', '').strip()
         if not imgbb_key:
-            return jsonify({'ok': False, 'error': 'IMGBB_API_KEY no configurado. Obtén una key gratuita en imgbb.com/api y agrégala en Railway.'}), 500
+            return jsonify({'ok': False, 'error': 'IMGBB_API_KEY no configurado. Obtén una key gratuita en imgbb.com/api y agrégala al entorno del VPS (/srv/panel/secretos/.env).'}), 500
 
         img_b64 = base64.b64encode(contenido).decode('utf-8')
         imgbb_resp = req_lib.post(
@@ -529,7 +715,10 @@ def upload_pago():
             for i, row in enumerate(rows[1:], start=2):
                 val = row[col_factura - 1] if len(row) >= col_factura else ''
                 if str(val).strip() == num_factura:
-                    ws.update_cell(i, col_pago, url_drive)
+                    # Viene de la respuesta de ImgBB (tercero), no del usuario,
+                    # pero update_cell es USER_ENTERED igual: se escapa por lo
+                    # mismo que las demas.
+                    ws.update_cell(i, col_pago, _escapar_formula(url_drive))
                     fila_actualizada = i
                     break
 
@@ -926,17 +1115,71 @@ def api_seguimiento():
     return jsonify(data)
 
 
+class FueraDeRango(ValueError):
+    """La coordenada pedida no es escribible. Se traduce a 400, no a 500."""
+
+
+def _fila_valida(ws, fila):
+    """Valida una fila de destino, o lanza FueraDeRango (Plan 5 · T5.1).
+
+    Dos cosas, y ninguna es cosmetica:
+
+    - **La fila 1 nunca.** Ahi viven los encabezados, y TODO el sistema resuelve
+      columnas con `headers.index(nombre)`. Escribir ahi no rompe una fila:
+      rompe en silencio cada lectura y escritura futura de esa hoja, para todo
+      el personal.
+    - **Tope superior.** Sin el se puede escribir en la fila 999.999.999 y
+      expandir la grilla. `seguimiento` y `bruce` comparten spreadsheet y el
+      limite de celdas es del ARCHIVO entero, asi que inflar una pestana rompe
+      los append de las demas.
+
+    Lo encontro `security-reviewer` en T5.2 (dos CRITICAL). El escape de
+    formulas impide la formula; esto impide la escritura arbitraria, que es un
+    control distinto.
+    """
+    try:
+        fila = int(fila)
+    except (TypeError, ValueError, OverflowError):
+        # OverflowError: {"_row": 1e400} llega como float('inf'), que int() no
+        # puede convertir. Sin capturarlo daba 500 en vez de 400.
+        raise FueraDeRango('fila no numerica')
+    if fila < 2:
+        raise FueraDeRango('la fila 1 son los encabezados y no se escribe')
+    tope = getattr(ws, 'row_count', None)
+    # `is not None` y no truthy: con row_count = 0 el tope superior desaparecia
+    # en silencio y solo quedaba la cota de fila >= 2.
+    if tope is not None and fila > tope:
+        raise FueraDeRango(f'fila {fila} fuera de la hoja (tope {tope})')
+    return fila
+
+
+def _columna_valida(ws, col):
+    try:
+        col = int(col)
+    except (TypeError, ValueError, OverflowError):
+        raise FueraDeRango('columna no numerica')
+    if col < 1:
+        raise FueraDeRango('columna fuera de rango')
+    tope = getattr(ws, 'col_count', None)
+    if tope is not None and col > tope:
+        raise FueraDeRango(f'columna {col} fuera de la hoja (tope {tope})')
+    return col
+
+
 def _sheet_update_row(ws_key, row_num, fields, cache_key=None):
     """Actualiza celdas de una hoja por nombre de columna."""
     import gspread.utils as gsu
     ws = get_worksheet(ws_key)
+    row_num = _fila_valida(ws, row_num)
     headers = ws.row_values(1)
     updates = []
     for col_name, value in fields.items():
         if col_name in headers:
             col_idx = headers.index(col_name) + 1
             a1 = gsu.rowcol_to_a1(int(row_num), col_idx)
-            updates.append({'range': a1, 'values': [[str(value)]]})
+            # El body no tiene allowlist: cualquier clave que coincida con un
+            # encabezado llega a una celda, y esto escribe con USER_ENTERED.
+            updates.append({'range': a1, 'values': [[_valor_para_celda(value)]]})
     if updates:
         ws.batch_update(updates, value_input_option='USER_ENTERED')
     _cache_pop(cache_key or ws_key)
@@ -954,6 +1197,9 @@ def api_seguimiento_update():
         n = _sheet_update_row('seguimiento', row_num, fields)
         print(f"[seguimiento] update row={row_num} fields={list(fields.keys())} updated={n}")
         return jsonify({'ok': True, 'updated': n})
+    except FueraDeRango as e:
+        # 400 y no 500: es una peticion invalida, no un fallo del panel.
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -970,11 +1216,29 @@ def api_mensajes_update():
     try:
         import gspread.utils as gsu
         ws = get_worksheet('mensajes')
-        a1 = gsu.rowcol_to_a1(int(row_num), int(col_num))
-        ws.update(a1, [[str(contenido)]], value_input_option='USER_ENTERED')
+        # La peor de las tres rutas: _row y _col son indices CRUDOS del body y
+        # ni siquiera pasan por nombre de encabezado. Sin cota, esto era una
+        # primitiva de escritura de celda arbitraria sobre la hoja que alimenta
+        # los telefonos y plantillas que envio_catalogo.py manda por WhatsApp.
+        a1 = gsu.rowcol_to_a1(_fila_valida(ws, row_num), _columna_valida(ws, col_num))
+        # Dos arreglos en una linea, y el orden importa entenderlo:
+        #
+        # 1) La firma. Hasta gspread 5.x era update(range_name, values); en 6.x
+        #    es update(values, range_name). Esta llamada usaba el orden viejo,
+        #    asi que con la version instalada (6.2.1) pasaba la celda como
+        #    valores y la lista como rango. requirements.txt pide
+        #    `gspread>=5.12.0` sin fijar, o sea que un pip install nuevo trae 6.x
+        #    y esta ruta deja de escribir. Escapar formulas en una llamada rota
+        #    no habria protegido nada.
+        # 2) El escape. `contenido` es texto de usuario del body y esto escribe
+        #    con USER_ENTERED.
+        ws.update([[_escapar_formula(str(contenido))]], a1,
+                  value_input_option='USER_ENTERED')
         _cache_pop('mensajes')
         print(f"[mensajes] update col={col_num} row={row_num}")
         return jsonify({'ok': True})
+    except FueraDeRango as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -3089,7 +3353,7 @@ def guardar_respuesta_formulario(datos):
         col_b = ws.col_values(2)
         ultima_fila = len(col_b) + 1
 
-        fecha_hora = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        fecha_hora = nc.ahora_mexico().strftime('%d/%m/%Y %H:%M:%S')
         tienda     = datos.get('tienda', '')
         r0         = datos.get('r0', '')
         r1         = datos.get('r1', '')
@@ -3199,7 +3463,7 @@ def api_bruce_agregar():
         return jsonify({'error': 'Nombre requerido'}), 400
     try:
         ws = get_bruce_ws()
-        fecha = datetime.now().strftime('%d/%m/%Y %H:%M')
+        fecha = nc.ahora_mexico().strftime('%d/%m/%Y %H:%M')
         ws.append_row([fecha, nombre, telefono, tipo, '', nota])
         _cache_pop('bruce')
         return jsonify({'ok': True})
@@ -3217,6 +3481,7 @@ def api_bruce_actualizar():
     try:
         import gspread.utils as gsu
         ws = get_bruce_ws()
+        row_num = _fila_valida(ws, row_num)
         headers = [str(h).strip() for h in ws.row_values(1)]
         updates = []
         for field, value in body.items():
@@ -3225,11 +3490,14 @@ def api_bruce_actualizar():
             if field in headers:
                 col = headers.index(field) + 1
                 a1  = gsu.rowcol_to_a1(int(row_num), col)
-                updates.append({'range': a1, 'values': [[str(value)]]})
+                # Mismo caso que seguimiento: sin allowlist y con USER_ENTERED.
+                updates.append({'range': a1, 'values': [[_valor_para_celda(value)]]})
         if updates:
             ws.batch_update(updates, value_input_option='USER_ENTERED')
         _cache_pop('bruce')
         return jsonify({'ok': True})
+    except FueraDeRango as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -3518,7 +3786,7 @@ def catalogo_corregir_numero():
         if not nc.transicion_valida(estado_actual, nc.PENDIENTE):
             return jsonify({'ok': False, 'error': f'No se puede corregir desde {estado_actual}'}), 400
         tel_norm = nc.normalizar_telefono(nuevo_tel)
-        ahora = datetime.now().strftime(nc.FMT_TIMESTAMP)
+        ahora = nc.ahora_mexico().strftime(nc.FMT_TIMESTAMP)
         try:
             intentos_actual = int(_valor_fila(filas, col, envio_row, 'intentos') or 0)
         except (TypeError, ValueError):
@@ -3591,7 +3859,7 @@ def catalogo_reintentar():
         estado_actual = str(_valor_fila(filas, col, envio_row, 'estado')).strip().upper()
         if not nc.transicion_valida(estado_actual, nc.PENDIENTE):
             return jsonify({'ok': False, 'error': f'No se puede reintentar desde {estado_actual}'}), 400
-        ahora = datetime.now().strftime(nc.FMT_TIMESTAMP)
+        ahora = nc.ahora_mexico().strftime(nc.FMT_TIMESTAMP)
         ws.batch_update([
             {'range': gsu.rowcol_to_a1(envio_row, col['estado']), 'values': [[nc.PENDIENTE]]},
             {'range': gsu.rowcol_to_a1(envio_row, col['timestamp_estado']), 'values': [[ahora]]},
@@ -3654,6 +3922,7 @@ WORKER_HEARTBEAT_TTL = 15 * 60  # 15 min sin heartbeat → "muerto"
 
 
 @app.route('/api/catalogo/heartbeat', methods=['POST'])
+@limiter.limit(LIMITE_HEARTBEAT)
 def catalogo_heartbeat():
     """El worker local reporta que está vivo. Exige WORKER_TOKEN (fail-closed)."""
     if not _auth_desactivada():
@@ -4632,12 +4901,115 @@ def _nuevo_import_job(ciudad='', status='idle'):
         'log':        [],
         'error':      '',
         'cancelado':  False,
+        'parada_por_senal': False,
         'medidor':    _nuevo_medidor(),
     }
 
 
 _import_job = _nuevo_import_job()
 _import_lock = threading.Lock()
+
+
+# ─── Parada ordenada ante SIGTERM (Plan 5 · T5.5, M3) ────────────────────────
+# El hilo del importador es daemon=True: al reiniciar el contenedor muere donde
+# este. El Plan 3 ya cerro la mitad visible (el registro de mas abajo permite
+# decir "se interrumpio"). Esto cierra la otra mitad: que la corrida se ENTERE
+# de que la estan parando y cierre con lo ya guardado.
+#
+# No hay un segundo camino de salida. El bucle del worker ya consulta una
+# bandera entre categorias para la cancelacion manual del operador, y la senal
+# se engancha a esa misma. Se consulta ENTRE negocios, nunca a media escritura.
+_parada_solicitada = threading.Event()
+
+
+def _solicitar_parada_ordenada():
+    """Pide al worker que cierre en el proximo punto seguro. Idempotente."""
+    _parada_solicitada.set()
+    _marcar_corrida_interrumpida()
+
+
+def _marcar_corrida_interrumpida(espera=1.0):
+    """Marca la corrida en curso, sin bloquear indefinidamente.
+
+    Se llama desde un manejador de senal, y `_import_lock` no es reentrante. Un
+    timeout convierte el peor caso de "el apagado se cuelga hasta el SIGKILL" en
+    "la corrida no queda marcada": lo segundo se nota y no cuelga nada. La
+    bandera `_parada_solicitada` ya esta puesta, asi que el bucle para igual.
+    """
+    if not _import_lock.acquire(timeout=espera):
+        print('[importador] no se pudo marcar la corrida como interrumpida: '
+              'el lock estaba ocupado. La parada sigue en marcha.',
+              file=sys.stderr, flush=True)
+        return
+    try:
+        if _import_job.get('status') == 'running':
+            # La MISMA bandera que ya consulta el bucle entre categorias.
+            _import_job['cancelado'] = True
+        # Pero marcada como parada por senal: que el operador pulse Detener y
+        # que el contenedor se reinicie no son lo mismo, y la interfaz y el
+        # registro persistido los muestran distinto.
+        _import_job['parada_por_senal'] = True
+    finally:
+        # Sin esto el lock se adquiere y no se suelta nunca, y cuelga el panel
+        # entero. `with` lo daba gratis; al cambiar a acquire(timeout) hay que
+        # escribirlo a mano.
+        _import_lock.release()
+
+
+def _instalar_parada_ordenada():
+    """Engancha SIGTERM sin pisar a quien ya estuviera. Devuelve si se instalo.
+
+    ENCADENA a proposito, y no es cortesia. En gunicorn, `init_signals()` corre
+    ANTES de `load_wsgi()` (workers/base.py:120 y :137), asi que cuando se
+    importa este modulo el manejador de gunicorn YA esta puesto y un
+    `signal.signal()` nuestro lo reemplaza. Su `handle_exit` solo hace
+    `self.alive = False`, que es como el worker se entera de que debe terminar:
+    pisarlo dejaria a gunicorn sin apagado ordenado y cada parada acabaria en
+    SIGKILL al agotar el `graceful_timeout`.
+
+    `signal.signal` solo funciona en el hilo principal; en cualquier otro lanza
+    ValueError. Se devuelve False en vez de reventar el arranque.
+    """
+    try:
+        anterior = signal.getsignal(signal.SIGTERM)
+
+        def _manejar(sig, frame):
+            # La bandera PRIMERO: no necesita lock y es lo que leen los puntos
+            # de parada del bucle.
+            _parada_solicitada.set()
+            # Encadenar ANTES de tocar el lock. `handle_exit` de gunicorn solo
+            # hace `alive = False`, y retrasarlo retrasa el apagado ordenado que
+            # este cambio existe para permitir. Ademas `_import_lock` NO es
+            # reentrante: si la senal cae dentro de un `with _import_lock:` del
+            # propio hilo principal, tomarlo aqui se autobloquea hasta el
+            # SIGKILL.
+            if callable(anterior):
+                anterior(sig, frame)
+                _marcar_corrida_interrumpida()
+                return
+            _marcar_corrida_interrumpida()
+            # SIG_DFL y SIG_IGN son enteros, no invocables, y aqui estuvo el
+            # fallo peor de esta tarea: limitarse a `if callable(anterior)` y
+            # volver NEUTRALIZA la senal. Sin gunicorn delante —pytest, CI,
+            # `python app.py` en local— el anterior es SIG_DFL, cuya semantica
+            # es "termina el proceso": sustituirlo por un manejador que solo
+            # pone una bandera dejaba el proceso inmune a SIGTERM para siempre.
+            # Se restaura la disposicion original y se reenvia la senal para
+            # que haga lo que habria hecho.
+            signal.signal(sig, anterior)
+            os.kill(os.getpid(), sig)
+
+        signal.signal(signal.SIGTERM, _manejar)
+        return True
+    except (ValueError, OSError, RuntimeError) as e:
+        # No es fatal: sin el manejador se vuelve al comportamiento de antes,
+        # que es el bug conocido, no una caida.
+        print(f'[importador] no se pudo instalar la parada ordenada: {e}',
+              file=sys.stderr, flush=True)
+        return False
+
+
+_instalar_parada_ordenada()
 
 
 # ─── Registro de corrida interrumpida ────────────────────────────────────────
@@ -4841,6 +5213,10 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                     aporte_variacion = _aporte_nuevo(lugares, vistos, ids_de_esta_consulta)
                     paginas = 1
                     while 'next_page_token' in resp and paginas < MAX_PAGINAS_POR_CONSULTA:
+                        # Punto de parada: entre paginas, con el hilo ya
+                        # detenido en el sleep y sin escritura en vuelo.
+                        if _parada_solicitada.is_set():
+                            break
                         time.sleep(2)
                         try:
                             resp = gmaps_client.places(page_token=resp['next_page_token'])
@@ -4947,6 +5323,8 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                                 'Tamaño':           tamano,
                                 'Tipo Cliente':     'Mayorista/Corporativo' if resenas > 300 else 'Minorista',
                             })
+                            if _parada_solicitada.is_set():
+                                break
                             time.sleep(0.3)
                         except PresupuestoAgotado:
                             raise            # el tope no es un tropiezo de la API
@@ -4972,6 +5350,12 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
 
             if consulta_ok:
                 consultas_ok += 1
+            # Punto de parada entre variaciones. Sin estos, el unico control
+            # de toda la corrida estaba entre las DOS categorias, y una
+            # categoria dura minutos: el graceful_timeout de gunicorn (30 s)
+            # llegaba antes y la parada ordenada no se ejecutaba nunca.
+            if _parada_solicitada.is_set():
+                break
             if query != variaciones[-1]: time.sleep(1)
 
         # Ninguna de las variaciones logro hablar con Places: eso no es "no hay
@@ -5008,6 +5392,17 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
     return resultados, stats, incidencias
 
 
+# Claves del dict `incidencias` que devuelve _buscar_negocios. Existen como
+# constante porque el worker las lee TODAS y un doble de prueba incompleto
+# revienta con KeyError a mitad de corrida: al escribir el test de la parada
+# ordenada se fallo tres veces seguidas adivinandolas de una en una.
+# OJO: 'cortes' es una LISTA (el worker la recorre); las demas son contadores.
+CLAVES_INCIDENCIAS = ('ya_en_hoja', 'cortes', 'detalles_desde_cache',
+                      'detalles_fallidos', 'paginas_fallidas',
+                      'consultas_fallidas', 'ya_vistos_otra_cat',
+                      'detalles_evitados')
+
+
 def _aporte_nuevo(pagina, vistos, ya_contados):
     """Cuantos place_id de esta pagina NO se habian visto todavia en la corrida.
 
@@ -5034,6 +5429,14 @@ def _clave_contacto(nombre, direccion):
     return f"{nombre}|{direccion}"
 
 
+# Caracteres de formato de ancho cero, por CODEPOINT y no literales: un
+# invisible escrito tal cual en el fuente no se ve al revisar, y este proyecto
+# ya tuvo un byte que volvio un archivo invisible para el barrido de secretos.
+# lstrip() sin argumentos ya cubre TODO espacio unicode (NBSP, ideografico,
+# separadores de linea); estos cinco no son "espacio" para Python y van aparte.
+_INVISIBLES = ''.join(chr(c) for c in (0xFEFF, 0x200B, 0x200C, 0x200D, 0x2060))
+
+
 def _escapar_formula(valor):
     """Evita que Sheets interprete un texto como formula.
 
@@ -5047,10 +5450,42 @@ def _escapar_formula(valor):
     parte del valor almacenado. Solo se toca lo que es cadena: los numeros
     (calificacion, resenas, latitud, longitud) y las fechas deben seguir
     entrando como numero y fecha, que es justo lo que RAW habria roto.
+
+    Se mira el primer caracter NO EN BLANCO, no el primero a secas. Mirar solo
+    el primero es el bypass clasico de este control: " =SUM(A1:A9)" con un
+    espacio delante no casaba, y Excel recorta ese espacio al importar el CSV y
+    ejecuta la formula igual. Lo mismo con tabulador, salto de linea, BOM y
+    espacio de ancho cero, que ademas son invisibles al revisar la hoja.
+
+    El apostrofo se antepone al valor ORIGINAL, no al recortado: los espacios
+    de delante son parte del dato del usuario y no se tiran.
     """
-    if isinstance(valor, str) and valor[:1] in ('=', '+', '-', '@'):
+    if not isinstance(valor, str):
+        return valor
+    # lstrip() sin argumentos cubre TODO espacio unicode (NBSP, ideografico,
+    # separadores de linea): la lista fija anterior los dejaba pasar. Los cinco
+    # caracteres de formato no son "espacio" para Python y siguen aparte.
+    sin_blancos = valor.lstrip().lstrip(_INVISIBLES)
+    if sin_blancos[:1] in ('=', '+', '-', '@'):
         return "'" + valor
     return valor
+
+
+def _valor_para_celda(valor):
+    """Prepara un valor de body JSON para escribirlo en una celda.
+
+    El orden importa y ya se hizo mal una vez: envolver en `str()` ANTES de
+    escapar anula el paso limpio de numeros que `_escapar_formula` tiene por
+    diseno, y un -50 legitimo acaba guardado como texto "'-50", rompiendo en
+    silencio cualquier SUM de esa columna. Los numeros se escapan primero como
+    numeros (o sea, no se tocan) y solo lo demas se convierte a texto.
+
+    `bool` se excluye a proposito: en Python es subclase de `int`, y escribir
+    True/False como numero en la hoja no es lo que espera nadie.
+    """
+    if isinstance(valor, (int, float)) and not isinstance(valor, bool):
+        return valor
+    return _escapar_formula(valor if isinstance(valor, str) else str(valor))
 
 
 def _exportar_a_sheets(resultados, categoria, ciudad, claves_existentes=None):
@@ -5076,8 +5511,8 @@ def _exportar_a_sheets(resultados, categoria, ciudad, claves_existentes=None):
         claves_existentes.update(frescas)
         nombres_existentes = claves_existentes
 
-    fecha  = datetime.now().strftime('%d/%m/%Y')
-    semana = datetime.now().isocalendar()[1]
+    fecha  = nc.ahora_mexico().strftime('%d/%m/%Y')
+    semana = nc.ahora_mexico().isocalendar()[1]
     nuevos = []
     claves_nuevas = set()   # se vuelcan al conjunto compartido solo si se escribe
 
@@ -5344,7 +5779,12 @@ def _worker_importador(ciudad, gmaps_api_key):
             # Una corrida cancelada NO es una corrida completada: lo escrito
             # antes del corte es valido, pero decir 'done' seria afirmar que se
             # recorrio todo.
-            _import_job['status'] = 'cancelado' if fue_cancelada else 'done'
+            # Una parada por SIGTERM no es una cancelacion del operador: la
+            # interfaz las muestra distinto y el registro persistido tambien.
+            if fue_cancelada and _import_job.get('parada_por_senal'):
+                _import_job['status'] = 'interrumpido'
+            else:
+                _import_job['status'] = 'cancelado' if fue_cancelada else 'done'
             if fue_cancelada:
                 # `desglose` solo tiene las categorias que llegaron a escribir.
                 completadas = len(desglose)
@@ -5453,6 +5893,13 @@ def importador_page():
 
 
 @app.route('/api/importador/iniciar', methods=['POST'])
+# deduct_when: solo descuenta si la corrida ARRANCO. El cubo es de 6/hora y el
+# almacenamiento es memoria, o sea que no hay forma de resetearlo sin reiniciar
+# el proceso. Sin esto, cada rechazo consumia cuota igual —ciudad vacia, "ya hay
+# una busqueda en curso", y sobre todo el 503 nuevo del apagado— y seis clics
+# inocentes durante un redespliegue dejaban el importador bloqueado una hora.
+@limiter.limit(LIMITE_IMPORTADOR,
+               deduct_when=lambda respuesta: respuesta.status_code < 400)
 def importador_iniciar():
     global _import_job
     ciudad       = request.json.get('ciudad', '').strip()
@@ -5462,6 +5909,24 @@ def importador_iniciar():
         return jsonify({'ok': False, 'error': 'Ciudad requerida'})
     if not gmaps_api_key:
         return jsonify({'ok': False, 'error': 'GMAPS_API_KEY no configurada'})
+
+    # El proceso ya recibio SIGTERM y se esta apagando. Arrancar aqui una
+    # corrida nueva es gastar Places para que el SIGKILL la corte a media
+    # escritura: justo lo que T5.5 viene a evitar. La ventana es estrecha pero
+    # real — un redeploy mientras alguien pulsa Iniciar — y el worker de gthread
+    # sigue atendiendo peticiones un instante despues de `alive = False`.
+    #
+    # La bandera NO se limpia, y es deliberado. Significa "este proceso se esta
+    # apagando", que no es una condicion por corrida sino del proceso entero:
+    # limpiarla al arrancar una corrida seria mentir sobre el estado del worker.
+    #
+    # Tampoco choca con el ADR de estado compartido, que exige que el registro
+    # persistido NUNCA vete una corrida nueva: eso habla de lo que sobrevive a
+    # un reinicio, y esto vive solo en la memoria de un proceso que va a morir.
+    # El siguiente proceso arranca con la bandera limpia.
+    if _parada_solicitada.is_set():
+        return jsonify({'ok': False,
+                        'error': 'El panel se esta apagando; reintenta en un momento'}), 503
 
     with _import_lock:
         if _import_job['status'] == 'running':
@@ -5496,6 +5961,7 @@ def importador_cancelar():
 
 
 @app.route('/api/importador/estado')
+@limiter.limit(LIMITE_SONDEO)
 def importador_estado():
     with _import_lock:
         snap = {

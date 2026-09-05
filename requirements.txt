@@ -9,11 +9,26 @@ google-api-python-client>=2.100.0
 googlemaps>=4.10.0
 gunicorn>=21.0.0
 
+# Flask-Limiter: rate limiting de todas las rutas (Plan 5 T5.1, M5). En memoria
+# del proceso, sin Redis (decision D5-A del owner): gunicorn corre --workers 1
+# --threads 4, asi que el contador es exacto porque no hay dos memorias.
+# Se fija el MAYOR a 4 a proposito: la configuracion cambio entre 2.x, 3.x y
+# 4.x, y escribirla de memoria produce limites que no se aplican.
+Flask-Limiter>=4.0,<5
+
 # requests se usa DIRECTAMENTE en app.py, envio_catalogo.py, worker_catalogo_run.py
 # y tools/smoke_panel.py. Estaba sin declarar y funcionaba solo porque gspread y
 # google-auth lo arrastran: el dia que alguna cambie de cliente HTTP, el panel
 # deja de arrancar sin que nadie haya tocado nada.
 requests>=2.31.0
+
+# tzdata: base de zonas horarias (Plan 5 T5.3). python:3.11-slim NO la trae, y
+# sin ella zoneinfo.ZoneInfo('America/Mexico_City') lanza ZoneInfoNotFoundError
+# al importar nucleo_catalogo.py: el panel no arranca. En Windows tampoco existe
+# la base del sistema, asi que tambien hace falta en local. No es opcional ni
+# "por si acaso": es el riesgo R3 del plan, cuyo impacto es una caida en
+# produccion.
+tzdata>=2024.1
 
 # RETIRADOS (no los importa nadie, comprobado con ast sobre todos los .py y con
 # sys.modules tras importar app.py):

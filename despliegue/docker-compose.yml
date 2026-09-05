@@ -11,6 +11,19 @@ services:
       - ./secretos/.env
     volumes:
       - ./secretos/credentials.json:/app/credentials.json:ro
+    # Healthcheck tambien aqui, no solo en el Dockerfile: la copia VIVA de este
+    # compose es la que manda en el VPS, y `docker compose ps` lee esta.
+    # Mismo motivo que alli para usar python y no curl: la imagen no trae curl.
+    healthcheck:
+      # ProxyHandler({}) vacio: en Linux urllib NO exceptua 127.0.0.1 de las
+      # variables de proxy, y este compose carga secretos/.env ENTERO con
+      # env_file. El dia que ahi haya un HTTP_PROXY, el healthcheck saldria a la
+      # red en vez de sondear localhost y reportaria enfermo un panel sano.
+      test: ["CMD", "python", "-c", "import urllib.request,sys; abridor=urllib.request.build_opener(urllib.request.ProxyHandler({})); sys.exit(0 if abridor.open('http://127.0.0.1:8000/salud', timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
     mem_limit: 768m
     networks:
       - web

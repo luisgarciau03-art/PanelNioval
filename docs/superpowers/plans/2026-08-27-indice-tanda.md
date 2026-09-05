@@ -293,9 +293,24 @@ archivo" sino "añadirle cinco nombres"; el bloque exacto está en §7.
 | Plan 2 — Optimización del gasto de Places | 9 | ✅ **COMPLETADO** | **9 / 9** |
 | Plan 1 — Relevancia de ciudades nacional | 10 | PENDIENTE | 0 / 10 |
 | Plan 4 — Rediseño profesional del panel | 12 | PENDIENTE | 0 / 12 |
-| Plan 5 — Endurecimiento del panel ⭐ | 8 | PENDIENTE | 0 / 8 |
+| Plan 5 — Endurecimiento del panel ⭐ | 8 | ✅ **COMPLETADO** | **8 / 8** |
 
-**PROGRESO GLOBAL: 23 / 53 tareas (43 %) · 3 de 6 planes completados**
+**PROGRESO GLOBAL EN ESTA RAMA: 31 / 53 tareas (58 %) · 4 de 6 planes completados**
+
+> ⚠️ **Esta copia del marcador está desfasada a propósito, y no hay que "arreglarla" aquí.**
+> La rama `fix/endurecimiento-panel` (Plan 5) sale de `main` @ `82995c3` por decisión **E5**
+> del owner, y en `main` los Planes 1 y 4 todavía figuran PENDIENTE porque su cierre vive en
+> los PRs **#42** y **#43**, aún sin mergear. El marcador real de la tanda es **53 / 53
+> (100 %) · 6 de 6 planes completados**: 45 de los PRs abiertos más las 8 de este plan.
+>
+> **Plan 5 cerrado el 2026-09-04**, 8/8. Baseline **388 → 620 passed, 1 skipped** (+232
+> tests). Partida en [`…t50-estado-de-partida.md`](../../auditoria/2026-09-04-t50-estado-de-partida.md);
+> cierre en [`…t56-verificacion-integral.md`](../../auditoria/2026-09-04-t56-verificacion-integral.md).
+> **9 de 10 criterios cumplidos**; CE8 (ver el contenedor `unhealthy`) es el gate 5 del owner.
+>
+> **Al rebasar esta rama sobre un `main` que ya tenga #43 dentro**, este bloque y las filas
+> de los Planes 1, 4 y 5 se reconcilian en una sola edición: Planes 1 y 4 a ✅, y el total a
+> 45 + las tareas cerradas del Plan 5. Es un conflicto **esperado**, no una regresión.
 
 > Sobre el alcance original de 4 planes (41 tareas), el avance es **17 / 41 (41 %)**. El
 > denominador subió porque se redactaron dos planes que el §4 recomendaba y nadie había
@@ -353,7 +368,7 @@ Ninguno se puede cerrar desde una sesión de Claude. Se **reportan**, no se inte
 | 5 | **Añadir a `.env.example` los nombres de las 5 variables de Places.** El archivo **existe y está versionado** (21 líneas), pero ninguna de las cinco está. El entorno de Claude bloquea escribir archivos `.env*` | Documentación del Plan 2 · T2.8 |
 | 6 | **Validación humana del top-20 de ciudades** | Plan 1 · T1.8 |
 | 7 | **Rotar `TELEGRAM_TOKEN`** (expuesto en el historial git, ~14 copias) | Nada técnico, pero es el riesgo abierto más grande |
-| 8 | **Apagar el despliegue de Railway** (sigue vivo sin `PANEL_DASHBOARD_TOKEN`) | Cierre de M6 |
+| 8 | **Railway: confirmar en la consola si está borrado o solo detenido.** El owner lo apagó el 2026-09-05 y **ninguna ruta responde 200**, así que la exposición está cerrada. Pero los registros no cuadran: el RUNBOOK lo dio por eliminado el 2026-08-19 con **404**, y hoy mide **502 con `x-railway-fallback`** — que significa que el dominio **sí** tiene ruta. Ese 404 → 502 sugiere que el servicio volvió a existir | M6 cerrada en lo que importa; queda confirmar el estado real |
 | 9 | **Activar la protección de rama en `main`** (permisos de administrador del repo) | Que el check del Plan 0 impida el merge, no solo lo informe |
 
 **Bloque exacto para el gate 5**, para pegar al final de `.env.example` (solo nombres, sin
@@ -386,6 +401,7 @@ Surgieron al ejecutar los planes 0 y 2. Todas contestadas el 2026-08-28.
 | **E2** | Plan 0 · T0.3 | **A) La cobertura se reporta y no bloquea** | Medida: **69 %** global, `app.py` **52 %**, `tools/barrer_secretos.py` 98 %. Se descartó B (gate duro al 69 % con trinquete) porque congelaría `app.py` justo cuando el **Plan 4 · T4.3** va a mover 5,067 líneas de HTML fuera: el porcentaje va a saltar por reestructuración, no por tests nuevos, y un trinquete lo interpretaría como mérito. Reconsiderar **después** del Plan 4 |
 | **E3** | Plan 2 · T2.7 | **A) El Plan 2 cierra con el −5 % de ciudad nueva** | No se abre plan para atacar los 80 Details de una ciudad nueva: **ese gasto compra prospectos**, y recortarlo sería recortar producto. El importe en pesos se calcula aplicando la tarifa sobre los conteos ya medidos cuando el owner traiga el gate 1 |
 | **E4** | Plan 1 | **A) El Plan 1 arranca en sesión nueva** | Son 10 tareas. Mensaje de arranque listo en [`2026-08-28-handoff-plan1.md`](2026-08-28-handoff-plan1.md) |
+| **E5** *(2026-09-04)* | Plan 5 · T5.0 | **A) La rama del Plan 5 sale de `main`**, no apilada sobre `feat/rediseno-panel` | Baseline de la rama: **388**, no 900. El Plan 5 puede mergear **sin esperar** el gate CE10 (validación humana del top-20 de ciudades), que no tiene fecha — y dentro del Plan 5 hay un bug de datos activo (M2: las capturas posteriores a las 18:00 se guardan con la fecha del día siguiente) y un vector de inyección abierto (M14). Se descartó apilar porque habría hecho un tercer PR encadenado: mergearlo habría mergeado los Planes 1+4+5 de golpe. Coste aceptado: **rebase obligatorio** sobre `main` cuando #43 entre, con conflicto esperado en el marcador §6 y en las 3 rutas de superficie de `app.py`. Los 5 archivos de infraestructura donde cae el grueso del plan son byte-idénticos entre ambas bases, así que el conflicto no los toca |
 
 Las cinco decisiones **D1–D5** del §8 siguen abiertas y los planes siguen asumiendo su
 opción A, salvo **D2** y **D4**, que quedaron resueltas por los hechos: el Plan 0 se ejecutó

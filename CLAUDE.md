@@ -1,19 +1,50 @@
 # PanelNioval — Instrucciones del Proyecto
 
-Panel web interno de NIOVAL (distribuidora mayorista de ferretería/plomería) para operar ventas, contactos/prospectos, seguimiento y un formulario de encuestas de llamadas. Complementado por un script Selenium que envía catálogos por WhatsApp Web. Stack: **Flask + gunicorn · Google Sheets (gspread + google-auth) · Google Drive · Google Maps/Places · Railway (auto-deploy desde `main`)**.
+Panel web interno de NIOVAL (distribuidora mayorista de ferretería/plomería) para operar ventas, contactos/prospectos, seguimiento y un formulario de encuestas de llamadas. Complementado por un script Selenium que envía catálogos por WhatsApp Web. Stack: **Flask + gunicorn · Google Sheets (gspread + google-auth) · Google Drive · Google Maps/Places · VPS Vultr con Docker + Caddy (auto-deploy desde `main`)**. Railway se apagó el 2026-09-05.
 
 ## Arquitectura (leer antes de tocar código)
 
 - **`app.py`** (~3.6k líneas, monolito Flask): todas las rutas API + HTML embebido + integración Sheets/Drive/Places + importador de prospectos en background. ⚠️ Viola el límite de 800 líneas de las reglas globales (mejora M2 pendiente: trocear en módulos).
-- **`envio_catalogo.py`** (antes `22.PY`): script Selenium **standalone** que corre en la PC del owner (no en Railway). Lee pedidos del día, busca teléfonos, abre WhatsApp Web con perfil Chrome local y envía mensajes + 4 archivos, marca `ENVIADO_WA` y reporta por Telegram. Auditoría completa: `docs/auditoria/2026-08-13-auditoria-22py.md`.
+- **`envio_catalogo.py`** (antes `22.PY`): script Selenium **standalone** que corre en la PC del owner (no en el VPS). Lee pedidos del día, busca teléfonos, abre WhatsApp Web con perfil Chrome local y envía mensajes + 4 archivos, marca `ENVIADO_WA` y reporta por Telegram. Auditoría completa: `docs/auditoria/2026-08-13-auditoria-22py.md`.
 - **`nucleo_catalogo.py`** (Plan 3): lógica pura de la cola de catálogo (conclusiones elegibles, estados, validación de números). Sin selenium/gspread. **`worker_catalogo.py`**: worker transport-agnostic que procesa la worksheet `ENVIOS_CATALOGO` (transporte = worker local, decisión owner). El panel encola/consulta/corrige vía `/api/catalogo/*`. Diseño: `docs/superpowers/plans/2026-08-13-plan3-diseno-cola.md`.
 - **`worker_catalogo_run.py`** (Plan 5): runner del worker local (Selenium + heartbeat + lock) que el owner corre en su PC (`instalar-worker.ps1` = Tarea Programada). Operación: `docs/RUNBOOK.md`; decisión de transporte: `docs/adr/2026-08-13-transporte-catalogo.md`. Smoke test: `tools/smoke_panel.py`.
 - **Importador — gasto de Places:** el costo se mide por corrida (`text_search`, `place_details`, `cache_hits`, `duplicados_evitados`) y se publica en la UI y en Telegram. Las tarifas van por entorno **sin valor por defecto** (`PLACES_COSTO_TEXT_SEARCH`, `PLACES_COSTO_DETAILS`): sin ellas no se muestra importe, porque un `0.00` afirmaría que la corrida salió gratis. Topes: `PLACES_MAX_LLAMADAS_CORRIDA` (funciona siempre) y `PLACES_PRESUPUESTO_CORRIDA` (necesita tarifas). Al tocarlos la corrida queda en `presupuesto_agotado`, que **no es un error**. Caché de detalles en `PLACES_CACHE_FILE` (30 días, lleva teléfonos: 0600 y en `.gitignore`/`.dockerignore`). Ver `docs/RUNBOOK.md`.
 - **Importador — los cuatro contadores:** `encontrados` (aprobados por los filtros de Places, deduplicados por `place_id` a nivel corrida), `nuevos_en_sheet` (**filas realmente escritas** — el número grande de la UI), `duplicados` (ya estaban en `LISTA DE CONTACTOS`) y `descartados` (reseñas, calificación o sin teléfono). Se cumple `nuevos_en_sheet + duplicados == encontrados`; `descartados` es disjunto. Un fallo de escritura **no** se cuenta como duplicado: la corrida termina en `error` con la causa.
 - **Estado del importador:** vive en memoria de UN solo proceso (`--workers 1 --threads 4`). Además se persiste un registro mínimo y sin datos personales en `IMPORT_ESTADO_FILE` (temp del sistema) con el único fin de poder decir "se interrumpió" tras un reinicio; **nunca veta** una corrida nueva. Ver `docs/adr/2026-08-27-estado-compartido-importador.md`.
 - **Autenticación fail-closed:** la app no arranca sin `PANEL_DASHBOARD_TOKEN` ni `SECRET_KEY` (`app.py:34-44`) — revienta con `RuntimeError` en vez de publicar el panel abierto. Ya arrancada, todas las rutas exigen el token (header `X-Dashboard-Token`, `?token=`, o cookie de sesión), y `/api/catalogo/heartbeat` exige por separado `WORKER_TOKEN` o devuelve 401. Único bypass, explícito y ruidoso: `PANEL_AUTH_DESACTIVADA=1` (usado por `tests/conftest.py` y para desarrollo local). El default nunca abre.
-- **`Procfile` / `nixpacks.toml`**: `gunicorn app:app --workers 1 --threads 4 --worker-class gthread --timeout 120`. **Un solo worker a proposito**: `_import_job` y `_cache` son globales de modulo y con 2 procesos son 2 memorias distintas (razon completa en `docs/adr/2026-08-27-estado-compartido-importador.md`). Artefactos de Railway; se retiran cuando ese despliegue se apague (ver `docs/superpowers/plans/2026-08-17-despliegue-vultr.md`, Task 10).
-- **`Dockerfile`**: imagen del panel para el VPS Vultr (`python:3.11-slim` + gunicorn, `--bind 0.0.0.0:8000`). **`despliegue/`**: plantillas versionadas de `docker-compose.yml` y del fragmento de Caddy que se copian al servidor `155.138.200.66`; la copia viva está en `/srv/panel/` (ver `docs/RUNBOOK.md` § Operación en el VPS y `docs/superpowers/specs/2026-08-17-panelnioval-vultr-design.md`).
+- **Endurecimiento (Plan 5)**: cinco cosas que el panel no tenía y ahora sí.
+  **Rate limiting** con `Flask-Limiter` en memoria del proceso (`--workers 1` lo hace exacto):
+  global 600/h y 60/min, importador **6/h** porque es la única ruta que gasta dinero,
+  heartbeat y `/salud` holgados porque un 429 ahí tumba al worker o al healthcheck. Se
+  engancha con `init_app()` **después** del gate de token: al revés, 60 peticiones anónimas
+  agotaban el cubo y dejaban fuera a quien sí tenía token. **`ProxyFix(x_for=1)`** porque
+  tras Caddy `remote_addr` es la IP del proxy y todos compartían un solo cubo.
+  **Escapado de fórmulas** en las 6 escrituras con `USER_ENTERED` efectivo — no en las
+  `RAW`, donde el apóstrofo se guardaría *dentro* del dato. ⚠️ `update_cell` **fija**
+  `USER_ENTERED` y no admite el parámetro: leyendo `app.py` parece el caso seguro y es el
+  contrario. **Zona horaria** en dos capas: `nucleo_catalogo.ahora_mexico()` con `ZoneInfo`
+  más `ENV TZ` y `tzdata` (sin él, `ZoneInfo` revienta al importar y el panel no arranca).
+  **`/salud`**, la única ruta sin auth: `{'ok': True}` pelado, sin tocar Google y sin
+  reflejar estado interno. **Parada cooperativa ante `SIGTERM`**, que *encadena* al
+  manejador de gunicorn — pisarlo dejaría al worker sin apagado ordenado. Detalle y
+  verificación: `docs/auditoria/2026-09-04-t56-verificacion-integral.md`.
+- **Arranque — solo `Dockerfile` desde el 2026-09-05.** Antes eran tres sitios (`Procfile`,
+  `nixpacks.toml`, `Dockerfile`) y podían divergir; Railway se apagó y sus dos archivos se
+  retiraron con la Task 10 del plan de Vultr. Siguen en el historial de git y en
+  `docs/auditoria/respaldos/2026-09-05/`. Hay un test que falla si reaparecen, porque
+  volverían sin `--graceful-timeout` ni `--workers 1`.
+  Comando: `gunicorn app:app --bind 0.0.0.0:8000 --workers 1 --threads 4 --worker-class
+  gthread --timeout 120 --graceful-timeout 120`. **Un solo worker a propósito**:
+  `_import_job`, `_cache` y el contador del limitador son globales de módulo, y con 2
+  procesos son 2 memorias distintas (razón completa en
+  `docs/adr/2026-08-27-estado-compartido-importador.md`). **`--graceful-timeout 120`** no es
+  cosmético: con los 30 s por defecto, la parada ordenada del importador no llega a
+  ejecutarse antes del SIGKILL.
+- **`Dockerfile` / `despliegue/`**: imagen del panel para el VPS Vultr (`python:3.11-slim` +
+  gunicorn, `--bind 0.0.0.0:8000`, con `HEALTHCHECK`). **`despliegue/`**: plantillas
+  versionadas de `docker-compose.yml` y del fragmento de Caddy que se copian al servidor
+  `155.138.200.66`; la copia viva está en `/srv/panel/` (ver `docs/RUNBOOK.md` § Operación
+  en el VPS y `docs/superpowers/specs/2026-08-17-panelnioval-vultr-design.md`).
 - **`requirements.txt`**: deps del panel Flask. **`requirements-dev.txt`**: pytest + deps runtime de `envio_catalogo.py` (selenium, etc.), no instaladas en el contenedor del panel.
 
 ## Hojas de Google (IDs — fuente de verdad en `app.py:28-45` `SHEET_IDS`/`SHEET_GIDS`)
@@ -36,10 +67,10 @@ Panel web interno de NIOVAL (distribuidora mayorista de ferretería/plomería) p
 ## Reglas del proyecto
 
 - **Integración continua (desde 2026-08-28):** `.github/workflows/tests.yml` corre la suite en cada PR contra `main` y en cada push a `main`, y barre secretos y teléfonos sobre el diff del PR con `tools/barrer_secretos.py`. El workflow **no recibe ningún secreto**: `tests/conftest.py` ya aísla los clientes externos. El barrido **avisa, no bloquea** en su primera versión; una línea se exceptúa con `barrido-ok: <motivo>`, que exige motivo escrito a propósito. Qué hacer cuando el check sale rojo: `docs/RUNBOOK.md` § Cuando el check de CI sale en rojo. ⚠️ **Falta el gate del owner**: sin la protección de rama en `main` (Settings → Branches), el check informa pero **no impide** el merge.
-- **Baseline de verificación:** `python -m pytest tests/` → **345 passed** (al 2026-08-28, tras los 31 tests del barrido de secretos del Plan 0). ⚠️ **El baseline es por rama.** En `main` eran **314**; la rama `perf/gasto-places-importador` del Plan 2 da **357 passed, 1 skipped** porque añade 43 tests suyos. Un gate escrito como «≥ 357» es inalcanzable desde una rama basada en `main` hasta que el Plan 2 mergee: comparar siempre contra el baseline de la rama base, no contra un número absoluto. (Al 2026-08-27, tras los 84 tests del Plan 3: 26 de frontend, 13 de progreso, 23 de estado compartido y 22 de conteo. **Ojo con el comando**: `pytest.ini` ya trae `addopts = -q`, así que añadir `-q` lo convierte en `-qq` y **suprime la línea del resumen** — se ven los puntos y `exit 0`, pero nunca el número. Por eso el comando oficial va sin `-q`. Antes: 230 al 2026-08-24, tras los 9 tests de rutas portables y archivos en Files/; 227 tras los 6 primeros; 221 tras los 2 del estado real en ya_encolado; 219 tras los 4 del cierre de Chrome huerfano; 215 tras los 10 del lock huerfano del worker; 205 tras los 5 de la lada de pais para WhatsApp; 200 tras los 13 de la columna CONTACTO y el formato de telefono; 187 tras los 16 del escape de formulas del importador; 171 tras los 6 del heartbeat compartido; 165 al 2026-08-17 tras la ronda final de correcciones de `feat/despliegue-vultr`; 164 justo antes; 155 al cierre del 2026-08-13; el 144 anterior era stale: PRs #6-#9 agregaron 11 tests a archivos existentes sin actualizar la documentación). Es el ÚNICO baseline oficial. Nada se mergea con la suite en rojo. Nota: importar `app.py` en frío tarda ~100s (`googleapiclient` + Defender); en caliente ~8s. **No es pandas**: medido con `sys.modules`, ni pandas ni numpy llegan a cargarse — pandas estaba en `requirements.txt` sin que nadie lo importara y se retiró. `pytest.ini` ancla el rootdir al proyecto.
+- **Baseline de verificación:** `python -m pytest tests/` → **620 passed, 1 skipped** (al 2026-09-04, en `fix/endurecimiento-panel`, tras los 232 tests del Plan 5). ⚠️ Ese 620 es de **Windows**; el runner Linux del CI da **621**, porque el test que aquí se salta necesita `fcntl` — ese +1 no es un test nuevo. Antes: **345 passed** (al 2026-08-28, tras los 31 tests del barrido de secretos del Plan 0). ⚠️ **El baseline es por rama.** En `main` eran **314**; la rama `perf/gasto-places-importador` del Plan 2 da **357 passed, 1 skipped** porque añade 43 tests suyos. Un gate escrito como «≥ 357» es inalcanzable desde una rama basada en `main` hasta que el Plan 2 mergee: comparar siempre contra el baseline de la rama base, no contra un número absoluto. (Al 2026-08-27, tras los 84 tests del Plan 3: 26 de frontend, 13 de progreso, 23 de estado compartido y 22 de conteo. **Ojo con el comando**: `pytest.ini` ya trae `addopts = -q`, así que añadir `-q` lo convierte en `-qq` y **suprime la línea del resumen** — se ven los puntos y `exit 0`, pero nunca el número. Por eso el comando oficial va sin `-q`. Antes: 230 al 2026-08-24, tras los 9 tests de rutas portables y archivos en Files/; 227 tras los 6 primeros; 221 tras los 2 del estado real en ya_encolado; 219 tras los 4 del cierre de Chrome huerfano; 215 tras los 10 del lock huerfano del worker; 205 tras los 5 de la lada de pais para WhatsApp; 200 tras los 13 de la columna CONTACTO y el formato de telefono; 187 tras los 16 del escape de formulas del importador; 171 tras los 6 del heartbeat compartido; 165 al 2026-08-17 tras la ronda final de correcciones de `feat/despliegue-vultr`; 164 justo antes; 155 al cierre del 2026-08-13; el 144 anterior era stale: PRs #6-#9 agregaron 11 tests a archivos existentes sin actualizar la documentación). Es el ÚNICO baseline oficial. Nada se mergea con la suite en rojo. Nota: importar `app.py` en frío tarda ~100s (`googleapiclient` + Defender); en caliente ~8s. **No es pandas**: medido con `sys.modules`, ni pandas ni numpy llegan a cargarse — pandas estaba en `requirements.txt` sin que nadie lo importara y se retiró. `pytest.ini` ancla el rootdir al proyecto.
 - **Datos personales:** teléfonos/nombres/correos de clientes **no** se commitean ni se vuelcan completos en logs; enmascarar (`+52...XXXX`). `.gitignore` cubre `*.json` (credenciales) y `debug_invalid_*`/`debug_timeout_*` (screenshots con PII de `envio_catalogo.py`).
-- **Secretos:** nada hardcodeado. `GOOGLE_CREDENTIALS_JSON`, `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` van por variables de entorno en Railway. **Pendiente owner:** rotar el token Telegram `8404009072` (expuesto en el historial git; ~14 copias).
-- **Ramas:** **nunca** trabajar directo en `main` (Railway auto-deploya). Una rama por plan; PRs con `gh pr create --base main`; merge `--squash` solo con baseline verde y reviews sin CRITICAL/HIGH abiertos.
+- **Secretos:** nada hardcodeado. `GOOGLE_CREDENTIALS_JSON`, `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` van por variables de entorno en el VPS (`/srv/panel/secretos/.env`, cargado entero por `env_file` del compose). **Pendiente owner:** rotar el token Telegram `8404009072` (expuesto en el historial git; ~14 copias).  <!-- barrido-ok: 8404009072 es el ID del bot de Telegram, no un telefono de cliente; ya consta como pendiente de rotar -->
+- **Ramas:** **nunca** trabajar directo en `main` (el VPS auto-deploya desde ahí). Una rama por plan; PRs con `gh pr create --base main`; merge `--squash` solo con baseline verde y reviews sin CRITICAL/HIGH abiertos.
 - **Idioma:** código con nombres en español (`guardar_respuesta_formulario`, `buscar_telefono`); docs y commits en español con prefijos convencionales (`fix:`, `feat:`, `test:`).
 
 ## Planes activos
@@ -74,7 +105,16 @@ Las decisiones abiertas al owner están en el índice §8; los nueve gates del o
 
 ## Pendientes conocidos (gates del owner)
 
-- Rotar `TELEGRAM_TOKEN` y cargar secretos en Railway (Plan 5 T5.3).
-- Elegir transporte de WhatsApp para Railway: A=WhatsApp Business API (recomendado) / B=worker local / C=Selenium headless (Plan 5 T5.1).
+- Rotar `TELEGRAM_TOKEN` — **el riesgo abierto más grande** ahora que Railway está apagado: sigue vivo en el historial de git (~14 copias) y válido en el proveedor hasta que se rote allí.
+- Elegir transporte de WhatsApp para el VPS: A=WhatsApp Business API (recomendado) / B=worker local (lo que corre hoy) / C=Selenium headless. ⚠️ Si se elige **C**, `envio_catalogo.py` pasa a un contenedor UTC y sus 5 relojes desnudos reintroducen el bug de fecha que cerró el Plan 5 — hay tripwire en `tests/test_endurecimiento_zona_horaria.py`.
 - Corridas reales de WhatsApp (Plan 3 T3.6 / Plan 5 T5.5) y confirmación de la columna T de `LISTA DE CONTACTOS` (Plan 4 T4.1).
-- ~~Autenticación del panel (M1)~~ — **RESUELTO** en `feat/despliegue-vultr`: el gate es fail-closed (`app.py:34-82`). Pendiente real: la exposición sigue **viva en Railway** — `https://web-production-1d453.up.railway.app/` corre sin `PANEL_DASHBOARD_TOKEN` definida ahí — hasta que ese despliegue se elimine (gate del owner, Task 10 de `docs/superpowers/plans/2026-08-17-despliegue-vultr.md`).
+- ~~Autenticación del panel (M1)~~ — **RESUELTO**: el gate es fail-closed (`app.py:34-82`).
+  Sobre la exposición en **Railway**, ⚠️ **los registros del proyecto se contradicen y hace
+  falta mirar la consola**: `docs/RUNBOOK.md` la dio por eliminada el **2026-08-19** con un
+  **404**; este archivo y el gate 8 del índice decían hasta el 2026-09-04 que seguía viva; y
+  el **2026-09-05** mide **502 con `x-railway-fallback: true`**. Un 404 es «el dominio no
+  tiene ruta»; un 502 con `fallback` es «sí la tiene y no hay nada detrás», así que ese
+  404 → 502 sugiere que el servicio volvió a existir. **Seguro hoy:** ninguna ruta responde
+  200 y el panel no está abierto por ahí — si resucitara sin token, moriría al arrancar.
+  **Por confirmar (owner):** si el proyecto está borrado o solo detenido. Detalle en
+  `docs/RUNBOOK.md` § Gates del owner pendientes.

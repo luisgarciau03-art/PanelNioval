@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 # ─── Conclusiones elegibles (col J de 'Respuestas de formulario 1') ───
 # Decisión owner 2026-08-13 (Plan 3 T3.1): "Pedido" Y "Revisará el Catálogo"
@@ -46,6 +47,43 @@ COLUMNAS_ENVIOS = [
 
 FMT_TIMESTAMP = "%d/%m/%Y %H:%M:%S"
 _FMT_TS = FMT_TIMESTAMP  # alias interno (compatibilidad)
+
+# ─────────────────────────── Reloj del proyecto ───────────────────────────
+# Plan 5 · T5.3 (M2). El contenedor corre en UTC y Mexico es UTC-6, asi que un
+# reloj sin zona guardaba TODO lo capturado despues de las 18:00 con la fecha
+# del dia siguiente, y la semana ISO de la grafica "Contactos por Semana" con
+# ella.
+#
+# El helper vive AQUI y no en app.py porque la hoja ENVIOS_CATALOGO recibe
+# timestamps de dos procesos distintos: el panel escribe `fecha_solicitud`
+# desde el contenedor y el worker escribe `timestamp_estado` desde la PC del
+# owner. Con dos relojes, una fila podia mostrar el cambio de estado seis horas
+# ANTES de la solicitud que lo origino. Este modulo es el unico que los dos
+# importan.
+#
+# Son dos capas: esta y `ENV TZ` en el Dockerfile. Solo la variable dejaria el
+# resultado dependiendo del despliegue (Windows local vs runner UTC); solo el
+# codigo dejaria los logs y el `date` del contenedor en UTC.
+TZ_MEXICO = ZoneInfo("America/Mexico_City")
+
+
+def ahora_mexico() -> datetime:
+    """Instante actual en hora de Mexico, con `tzinfo` explicito.
+
+    Fuente de "ahora" de todo lo que corre EN EL CONTENEDOR: `app.py`,
+    `nucleo_catalogo` y `worker_catalogo`. No usar `datetime.now()` a secas ahi:
+    hay un guarda en `tests/test_endurecimiento_zona_horaria.py` que falla si
+    reaparece.
+
+    NO es la unica fuente de "ahora" del repo, y decirlo seria falso:
+    `envio_catalogo.py` conserva tres `datetime.now()` desnudos y escribe en la
+    MISMA hoja ('Respuestas de formulario 1'). Hoy no es un bug porque ese
+    script corre en la PC del owner, donde el reloj ya esta en hora de Mexico.
+    Se vuelve un bug el dia que se elija el transporte "C = Selenium headless"
+    para WhatsApp, porque entonces correria en un contenedor UTC. Queda como
+    deuda anotada y con tripwire en el test, atada a esa decision del owner.
+    """
+    return datetime.now(TZ_MEXICO)
 
 
 def columnas_indexadas(headers: Optional[list] = None) -> dict:
@@ -139,7 +177,7 @@ def nueva_fila_envio(
     ahora: Optional[datetime] = None,
 ) -> list:
     """Construye la fila (en orden COLUMNAS_ENVIOS) para un envío PENDIENTE."""
-    ts = (ahora or datetime.now()).strftime(_FMT_TS)
+    ts = (ahora or ahora_mexico()).strftime(_FMT_TS)
     return [
         ts,                     # fecha_solicitud
         tienda,                 # tienda

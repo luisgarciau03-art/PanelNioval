@@ -806,11 +806,16 @@ git push
 
 Verificar con el owner que usó el panel nuevo para su trabajo real al menos un ciclo completo (un formulario guardado, un envío de catálogo).
 
-- [ ] **Step 2: GATE DEL OWNER — eliminar el servicio en Railway**
+- [x] **Step 2: GATE DEL OWNER — eliminar el servicio en Railway** ✅ 2026-09-05
 
 El owner elimina el servicio desde el panel de Railway.
 
-- [ ] **Step 3: Verificar que murió**
+- [x] **Step 3: Verificar que murió** ✅ 2026-09-05 — **502** con `x-railway-fallback: true`
+  en `/` y en `/api/prospectos/contactos`. No es 200, que era el criterio de "sigue vivo".
+  ⚠️ Tampoco es 404: el borde de Railway conserva la ruta del dominio, así que desde fuera
+  no se distingue "servicio eliminado" de "app en bucle de fallo" — y la guarda
+  fail-closed de `main` produciría exactamente ese 502 si el servicio siguiera existiendo
+  sin `PANEL_DASHBOARD_TOKEN`. En los dos casos el panel **no está abierto**.
 
 ```bash
 curl -sS -o /dev/null -w "%{http_code}\n" --max-time 20 https://web-production-1d453.up.railway.app/
@@ -818,7 +823,9 @@ curl -sS -o /dev/null -w "%{http_code}\n" --max-time 20 https://web-production-1
 
 Expected: 404, error de conexión, o timeout. **Un 200 significa que sigue vivo y abierto**: no cerrar esta task.
 
-- [ ] **Step 4: Retirar los artefactos de Railway**
+- [x] **Step 4: Retirar los artefactos de Railway** ✅ 2026-09-05 — respaldados antes en
+  `docs/auditoria/respaldos/2026-09-05/` (nada se borra) y con test que falla si reaparecen,
+  porque volverían sin `--graceful-timeout` ni `--workers 1`.
 
 ```bash
 git rm Procfile nixpacks.toml
