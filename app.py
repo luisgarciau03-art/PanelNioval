@@ -85,6 +85,13 @@ LIMITE_HEARTBEAT = "600 per minute"
 # nada y si estorba al operador.
 LIMITE_SONDEO = "240 per minute"
 
+# El healthcheck del contenedor. Docker lo sondea cada pocos segundos y NO
+# puede recibir un 429 jamas: Docker lo leeria como "el panel no responde",
+# marcaria el contenedor unhealthy y lo reiniciaria. El limitador provocaria
+# justo la caida que el healthcheck existe para detectar. Holgado, pero NO
+# exento: CE1 exige que ninguna ruta lo este, y esta es la unica publica.
+LIMITE_SALUD = "600 per minute"
+
 limiter = Limiter(
     key_func=get_remote_address,
     # OJO: NO se pasa `app=` aqui. El constructor registra el before_request del
@@ -139,7 +146,14 @@ def _limite_excedido(e):
 # SECRET_KEY) no tiene guarda de arranque a propósito: el heartbeat es
 # telemetría, no un dato de cliente, y su ausencia falla cerrado en la propia
 # ruta (401) en vez de bloquear el arranque de todo el panel.
-_RUTAS_EXENTAS_AUTH = ('/api/catalogo/heartbeat',)  # el worker usa su propio WORKER_TOKEN
+_RUTAS_EXENTAS_AUTH = (
+    '/api/catalogo/heartbeat',  # el worker usa su propio WORKER_TOKEN
+    # /salud es el healthcheck del contenedor (Plan 5 T5.4). Va sin auth a
+    # proposito: Docker no tiene el token del panel, y un healthcheck que lo
+    # necesitara no podria correr. Es la UNICA ruta publica del panel, y por eso
+    # su cuerpo es un {'ok': True} pelado: ni versiones, ni rutas, ni estado.
+    '/salud',
+)
 
 
 def _auth_desactivada() -> bool:
@@ -195,6 +209,30 @@ if os.environ.get('PANEL_AUTH_DESACTIVADA') == '1':
           'limiting. Correcto en desarrollo y en tests; en un despliegue real '
           'significa que el panel esta ABIERTO a internet. ***',
           file=sys.stderr, flush=True)
+
+
+@app.route('/salud')
+@limiter.limit(LIMITE_SALUD)
+def salud():
+    """Healthcheck del contenedor (Plan 5 · T5.4, M9).
+
+    Responde 200 si el proceso esta vivo y sirviendo peticiones. Eso es TODO lo
+    que un healthcheck debe comprobar, y las tres cosas que NO hace importan
+    tanto como la que hace:
+
+    - **No toca Google.** Un healthcheck que llama a Sheets convierte una caida
+      de Google en un reinicio del panel: el contenedor entraria en bucle de
+      reinicios estando sano, y ademas gastaria cuota en cada sondeo.
+    - **No mira el estado interno.** Si la respuesta cambiara segun haya o no
+      una corrida en curso, estaria filtrando operacion a cualquiera desde
+      internet, y ademas dejaria de ser una respuesta estable.
+    - **No dice nada mas.** Ni version, ni commit, ni hostname, ni rutas. Es la
+      unica ruta del panel sin autenticacion: todo lo que devuelva lo lee
+      cualquiera. Un `{'ok': True}` pelado no le sirve a nadie que no sea Docker.
+
+    Va exenta de la auth en `_RUTAS_EXENTAS_AUTH`, no del limitador.
+    """
+    return jsonify({'ok': True})
 
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────

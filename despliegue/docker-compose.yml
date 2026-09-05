@@ -11,6 +11,15 @@ services:
       - ./secretos/.env
     volumes:
       - ./secretos/credentials.json:/app/credentials.json:ro
+    # Healthcheck tambien aqui, no solo en el Dockerfile: la copia VIVA de este
+    # compose es la que manda en el VPS, y `docker compose ps` lee esta.
+    # Mismo motivo que alli para usar python y no curl: la imagen no trae curl.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/salud', timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
     mem_limit: 768m
     networks:
       - web

@@ -22,6 +22,21 @@ COPY . .
 
 EXPOSE 8000
 
+# Healthcheck (Plan 5 T5.4, M9). Sin esto, un contenedor que arranco pero no
+# responde queda `Up` para Docker y para Caddy, y el owner se entera cuando abre
+# el panel.
+#
+# Se usa PYTHON y no curl/wget A PROPOSITO: python:3.11-slim no trae ninguno de
+# los dos. Un HEALTHCHECK que los invoque falla SIEMPRE, marca el contenedor
+# unhealthy estando sano y, con `restart: unless-stopped`, lo mete en un bucle
+# de reinicios. Es el error clasico de esta directiva y es silencioso: parece
+# que el healthcheck "funciona" porque efectivamente reporta algo.
+#
+# start-period 40s: el arranque en frio importa googleapiclient, que tarda. Sin
+# margen, el contenedor se marcaria unhealthy mientras todavia esta cargando.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3   CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/salud', timeout=4).status == 200 else 1)"]
+
+
 # UN worker con hilos, no dos procesos. _import_job y _cache son globales de
 # modulo: con --workers 2 son dos memorias distintas y la mitad de los sondeos
 # del importador responde 'idle' con el trabajo corriendo (medido: 10 de 20).
