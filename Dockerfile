@@ -31,4 +31,8 @@ EXPOSE 8000
 # Forma exec: gunicorn queda como PID 1 y recibe el SIGTERM de `docker stop`
 # directamente. En forma shell, PID 1 seria /bin/sh, que no reenvia senales:
 # cada parada terminaria en SIGKILL a los 10s, cortando peticiones en vuelo.
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "4", "--worker-class", "gthread", "--timeout", "120"]
+# --graceful-timeout 120: la parada ordenada del importador (Plan 5 T5.5) se
+# consulta en puntos seguros del bucle, y con los 30 s por defecto de gunicorn
+# el SIGKILL llegaba antes de que el hilo alcanzara uno. Sin esto, la parada
+# ordenada existe en el codigo y no se ejecuta nunca en produccion.
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "4", "--worker-class", "gthread", "--timeout", "120", "--graceful-timeout", "120"]

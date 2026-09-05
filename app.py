@@ -4878,9 +4878,19 @@ def _instalar_parada_ordenada():
 
         def _manejar(sig, frame):
             _solicitar_parada_ordenada()
-            # SIG_DFL y SIG_IGN son enteros, no invocables.
             if callable(anterior):
                 anterior(sig, frame)
+                return
+            # SIG_DFL y SIG_IGN son enteros, no invocables, y aqui estuvo el
+            # fallo peor de esta tarea: limitarse a `if callable(anterior)` y
+            # volver NEUTRALIZA la senal. Sin gunicorn delante —pytest, CI,
+            # `python app.py` en local— el anterior es SIG_DFL, cuya semantica
+            # es "termina el proceso": sustituirlo por un manejador que solo
+            # pone una bandera dejaba el proceso inmune a SIGTERM para siempre.
+            # Se restaura la disposicion original y se reenvia la senal para
+            # que haga lo que habria hecho.
+            signal.signal(sig, anterior)
+            os.kill(os.getpid(), sig)
 
         signal.signal(signal.SIGTERM, _manejar)
         return True
@@ -5096,6 +5106,10 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                     aporte_variacion = _aporte_nuevo(lugares, vistos, ids_de_esta_consulta)
                     paginas = 1
                     while 'next_page_token' in resp and paginas < MAX_PAGINAS_POR_CONSULTA:
+                        # Punto de parada: entre paginas, con el hilo ya
+                        # detenido en el sleep y sin escritura en vuelo.
+                        if _parada_solicitada.is_set():
+                            break
                         time.sleep(2)
                         try:
                             resp = gmaps_client.places(page_token=resp['next_page_token'])
@@ -5202,6 +5216,8 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                                 'Tamaño':           tamano,
                                 'Tipo Cliente':     'Mayorista/Corporativo' if resenas > 300 else 'Minorista',
                             })
+                            if _parada_solicitada.is_set():
+                                break
                             time.sleep(0.3)
                         except PresupuestoAgotado:
                             raise            # el tope no es un tropiezo de la API
@@ -5227,6 +5243,12 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
 
             if consulta_ok:
                 consultas_ok += 1
+            # Punto de parada entre variaciones. Sin estos, el unico control
+            # de toda la corrida estaba entre las DOS categorias, y una
+            # categoria dura minutos: el graceful_timeout de gunicorn (30 s)
+            # llegaba antes y la parada ordenada no se ejecutaba nunca.
+            if _parada_solicitada.is_set():
+                break
             if query != variaciones[-1]: time.sleep(1)
 
         # Ninguna de las variaciones logro hablar con Places: eso no es "no hay
@@ -5261,6 +5283,17 @@ def _buscar_negocios(gmaps_client, categoria, ciudad, vistos=None,
                    'ya_vistos_otra_cat': ya_vistos_otra_cat,
                    'detalles_evitados': detalles_evitados}
     return resultados, stats, incidencias
+
+
+# Claves del dict `incidencias` que devuelve _buscar_negocios. Existen como
+# constante porque el worker las lee TODAS y un doble de prueba incompleto
+# revienta con KeyError a mitad de corrida: al escribir el test de la parada
+# ordenada se fallo tres veces seguidas adivinandolas de una en una.
+# OJO: 'cortes' es una LISTA (el worker la recorre); las demas son contadores.
+CLAVES_INCIDENCIAS = ('ya_en_hoja', 'cortes', 'detalles_desde_cache',
+                      'detalles_fallidos', 'paginas_fallidas',
+                      'consultas_fallidas', 'ya_vistos_otra_cat',
+                      'detalles_evitados')
 
 
 def _aporte_nuevo(pagina, vistos, ya_contados):
@@ -5763,6 +5796,24 @@ def importador_iniciar():
         return jsonify({'ok': False, 'error': 'Ciudad requerida'})
     if not gmaps_api_key:
         return jsonify({'ok': False, 'error': 'GMAPS_API_KEY no configurada'})
+
+    # El proceso ya recibio SIGTERM y se esta apagando. Arrancar aqui una
+    # corrida nueva es gastar Places para que el SIGKILL la corte a media
+    # escritura: justo lo que T5.5 viene a evitar. La ventana es estrecha pero
+    # real — un redeploy mientras alguien pulsa Iniciar — y el worker de gthread
+    # sigue atendiendo peticiones un instante despues de `alive = False`.
+    #
+    # La bandera NO se limpia, y es deliberado. Significa "este proceso se esta
+    # apagando", que no es una condicion por corrida sino del proceso entero:
+    # limpiarla al arrancar una corrida seria mentir sobre el estado del worker.
+    #
+    # Tampoco choca con el ADR de estado compartido, que exige que el registro
+    # persistido NUNCA vete una corrida nueva: eso habla de lo que sobrevive a
+    # un reinicio, y esto vive solo en la memoria de un proceso que va a morir.
+    # El siguiente proceso arranca con la bandera limpia.
+    if _parada_solicitada.is_set():
+        return jsonify({'ok': False,
+                        'error': 'El panel se esta apagando; reintenta en un momento'}), 503
 
     with _import_lock:
         if _import_job['status'] == 'running':
