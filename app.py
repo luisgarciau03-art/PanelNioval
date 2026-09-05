@@ -5,6 +5,8 @@ Deploy: Railway  |  Auth: GOOGLE_CREDENTIALS_JSON env var o archivo .json local
 """
 
 from flask import Flask, jsonify, render_template_string, request, session
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import secrets, threading
 try:
     import googlemaps
@@ -32,8 +34,10 @@ app.json.sort_keys = False
 # ruidosamente, en vez de publicar el panel abierto. Bypass explícito para
 # desarrollo local y tests: PANEL_AUTH_DESACTIVADA=1.
 # Lectura directa (no vía _auth_desactivada()): esta guarda corre antes de que
-# la función se defina más abajo; llamarla aquí sería un NameError. Es la
-# única lectura directa de la variable en todo el archivo.
+# la función se defina más abajo; llamarla aquí sería un NameError.
+# Son las ÚNICAS DOS lecturas directas del archivo: esta y la del limitador de
+# T5.1, que se construye a nivel de módulo por el mismo motivo. Todo lo demás
+# usa _auth_desactivada().
 if os.environ.get('PANEL_AUTH_DESACTIVADA') != '1':
     if not os.environ.get('PANEL_DASHBOARD_TOKEN'):
         raise RuntimeError(
@@ -49,6 +53,70 @@ if os.environ.get('PANEL_AUTH_DESACTIVADA') != '1':
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
 # Cookie de sesión endurecida (el panel corre tras TLS).
 app.config.update(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE='Lax', SESSION_COOKIE_HTTPONLY=True)
+
+
+# ─── RATE LIMITING (Plan 5 · T5.1, M5) ───────────────────────────────────────
+# El gate de token es fail-closed y funciona, pero un token filtrado da barra
+# libre. Entre lo que da acceso esta /api/importador/iniciar, que dispara
+# corridas de Google Places: la unica API FACTURABLE del proyecto. El tope de
+# presupuesto del Plan 2 acota UNA corrida; nada acotaba cuantas se lanzan.
+#
+# En memoria del proceso, no Redis (decision D5·A del owner). gunicorn corre
+# --workers 1 --threads 4, asi que el contador es exacto: no hay dos memorias.
+# Si algun dia se sube a --workers 2, este limite deja de ser exacto EN
+# SILENCIO — la misma consecuencia ya anotada para _import_job y _cache en
+# docs/adr/2026-08-27-estado-compartido-importador.md.
+LIMITES_POR_DEFECTO = ["600 per hour", "60 per minute"]
+
+# El importador va aparte y mucho mas estricto: cada corrida cuesta dinero.
+LIMITE_IMPORTADOR = "6 per hour"
+
+# El heartbeat va aparte y HOLGADO. Lo llama un proceso legitimo cada pocos
+# segundos, y un limite mal calibrado aqui no "protege": tumba el worker de
+# catalogo del owner, que es lo que envia los catalogos por WhatsApp (R1).
+LIMITE_HEARTBEAT = "600 per minute"
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=LIMITES_POR_DEFECTO,
+    storage_uri="memory://",
+    # Se apaga con la MISMA variable que ya usan conftest.py y el desarrollo
+    # local. Con el limitador activo en la suite, cada test consume cuota del
+    # siguiente y los resultados dependen del orden de ejecucion.
+    # Se construye SIEMPRE habilitado y se apaga justo despues si toca. No es
+    # un rodeo: con enabled=False en el constructor, Flask-Limiter ni siquiera
+    # crea el almacenamiento, y encenderlo luego revienta con AssertionError al
+    # tocar `limiter.storage`. Asi la suite puede activarlo para el test que lo
+    # necesita y volver a apagarlo.
+    enabled=True,
+    # NO tragarse los errores: con swallow_errors un fallo del almacenamiento
+    # dejaria pasar TODAS las peticiones pareciendo que el limitador funciona.
+    # Es el modo fail-open, y este proyecto ya tuvo uno abierto a internet.
+    swallow_errors=False,
+)
+
+# Apagado bajo el mismo bypass explicito que ya usan conftest.py y el desarrollo
+# local. Con el limitador activo en la suite, cada test consume cuota del
+# siguiente y los resultados pasan a depender del orden de ejecucion.
+# Lectura directa de la variable, como la guarda de arranque y por lo mismo:
+# esto corre a nivel de modulo, antes de que _auth_desactivada() exista.
+if os.environ.get('PANEL_AUTH_DESACTIVADA') == '1':
+    limiter.enabled = False
+
+
+@app.errorhandler(429)
+def _limite_excedido(e):
+    """429 en JSON, coherente con el resto de la API.
+
+    Flask-Limiter devuelve por defecto una pagina HTML, y el frontend hace
+    r.json() en todas las rutas: recibiria un error de parseo en vez del motivo
+    real, que es exactamente cuando el operador necesita entender que pasa.
+    """
+    return jsonify({
+        'error': 'demasiadas peticiones',
+        'detalle': str(getattr(e, 'description', '')),
+    }), 429
 
 
 # ─── AUTENTICACIÓN DEL PANEL (fail-closed) ───────────────────────────────────
@@ -931,10 +999,58 @@ def api_seguimiento():
     return jsonify(data)
 
 
+class FueraDeRango(ValueError):
+    """La coordenada pedida no es escribible. Se traduce a 400, no a 500."""
+
+
+def _fila_valida(ws, fila):
+    """Valida una fila de destino, o lanza FueraDeRango (Plan 5 · T5.1).
+
+    Dos cosas, y ninguna es cosmetica:
+
+    - **La fila 1 nunca.** Ahi viven los encabezados, y TODO el sistema resuelve
+      columnas con `headers.index(nombre)`. Escribir ahi no rompe una fila:
+      rompe en silencio cada lectura y escritura futura de esa hoja, para todo
+      el personal.
+    - **Tope superior.** Sin el se puede escribir en la fila 999.999.999 y
+      expandir la grilla. `seguimiento` y `bruce` comparten spreadsheet y el
+      limite de celdas es del ARCHIVO entero, asi que inflar una pestana rompe
+      los append de las demas.
+
+    Lo encontro `security-reviewer` en T5.2 (dos CRITICAL). El escape de
+    formulas impide la formula; esto impide la escritura arbitraria, que es un
+    control distinto.
+    """
+    try:
+        fila = int(fila)
+    except (TypeError, ValueError):
+        raise FueraDeRango('fila no numerica')
+    if fila < 2:
+        raise FueraDeRango('la fila 1 son los encabezados y no se escribe')
+    tope = getattr(ws, 'row_count', None)
+    if tope and fila > tope:
+        raise FueraDeRango(f'fila {fila} fuera de la hoja (tope {tope})')
+    return fila
+
+
+def _columna_valida(ws, col):
+    try:
+        col = int(col)
+    except (TypeError, ValueError):
+        raise FueraDeRango('columna no numerica')
+    if col < 1:
+        raise FueraDeRango('columna fuera de rango')
+    tope = getattr(ws, 'col_count', None)
+    if tope and col > tope:
+        raise FueraDeRango(f'columna {col} fuera de la hoja (tope {tope})')
+    return col
+
+
 def _sheet_update_row(ws_key, row_num, fields, cache_key=None):
     """Actualiza celdas de una hoja por nombre de columna."""
     import gspread.utils as gsu
     ws = get_worksheet(ws_key)
+    row_num = _fila_valida(ws, row_num)
     headers = ws.row_values(1)
     updates = []
     for col_name, value in fields.items():
@@ -961,6 +1077,9 @@ def api_seguimiento_update():
         n = _sheet_update_row('seguimiento', row_num, fields)
         print(f"[seguimiento] update row={row_num} fields={list(fields.keys())} updated={n}")
         return jsonify({'ok': True, 'updated': n})
+    except FueraDeRango as e:
+        # 400 y no 500: es una peticion invalida, no un fallo del panel.
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -977,7 +1096,11 @@ def api_mensajes_update():
     try:
         import gspread.utils as gsu
         ws = get_worksheet('mensajes')
-        a1 = gsu.rowcol_to_a1(int(row_num), int(col_num))
+        # La peor de las tres rutas: _row y _col son indices CRUDOS del body y
+        # ni siquiera pasan por nombre de encabezado. Sin cota, esto era una
+        # primitiva de escritura de celda arbitraria sobre la hoja que alimenta
+        # los telefonos y plantillas que envio_catalogo.py manda por WhatsApp.
+        a1 = gsu.rowcol_to_a1(_fila_valida(ws, row_num), _columna_valida(ws, col_num))
         # Dos arreglos en una linea, y el orden importa entenderlo:
         #
         # 1) La firma. Hasta gspread 5.x era update(range_name, values); en 6.x
@@ -994,6 +1117,8 @@ def api_mensajes_update():
         _cache_pop('mensajes')
         print(f"[mensajes] update col={col_num} row={row_num}")
         return jsonify({'ok': True})
+    except FueraDeRango as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -3236,6 +3361,7 @@ def api_bruce_actualizar():
     try:
         import gspread.utils as gsu
         ws = get_bruce_ws()
+        row_num = _fila_valida(ws, row_num)
         headers = [str(h).strip() for h in ws.row_values(1)]
         updates = []
         for field, value in body.items():
@@ -3250,6 +3376,8 @@ def api_bruce_actualizar():
             ws.batch_update(updates, value_input_option='USER_ENTERED')
         _cache_pop('bruce')
         return jsonify({'ok': True})
+    except FueraDeRango as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -3674,6 +3802,7 @@ WORKER_HEARTBEAT_TTL = 15 * 60  # 15 min sin heartbeat → "muerto"
 
 
 @app.route('/api/catalogo/heartbeat', methods=['POST'])
+@limiter.limit(LIMITE_HEARTBEAT)
 def catalogo_heartbeat():
     """El worker local reporta que está vivo. Exige WORKER_TOKEN (fail-closed)."""
     if not _auth_desactivada():
@@ -5502,6 +5631,7 @@ def importador_page():
 
 
 @app.route('/api/importador/iniciar', methods=['POST'])
+@limiter.limit(LIMITE_IMPORTADOR)
 def importador_iniciar():
     global _import_job
     ciudad       = request.json.get('ciudad', '').strip()

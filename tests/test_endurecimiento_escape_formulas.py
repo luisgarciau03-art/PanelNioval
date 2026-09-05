@@ -384,6 +384,10 @@ class TestSeguimientoUpdate:
     def _ws(self):
         ws = MagicMock()
         ws.row_values.return_value = ["Nombre", "Nota"]
+        # Un MagicMock inventa cualquier atributo, asi que sin estas dos el
+        # doble no es fiel: la cota de fila de T5.1 recibiria un mock en vez
+        # de un entero y la comparacion reventaria.
+        ws.row_count, ws.col_count = 100, 20
         return ws
 
     @pytest.mark.parametrize("formula", FORMULAS)
@@ -406,6 +410,7 @@ class TestBruceActualizar:
     def _ws(self):
         ws = MagicMock()
         ws.row_values.return_value = ["Nombre", "NOTA"]
+        ws.row_count, ws.col_count = 100, 20
         return ws
 
     @pytest.mark.parametrize("formula", FORMULAS)
@@ -429,6 +434,7 @@ class TestVentasUpdatePagoUrl:
     def _ws(self):
         ws = MagicMock()
         ws.get_all_values.return_value = [["Num Factura", "PAGO"], ["F-1", ""]]
+        ws.row_count, ws.col_count = 100, 20
         return ws
 
     def test_una_url_con_formula_llega_escapada(self, client, monkeypatch):
@@ -462,6 +468,8 @@ class TestMensajesUpdate:
         seria un test que pasa con y sin el arreglo.
         """
         class WS:
+            row_count, col_count = 100, 20
+
             def update(self, values, range_name=None, **kw):
                 assert isinstance(values, list) and isinstance(values[0], list), (
                     f"primer argumento debe ser los VALORES, llego {values!r}"

@@ -9,6 +9,13 @@ google-api-python-client>=2.100.0
 googlemaps>=4.10.0
 gunicorn>=21.0.0
 
+# Flask-Limiter: rate limiting de todas las rutas (Plan 5 T5.1, M5). En memoria
+# del proceso, sin Redis (decision D5-A del owner): gunicorn corre --workers 1
+# --threads 4, asi que el contador es exacto porque no hay dos memorias.
+# Se fija el MAYOR a 4 a proposito: la configuracion cambio entre 2.x, 3.x y
+# 4.x, y escribirla de memoria produce limites que no se aplican.
+Flask-Limiter>=4.0,<5
+
 # requests se usa DIRECTAMENTE en app.py, envio_catalogo.py, worker_catalogo_run.py
 # y tools/smoke_panel.py. Estaba sin declarar y funcionaba solo porque gspread y
 # google-auth lo arrastran: el dia que alguna cambie de cliente HTTP, el panel
