@@ -146,13 +146,24 @@ def _limite_excedido(e):
 # SECRET_KEY) no tiene guarda de arranque a propósito: el heartbeat es
 # telemetría, no un dato de cliente, y su ausencia falla cerrado en la propia
 # ruta (401) en vez de bloquear el arranque de todo el panel.
-_RUTAS_EXENTAS_AUTH = (
-    '/api/catalogo/heartbeat',  # el worker usa su propio WORKER_TOKEN
+# Se comparan ENDPOINTS, no rutas. La version anterior comparaba `request.path`
+# contra cadenas, y eso funcionaba por una coincidencia: `Request.path` colapsa
+# las barras iniciales duplicadas igual que el enrutador de Werkzeug, asi que
+# `//salud` acababa en la misma vista. security-reviewer lo probo con barras
+# dobles y triples, mayusculas, %2f, barra final y `../`, y no encontro bypass
+# — pero el guarda dependia de que las dos normalizaciones siguieran
+# coincidiendo, no del diseno. Atarlo al endpoint lo ata a la vista que de
+# verdad se va a ejecutar.
+#
+# `request.endpoint` ya esta resuelto cuando corren los before_request: Flask
+# hace el enrutado al empujar el contexto de peticion.
+_ENDPOINTS_EXENTOS_AUTH = (
+    'catalogo_heartbeat',  # el worker usa su propio WORKER_TOKEN
     # /salud es el healthcheck del contenedor (Plan 5 T5.4). Va sin auth a
     # proposito: Docker no tiene el token del panel, y un healthcheck que lo
     # necesitara no podria correr. Es la UNICA ruta publica del panel, y por eso
     # su cuerpo es un {'ok': True} pelado: ni versiones, ni rutas, ni estado.
-    '/salud',
+    'salud',
 )
 
 
@@ -165,8 +176,7 @@ def _auth_desactivada() -> bool:
 def _requiere_token_panel():
     if _auth_desactivada():
         return
-    path = request.path or ''
-    if path in _RUTAS_EXENTAS_AUTH:
+    if request.endpoint in _ENDPOINTS_EXENTOS_AUTH:
         return
     token = os.environ.get('PANEL_DASHBOARD_TOKEN')
     if not token:
@@ -220,9 +230,9 @@ def salud():
     que un healthcheck debe comprobar, y las tres cosas que NO hace importan
     tanto como la que hace:
 
-    - **No toca Google.** Un healthcheck que llama a Sheets convierte una caida
-      de Google en un reinicio del panel: el contenedor entraria en bucle de
-      reinicios estando sano, y ademas gastaria cuota en cada sondeo.
+    - **No toca Google.** Un healthcheck que llama a Sheets reportaria enfermo
+      un panel sano cada vez que Google tuviera un mal rato, y ademas gastaria
+      cuota en cada sondeo.
     - **No mira el estado interno.** Si la respuesta cambiara segun haya o no
       una corrida en curso, estaria filtrando operacion a cualquiera desde
       internet, y ademas dejaria de ser una respuesta estable.
@@ -230,7 +240,7 @@ def salud():
       unica ruta del panel sin autenticacion: todo lo que devuelva lo lee
       cualquiera. Un `{'ok': True}` pelado no le sirve a nadie que no sea Docker.
 
-    Va exenta de la auth en `_RUTAS_EXENTAS_AUTH`, no del limitador.
+    Va exenta de la auth en `_ENDPOINTS_EXENTOS_AUTH`, no del limitador.
     """
     return jsonify({'ok': True})
 

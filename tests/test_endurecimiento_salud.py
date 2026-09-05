@@ -8,9 +8,8 @@ Las tres condiciones de la ruta, y ninguna es cosmetica:
 
 1. **Sin autenticacion.** Un healthcheck que necesita el token del panel no
    puede correr desde Docker.
-2. **Sin tocar Google.** Un healthcheck que llama a Sheets convierte una caida
-   de Google en un reinicio del panel, que es peor que la caida: el contenedor
-   entra en bucle de reinicios mientras el panel, en realidad, esta sano.
+2. **Sin tocar Google.** Un healthcheck que llama a Sheets reportaria enfermo
+   un panel sano cada vez que Google tuviera un mal rato.
 3. **Sin filtrar nada.** Es la unica ruta publica del panel: ni versiones de
    dependencias, ni rutas internas, ni si hay una corrida en curso.
 
@@ -70,9 +69,8 @@ class TestLaRutaResponde:
 
 
 class TestNoTocaGoogle:
-    """Un healthcheck que llama a una API externa convierte una caida de Google
-    en un reinicio del panel. El contenedor entraria en bucle de reinicios
-    estando sano."""
+    """Un healthcheck que llama a una API externa reporta enfermo un panel sano
+    cada vez que la API externa tiene un mal rato."""
 
     def test_no_llama_a_google(self, client, monkeypatch):
         def _explotar(*a, **k):
@@ -147,8 +145,8 @@ class TestNoFiltraNada:
 
 class TestNoRompeElRateLimiting:
     """Docker sondea /salud cada pocos segundos. Si esa ruta llega a devolver
-    429, Docker marca el contenedor `unhealthy` y lo reinicia: el limitador
-    provocaria justo la caida que el healthcheck existe para detectar."""
+    429, Docker marcaria el contenedor `unhealthy` estando sano: el limitador
+    convertiria el healthcheck en una fuente de alarmas falsas."""
 
     def test_tiene_un_limite_propio_y_holgado(self):
         assert hasattr(app, "LIMITE_SALUD")
@@ -169,12 +167,39 @@ class TestNoRompeElRateLimiting:
 
     def test_no_esta_exenta_del_limitador(self):
         """Holgada no es lo mismo que exenta: CE1 exige que ninguna ruta lo
-        este, y esta es la unica publica — la mas facil de martillear."""
-        from flask_limiter.util import get_qualified_name
+        este, y esta es la unica publica — la mas facil de martillear.
 
-        exentas = set(getattr(app.limiter, "_route_exemptions", {}) or {})
-        vista = app.app.view_functions["salud"]
-        assert get_qualified_name(vista) not in exentas
+        Se comprueba por COMPORTAMIENTO, no leyendo `_route_exemptions`. Esa es
+        API privada y la version anterior la leia con `getattr(..., {})`: si
+        Flask-Limiter la renombra, el fallback devuelve un dict vacio y el test
+        pasa SIEMPRE, aunque alguien exima la ruta de verdad. Es el mismo guarda
+        que se apaga en silencio que ya aparecio en CE1.
+
+        Se mandan 800 peticiones, por encima del limite real de la ruta
+        (LIMITE_SALUD, 600/minuto). Si ninguna devuelve 429, el limitador no la
+        esta mirando.
+
+        No se intenta bajar LIMITE_SALUD con monkeypatch: el decorador
+        `@limiter.limit(LIMITE_SALUD)` capturo la cadena al importar el modulo,
+        asi que sustituir el atributo despues no cambia el limite aplicado. Una
+        linea asi habria hecho creer que el test prueba algo que no prueba.
+        """
+        limite_original = app.app.view_functions["salud"]
+        app.limiter.enabled = True
+        with app.app.app_context():
+            app.limiter.reset()
+        try:
+            codigos = [app.app.test_client().get("/salud").status_code
+                       for _ in range(800)]
+        finally:
+            app.limiter.enabled = False
+            with app.app.app_context():
+                app.limiter.reset()
+        assert limite_original is app.app.view_functions["salud"]
+        assert 429 in codigos, (
+            "800 peticiones sin un solo 429: /salud no esta pasando por el "
+            "limitador"
+        )
 
 
 class TestDeclaracionEnLosDosSitios:
@@ -203,3 +228,36 @@ class TestDeclaracionEnLosDosSitios:
         assert "curl" not in texto and "wget" not in texto, (
             f"el healthcheck usa una herramienta que la imagen no trae: {texto}"
         )
+
+
+def test_el_dockerfile_y_el_compose_declaran_lo_mismo():
+    """Los dos declaran healthcheck y `docker compose up` usa el del compose,
+    mientras que un `docker run` suelto usa el de la imagen. Comprobar solo que
+    ambos EXISTEN deja que diverjan en silencio: un cambio de `interval` o de
+    `retries` en un solo sitio dejaria las dos formas de arranque con salud
+    distinta y la suite en verde.
+    """
+    import re
+
+    df = (RAIZ / "Dockerfile").read_text(encoding="utf-8")
+    cp = (RAIZ / "despliegue" / "docker-compose.yml").read_text(encoding="utf-8")
+
+    linea = [l for l in df.splitlines() if l.startswith("HEALTHCHECK")]
+    assert len(linea) == 1, f"esperaba 1 directiva HEALTHCHECK, hay {len(linea)}"
+    del_df = dict(re.findall(r"--(\w[\w-]*)=(\w+)", linea[0]))
+    del_cp = {
+        "interval": re.search(r"^\s+interval:\s*(\S+)", cp, re.M).group(1),
+        "timeout": re.search(r"^\s+timeout:\s*(\S+)", cp, re.M).group(1),
+        "start-period": re.search(r"^\s+start_period:\s*(\S+)", cp, re.M).group(1),
+        "retries": re.search(r"^\s+retries:\s*(\S+)", cp, re.M).group(1),
+    }
+    assert del_df == del_cp, f"divergen: Dockerfile={del_df} compose={del_cp}"
+
+    # Y la sonda tiene que ser la misma, incluido el ProxyHandler.
+    for texto, nombre in ((df, "Dockerfile"), (cp, "docker-compose.yml")):
+        assert "ProxyHandler" in texto, (
+            f"{nombre}: la sonda no desactiva los proxies del entorno. En Linux "
+            "urllib no exceptua 127.0.0.1, y el compose carga secretos/.env "
+            "entero: un HTTP_PROXY ahi mandaria el healthcheck a la red."
+        )
+        assert "/salud" in texto
