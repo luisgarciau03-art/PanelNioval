@@ -461,10 +461,10 @@ va al respaldo fechado.
 | T5.3 | Zona horaria explícita, dos capas (M2) | ✅ **HECHA** | `fe907b0` + `bdfa5cb`. Helper `nc.ahora_mexico()` (ZoneInfo) + `ENV TZ` + `tzdata`. 24 tests nuevos; suite **412 passed, 1 skipped**. Reviews: code-reviewer APPROVE, python-reviewer Warning, silent-failure-hunter 2 HIGH — todos resueltos. Histórico medido y NO corregido: 2 de 2,662 filas del panel (0.1 %) | 2026-09-04 |
 | T5.4 | Healthcheck del contenedor (M9) | ✅ **HECHA** *(CE8 abierto: gate del owner)* | `b256336` + `517362c`. Ruta `/salud` sin auth, sin tocar Google y sin filtrar nada; `HEALTHCHECK` en `Dockerfile` y compose, con `ProxyHandler` vacío. 40 tests; suite **620 passed, 1 skipped**. Reviews sin CRITICAL/HIGH. ⚠️ **CE8 no se cierra aquí**: Docker no está instalado. Verificado en su lugar que la sonda exacta da exit 0 contra el panel vivo y exit 1 con la ruta rota | 2026-09-04 |
 | T5.5 | Cierre ordenado del hilo del importador (M3) | ✅ **HECHA** | `7677bae` + `8ffb7a1`. Manejador de SIGTERM que **encadena** al de gunicorn (su `init_signals` corre antes de importar la app); 3 puntos de parada dentro de la categoría y `--graceful-timeout 120`, sin los cuales era un no-op. 18 tests; suite **580 passed, 1 skipped**. Reviews: python-reviewer **Block con 1 CRITICAL** (el manejador neutralizaba SIGTERM fuera de gunicorn) y silent-failure-hunter **1 ALTA** (la parada no llegaba antes del SIGKILL) — resueltos | 2026-09-04 |
-| T5.6 | Verificación integral | PENDIENTE | | |
+| T5.6 | Verificación integral | ✅ **HECHA** | Los 5 grep repetidos, `tools/verificar_endurecimiento.py` (12/12 guardas detectan su defecto, y el arnés comprobado en las dos direcciones), suite **620 passed, 1 skipped**, barrido limpio sobre 3,463 líneas. Evidencia en [`docs/auditoria/2026-09-04-t56-verificacion-integral.md`](../../auditoria/2026-09-04-t56-verificacion-integral.md). **9 de 10 CE cumplidos**; CE8 es gate del owner | 2026-09-04 |
 | T5.7 | Cierre: docs, PR, handoff | PENDIENTE | | |
 
-**Avance del plan: 6 / 8 tareas (75 %)**
+**Avance del plan: 7 / 8 tareas (88 %)**
 
 **Gates del owner asociados (reportar, no intentar):** rotar `TELEGRAM_TOKEN` (M7) y apagar
 el despliegue de Railway (M6). Ninguno lo cierra este plan, y ambos siguen siendo el riesgo
