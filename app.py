@@ -20,7 +20,7 @@ from gspread.exceptions import WorksheetNotFound
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-import os, sys, json, time, io, base64, re, hmac, tempfile, subprocess, requests as req_lib
+import os, sys, json, time, io, base64, re, hmac, signal, tempfile, subprocess, requests as req_lib
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
@@ -4825,12 +4825,74 @@ def _nuevo_import_job(ciudad='', status='idle'):
         'log':        [],
         'error':      '',
         'cancelado':  False,
+        'parada_por_senal': False,
         'medidor':    _nuevo_medidor(),
     }
 
 
 _import_job = _nuevo_import_job()
 _import_lock = threading.Lock()
+
+
+# ─── Parada ordenada ante SIGTERM (Plan 5 · T5.5, M3) ────────────────────────
+# El hilo del importador es daemon=True: al reiniciar el contenedor muere donde
+# este. El Plan 3 ya cerro la mitad visible (el registro de mas abajo permite
+# decir "se interrumpio"). Esto cierra la otra mitad: que la corrida se ENTERE
+# de que la estan parando y cierre con lo ya guardado.
+#
+# No hay un segundo camino de salida. El bucle del worker ya consulta una
+# bandera entre categorias para la cancelacion manual del operador, y la senal
+# se engancha a esa misma. Se consulta ENTRE negocios, nunca a media escritura.
+_parada_solicitada = threading.Event()
+
+
+def _solicitar_parada_ordenada():
+    """Pide al worker que cierre en el proximo punto seguro. Idempotente."""
+    _parada_solicitada.set()
+    with _import_lock:
+        if _import_job.get('status') == 'running':
+            # La MISMA bandera que ya consulta el bucle entre categorias.
+            _import_job['cancelado'] = True
+        # Pero marcada como parada por senal: que el operador pulse Detener y
+        # que el contenedor se reinicie no son lo mismo, y la interfaz y el
+        # registro persistido los muestran distinto.
+        _import_job['parada_por_senal'] = True
+
+
+def _instalar_parada_ordenada():
+    """Engancha SIGTERM sin pisar a quien ya estuviera. Devuelve si se instalo.
+
+    ENCADENA a proposito, y no es cortesia. En gunicorn, `init_signals()` corre
+    ANTES de `load_wsgi()` (workers/base.py:120 y :137), asi que cuando se
+    importa este modulo el manejador de gunicorn YA esta puesto y un
+    `signal.signal()` nuestro lo reemplaza. Su `handle_exit` solo hace
+    `self.alive = False`, que es como el worker se entera de que debe terminar:
+    pisarlo dejaria a gunicorn sin apagado ordenado y cada parada acabaria en
+    SIGKILL al agotar el `graceful_timeout`.
+
+    `signal.signal` solo funciona en el hilo principal; en cualquier otro lanza
+    ValueError. Se devuelve False en vez de reventar el arranque.
+    """
+    try:
+        anterior = signal.getsignal(signal.SIGTERM)
+
+        def _manejar(sig, frame):
+            _solicitar_parada_ordenada()
+            # SIG_DFL y SIG_IGN son enteros, no invocables.
+            if callable(anterior):
+                anterior(sig, frame)
+
+        signal.signal(signal.SIGTERM, _manejar)
+        return True
+    except (ValueError, OSError, RuntimeError) as e:
+        # No es fatal: sin el manejador se vuelve al comportamiento de antes,
+        # que es el bug conocido, no una caida.
+        print(f'[importador] no se pudo instalar la parada ordenada: {e}',
+              file=sys.stderr, flush=True)
+        return False
+
+
+_instalar_parada_ordenada()
 
 
 # ─── Registro de corrida interrumpida ────────────────────────────────────────
@@ -5577,7 +5639,12 @@ def _worker_importador(ciudad, gmaps_api_key):
             # Una corrida cancelada NO es una corrida completada: lo escrito
             # antes del corte es valido, pero decir 'done' seria afirmar que se
             # recorrio todo.
-            _import_job['status'] = 'cancelado' if fue_cancelada else 'done'
+            # Una parada por SIGTERM no es una cancelacion del operador: la
+            # interfaz las muestra distinto y el registro persistido tambien.
+            if fue_cancelada and _import_job.get('parada_por_senal'):
+                _import_job['status'] = 'interrumpido'
+            else:
+                _import_job['status'] = 'cancelado' if fue_cancelada else 'done'
             if fue_cancelada:
                 # `desglose` solo tiene las categorias que llegaron a escribir.
                 completadas = len(desglose)
