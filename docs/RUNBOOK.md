@@ -1,10 +1,10 @@
 # RUNBOOK — Operación de PanelNioval + envío de catálogo
 
-Guía operativa para el owner. Arquitectura: **panel en Railway** + **worker local** que envía el catálogo por WhatsApp Web (decisión ADR `docs/adr/2026-08-13-transporte-catalogo.md`).
+Guía operativa para el owner. Arquitectura: **panel en el VPS Vultr** + **worker local** que envía el catálogo por WhatsApp Web (decisión ADR `docs/adr/2026-08-13-transporte-catalogo.md`).
 
 ## Flujo completo
 
-1. El operador usa `/formulario` (Railway) y cierra llamadas.
+1. El operador usa `/formulario` (VPS) y cierra llamadas.
 2. Al cerrar con **"Pedido"** o **"Revisará el Catálogo"**, el panel encola un envío `PENDIENTE` en la worksheet `ENVIOS_CATALOGO`.
 3. Al cerrar con **"Correo"**, un modal captura el correo → se guarda en la columna **T** de `LISTA DE CONTACTOS`.
 4. El **worker local** (PC del owner) procesa la cola: envía por WhatsApp Web y marca `ENVIADO` / `NUMERO_INVALIDO` / `FALLO`.
@@ -119,7 +119,7 @@ El worker **no envía nada** sin autorización explícita (para evitar disparos 
 ```bash
 python tools/smoke_panel.py https://panelnioval.duckdns.org --token <valor>
 ```
-Debe imprimir `Todo OK ✅`. Railway auto-deploya `main`: correr el smoke tras cada merge.
+Debe imprimir `Todo OK ✅`. El VPS auto-deploya `main`: correr el smoke tras cada merge.
 
 ## Verificar la hoja de contactos (antes de capturar correos)
 
@@ -478,7 +478,25 @@ y no lo es.
 ## Gates del owner pendientes (seguridad)
 
 - **Rotar** `TELEGRAM_TOKEN` (bot `8404009072`, expuesto en ~14 copias del historial) y la **Google Places key**; cargarlas en `/srv/panel/secretos/.env` y `/srv/bruce/secretos/.env` en el VPS (ya no en Railway).
-- ~~Eliminar el servicio de Railway~~ — **HECHO** (2026-08-19). `https://web-production-1d453.up.railway.app/` devuelve 404 en la raíz y en `/api/prospectos/stats`. Antes servía el panel abierto sin token: esa exposición está cerrada.
+- ⚠️ **Railway: los registros no cuadran, y conviene mirarlo en la consola.**
+  - **2026-08-19** (este RUNBOOK): «eliminado», verificado con **404** en la raíz y en
+    `/api/prospectos/stats`.
+  - **Hasta el 2026-09-04** `CLAUDE.md` y el gate 8 del índice decían lo contrario: que
+    seguía vivo y sin `PANEL_DASHBOARD_TOKEN`.
+  - **2026-09-05**, medido: **502** con `x-railway-fallback: true` en `/` y en
+    `/api/prospectos/contactos`.
+
+  Un **404** significa que el dominio no tiene ruta; un **502 con `fallback`** significa
+  que **sí la tiene** y no hay nada detrás. Ese 404 → 502 sugiere que el servicio volvió a
+  existir en algún momento. Desde fuera no se puede distinguir «proyecto eliminado» de
+  «aplicación en bucle de fallo», y la guarda fail-closed de `main` produciría ese mismo
+  502 si el servicio existiera sin `PANEL_DASHBOARD_TOKEN`.
+
+  **Lo que sí es seguro hoy:** el panel **no está abierto** por ahí. Ninguna ruta responde
+  200, y si resucitara sin token moriría al arrancar en vez de servir.
+  **Lo que hay que confirmar en la consola de Railway:** si el proyecto está borrado o solo
+  detenido. Si solo está detenido, hay que borrarlo — o al menos comprobar que no puede
+  redesplegar desde `main`.
 - **Corrida real de WhatsApp** (T5.5): 1 llamada de prueba end-to-end con un número propio.
 
 ## Operación en el VPS (desde 2026-08-17)

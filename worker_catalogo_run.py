@@ -3,12 +3,12 @@
 Se ejecuta en la PC del owner (donde vive la sesión de WhatsApp Web). Lee la cola
 `ENVIOS_CATALOGO` desde Google Sheets, envía el catálogo por WhatsApp usando el
 transporte Selenium existente (`envio_catalogo.py`), escribe el estado final y
-reporta un heartbeat al panel en Railway.
+reporta un heartbeat al panel del VPS.
 
 Uso (PC del owner):
     set TELEGRAM_TOKEN=...        (opcional, para reportes)
     set TELEGRAM_CHAT_ID=...
-    set PANEL_URL=https://<tu-app>.up.railway.app   (para heartbeat)
+    set PANEL_URL=https://panelnioval.duckdns.org   (para heartbeat)
     set WORKER_TOKEN=...          (obligatorio: el heartbeat devuelve 401 sin el)
     python worker_catalogo_run.py
 

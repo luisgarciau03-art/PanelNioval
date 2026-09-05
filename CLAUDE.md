@@ -108,12 +108,13 @@ Las decisiones abiertas al owner están en el índice §8; los nueve gates del o
 - Rotar `TELEGRAM_TOKEN` — **el riesgo abierto más grande** ahora que Railway está apagado: sigue vivo en el historial de git (~14 copias) y válido en el proveedor hasta que se rote allí.
 - Elegir transporte de WhatsApp para el VPS: A=WhatsApp Business API (recomendado) / B=worker local (lo que corre hoy) / C=Selenium headless. ⚠️ Si se elige **C**, `envio_catalogo.py` pasa a un contenedor UTC y sus 5 relojes desnudos reintroducen el bug de fecha que cerró el Plan 5 — hay tripwire en `tests/test_endurecimiento_zona_horaria.py`.
 - Corridas reales de WhatsApp (Plan 3 T3.6 / Plan 5 T5.5) y confirmación de la columna T de `LISTA DE CONTACTOS` (Plan 4 T4.1).
-- ~~Autenticación del panel (M1)~~ — **RESUELTO** en `feat/despliegue-vultr`: el gate es
-  fail-closed (`app.py:34-82`). ~~Y la exposición en Railway~~ — **CERRADA el 2026-09-05**:
-  el owner apagó ese despliegue. Verificado: `https://web-production-1d453.up.railway.app/`
-  devuelve **502 con `x-railway-fallback: true`** en todas las rutas, o sea sin despliegue
-  activo detrás del dominio. ⚠️ Desde fuera **no se distingue** «servicio eliminado» de
-  «app en bucle de fallo» — las dos dan 502, y la guarda fail-closed de `main` produciría
-  exactamente eso si el servicio siguiera existiendo sin `PANEL_DASHBOARD_TOKEN`.
-  Confirmarlo en la consola de Railway es del owner. En cualquiera de los dos casos el
-  panel **no está abierto**: si resucitara sin token, moriría al arrancar en vez de servir.
+- ~~Autenticación del panel (M1)~~ — **RESUELTO**: el gate es fail-closed (`app.py:34-82`).
+  Sobre la exposición en **Railway**, ⚠️ **los registros del proyecto se contradicen y hace
+  falta mirar la consola**: `docs/RUNBOOK.md` la dio por eliminada el **2026-08-19** con un
+  **404**; este archivo y el gate 8 del índice decían hasta el 2026-09-04 que seguía viva; y
+  el **2026-09-05** mide **502 con `x-railway-fallback: true`**. Un 404 es «el dominio no
+  tiene ruta»; un 502 con `fallback` es «sí la tiene y no hay nada detrás», así que ese
+  404 → 502 sugiere que el servicio volvió a existir. **Seguro hoy:** ninguna ruta responde
+  200 y el panel no está abierto por ahí — si resucitara sin token, moriría al arrancar.
+  **Por confirmar (owner):** si el proyecto está borrado o solo detenido. Detalle en
+  `docs/RUNBOOK.md` § Gates del owner pendientes.

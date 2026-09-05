@@ -1,7 +1,7 @@
 """
 Panel Principal NIOVAL
 Dashboard centralizado: Prospectos + Seguimiento
-Deploy: Railway  |  Auth: GOOGLE_CREDENTIALS_JSON env var o archivo .json local
+Deploy: VPS Vultr (Docker + Caddy)  |  Auth: GOOGLE_CREDENTIALS_JSON env var o archivo .json local
 """
 
 from flask import Flask, jsonify, render_template_string, request, session
@@ -413,7 +413,7 @@ def _construir_pago_folder_id():
         'PAGO_FOLDER_ID no configurado. '
         'Crea una carpeta en tu Google Drive, compártela con '
         'maps-905@bubbly-subject-412101.iam.gserviceaccount.com (Editor) '
-        'y agrega el ID de la carpeta como variable PAGO_FOLDER_ID en Railway.'
+        'y agrega el ID de la carpeta como variable PAGO_FOLDER_ID en el entorno del VPS (/srv/panel/secretos/.env).'
     )
 
 
@@ -680,7 +680,7 @@ def upload_pago():
         # 1. Subir a ImgBB (hosting gratuito, evita limite de cuota de Drive)
         imgbb_key = os.environ.get('IMGBB_API_KEY', '').strip()
         if not imgbb_key:
-            return jsonify({'ok': False, 'error': 'IMGBB_API_KEY no configurado. Obtén una key gratuita en imgbb.com/api y agrégala en Railway.'}), 500
+            return jsonify({'ok': False, 'error': 'IMGBB_API_KEY no configurado. Obtén una key gratuita en imgbb.com/api y agrégala al entorno del VPS (/srv/panel/secretos/.env).'}), 500
 
         img_b64 = base64.b64encode(contenido).decode('utf-8')
         imgbb_resp = req_lib.post(

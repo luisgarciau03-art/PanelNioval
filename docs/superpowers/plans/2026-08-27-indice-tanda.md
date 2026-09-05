@@ -368,7 +368,7 @@ Ninguno se puede cerrar desde una sesión de Claude. Se **reportan**, no se inte
 | 5 | **Añadir a `.env.example` los nombres de las 5 variables de Places.** El archivo **existe y está versionado** (21 líneas), pero ninguna de las cinco está. El entorno de Claude bloquea escribir archivos `.env*` | Documentación del Plan 2 · T2.8 |
 | 6 | **Validación humana del top-20 de ciudades** | Plan 1 · T1.8 |
 | 7 | **Rotar `TELEGRAM_TOKEN`** (expuesto en el historial git, ~14 copias) | Nada técnico, pero es el riesgo abierto más grande |
-| 8 | ~~Apagar el despliegue de Railway~~ — ✅ **CERRADO el 2026-09-05**. Verificado: 502 con `x-railway-fallback: true` en todas las rutas, o sea sin despliegue activo. Artefactos (`Procfile`, `nixpacks.toml`) retirados con la Task 10 del plan de Vultr. ⚠️ Desde fuera no se distingue «eliminado» de «en bucle de fallo»; confirmarlo en la consola es del owner. En ambos casos el panel **no está abierto**: la guarda fail-closed lo mataría al arrancar sin token | M6 cerrada |
+| 8 | **Railway: confirmar en la consola si está borrado o solo detenido.** El owner lo apagó el 2026-09-05 y **ninguna ruta responde 200**, así que la exposición está cerrada. Pero los registros no cuadran: el RUNBOOK lo dio por eliminado el 2026-08-19 con **404**, y hoy mide **502 con `x-railway-fallback`** — que significa que el dominio **sí** tiene ruta. Ese 404 → 502 sugiere que el servicio volvió a existir | M6 cerrada en lo que importa; queda confirmar el estado real |
 | 9 | **Activar la protección de rama en `main`** (permisos de administrador del repo) | Que el check del Plan 0 impida el merge, no solo lo informe |
 
 **Bloque exacto para el gate 5**, para pegar al final de `.env.example` (solo nombres, sin
