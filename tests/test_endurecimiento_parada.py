@@ -309,19 +309,32 @@ class TestLaParadaLlegaADondeSeGastaDinero:
             "el SIGKILL llega antes"
         )
 
-    @pytest.mark.parametrize("archivo,patron", [
-        ("Procfile", "--graceful-timeout"),
-        ("nixpacks.toml", "--graceful-timeout"),
-        ("Dockerfile", "graceful-timeout"),
-    ])
-    def test_el_graceful_timeout_esta_fijado(self, archivo, patron):
-        """30 s por defecto no alcanzan para llegar a un punto de parada."""
+    def test_el_graceful_timeout_esta_fijado(self):
+        """30 s por defecto no alcanzan para llegar a un punto de parada.
+
+        Solo el Dockerfile: `Procfile` y `nixpacks.toml` se retiraron el
+        2026-09-05 al apagarse Railway (Task 10 del plan de Vultr). El VPS
+        arranca por Docker, asi que ese es el unico sitio que manda.
+        """
         import pathlib
-        ruta = pathlib.Path(app.__file__).parent / archivo
-        assert patron in ruta.read_text(encoding="utf-8"), (
-            f"{archivo} no fija graceful-timeout: la parada ordenada no llega a "
-            "ejecutarse antes del SIGKILL"
+        ruta = pathlib.Path(app.__file__).parent / "Dockerfile"
+        assert "graceful-timeout" in ruta.read_text(encoding="utf-8"), (
+            "el Dockerfile no fija graceful-timeout: la parada ordenada no "
+            "llega a ejecutarse antes del SIGKILL"
         )
+
+    def test_no_reaparecen_los_arranques_de_railway(self):
+        """Si vuelven, vuelven sin graceful-timeout y con la deuda de tener
+        tres sitios de arranque que pueden divergir."""
+        import pathlib
+
+        raiz = pathlib.Path(app.__file__).parent
+        for muerto in ("Procfile", "nixpacks.toml"):
+            assert not (raiz / muerto).exists(), (
+                f"{muerto} reaparecio: Railway se apago el 2026-09-05 y sus "
+                "artefactos se retiraron. Si vuelve el despliegue, hay que "
+                "reponer tambien --graceful-timeout y --workers 1."
+            )
 
 
 class TestNoSeNeutralizaLaSenal:

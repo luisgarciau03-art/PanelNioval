@@ -26,7 +26,14 @@ def _leer(nombre):
 
 # ─────────────── el arranque no puede volver a partirse en dos ───────────────
 
-ARCHIVOS_DE_ARRANQUE = ["Procfile", "Dockerfile", "nixpacks.toml"]
+# Solo el Dockerfile desde el 2026-09-05: Railway se apago y sus dos archivos
+# de arranque (Procfile, nixpacks.toml) se retiraron con la Task 10 del plan de
+# Vultr. Siguen en el historial de git y en el respaldo fechado.
+#
+# La guarda NO pierde valor por quedarse con uno: su motivo era que los sitios
+# de arranque no divergieran, y ahora no pueden — hay uno solo. Si alguna vez
+# vuelve un segundo, se anade aqui y el test vuelve a comparar.
+ARCHIVOS_DE_ARRANQUE = ["Dockerfile"]
 
 
 def _sin_comentarios(texto):
