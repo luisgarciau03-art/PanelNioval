@@ -144,6 +144,62 @@ Todos salieron de las revisiones. Ninguno es una regresión introducida por este
 | 6 | **Una caída de Sheets devuelve 200 con datos vacíos.** `get_data` atrapa el error y degrada en silencio, así que el panel muestra «sin datos» en vez de un fallo. Preexistente, detectado en el recorrido de esta tarea | T5.6 |
 | 7 | **Riesgo residual de las escrituras `RAW`**: seguras al escribir, pero el texto se reactiva al exportar a CSV/Excel o si otra ruta lo reescribe con `USER_ENTERED` | security-reviewer, T5.2 |
 
+## 7.1 Auditoría del conjunto (`security-auditor`) — lo que ninguna revisión individual vio
+
+Veredicto: **el panel queda más seguro y ninguna pieza revierte un control existente.**
+Verificado contra la instantánea pre-Plan-5: ninguna escritura pasó de `RAW` a
+`USER_ENTERED`, y las cotas nuevas no rechazan una edición legítima.
+
+Seis hallazgos de **interacción** — cada uno vive en el cruce de dos cambios. **Cinco
+corregidos** en `ac4c2d6`; uno queda abierto y reencuadra un criterio.
+
+| # | Hallazgo | Estado |
+|---|---|---|
+| H6 | **Regresión real:** `tzdata` era dependencia dura del **worker local** y solo estaba declarada en el `requirements.txt` del panel. Sin ella la Tarea Programada del owner moría al importar, sin enviar un catálogo | ✅ corregido |
+| H2 | Se podía **envenenar la sonda de Docker**: `X-Forwarded-For: 127.0.0.1` agotaba el cubo de la clave que usa la sonda | ✅ corregido |
+| H5 | El manejador de señal tomaba un lock **no reentrante** antes de encadenar: retrasaba el apagado y podía autobloquearse | ✅ corregido |
+| H4 | `ProxyFix` concedía `x_proto`/`x_host` que **nadie consume**, haciendo falsificables el Host y el esquema | ✅ corregido |
+| — | El cubo de 6/hora del importador **se consumía al rechazar**: seis clics en un redespliegue lo bloqueaban una hora | ✅ corregido |
+| **H1** | **CE1 estaba mal encuadrado.** Ver abajo | ⚠️ **abierto** |
+| H3 | Ningún test ejercita la combinación de producción (auth ON + limitador ON) | ⚠️ abierto |
+
+### H1 — CE1 es cierto de la tabla de rutas y falso del camino de la petición
+
+El arreglo del DoS pre-auth (el gate corta antes de que la petición anónima consuma cuota)
+tiene una consecuencia simétrica que no estaba documentada: **una petición sin token nunca
+llega al limitador**, así que **los intentos de adivinar `PANEL_DASHBOARD_TOKEN` no están
+acotados por nada**. No hay bloqueo, ni backoff, ni un log del 401, y Caddy no pone nada
+delante.
+
+Así que el limitador del Plan 5 es un control de **abuso autenticado** —que es exactamente
+para lo que se diseñó: acotar la ruta facturable— y **no** de fuerza bruta ni de DoS. CE1
+debe leerse así, y no como si cubriera las dos cosas.
+
+Cierre propuesto, sin tocar el orden que arregló el DoS: un cubo propio de fallos de
+autenticación dentro del propio gate, antes del 401. Es un **control nuevo**, no un arreglo,
+y por eso se reporta en vez de colarlo al cierre del plan.
+
+### Reordenación de los siete hallazgos abiertos
+
+El auditor cambió la prioridad, y el motivo importa más que el orden:
+
+1. **nº 3** (ProxyFix confía en la red `web`) sube al primer puesto: es la **precondición**
+   de H2. Deja de ser «se puede evadir el 6/h» y pasa a ser «se puede manipular el
+   healthcheck».
+2. **nº 2** (contenedor como root) sube: es la única que se cierra con **una línea** (`USER`)
+   y compone con todas las demás.
+3. **nº 6** (Sheets caído devuelve 200 vacío) sube y **se cierra junto con el nº 1**: `/salud`
+   responde 200 mientras todas las rutas devuelven listas vacías y el operador cree que no
+   hay contactos. El healthcheck no puede verlo por diseño, y es correcto que no lo haga.
+7. **nº 1** (el healthcheck no auto-repara) **baja, con advertencia**: ⚠️ **no cerrarlo antes
+   que el nº 3**, o se construye un botón de reinicio remoto del panel.
+
+### Uno más, preexistente, que ahora conviene anotar
+
+`?token=` como vía de autenticación deja el token en el historial del navegador y en
+cualquier `Referer` — y quedaría en el log de acceso el día que se añada `log` al bloque de
+Caddy.
+
 ## 8. Estado de los criterios de éxito
 
 | # | Criterio | Estado |
