@@ -7,6 +7,7 @@ Deploy: Railway  |  Auth: GOOGLE_CREDENTIALS_JSON env var o archivo .json local
 from flask import Flask, jsonify, render_template_string, request, session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 import secrets, threading
 try:
     import googlemaps
@@ -19,7 +20,7 @@ from gspread.exceptions import WorksheetNotFound
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-import os, json, time, io, base64, re, hmac, tempfile, subprocess, requests as req_lib
+import os, sys, json, time, io, base64, re, hmac, tempfile, subprocess, requests as req_lib
 from datetime import datetime
 from collections import Counter, defaultdict
 import traceback
@@ -76,9 +77,23 @@ LIMITE_IMPORTADOR = "6 per hour"
 # catalogo del owner, que es lo que envia los catalogos por WhatsApp (R1).
 LIMITE_HEARTBEAT = "600 per minute"
 
+# El sondeo del importador tambien va aparte. El frontend llama a
+# /api/importador/estado cada 3 s mientras hay una corrida (con backoff hasta
+# 15 s), o sea ~20/minuto de UNA sola persona con la pestana abierta: un tercio
+# del limite por defecto solo por mirar. La ruta lee estado EN MEMORIA — no
+# toca Sheets ni Places— asi que acotarla igual que a una escritura no protege
+# nada y si estorba al operador.
+LIMITE_SONDEO = "240 per minute"
+
 limiter = Limiter(
     key_func=get_remote_address,
-    app=app,
+    # OJO: NO se pasa `app=` aqui. El constructor registra el before_request del
+    # limitador, y Flask los ejecuta EN ORDEN DE REGISTRO, parando en cuanto uno
+    # devuelve respuesta. Registrandolo aqui corria ANTES del gate de token, asi
+    # que una peticion anonima consumia cuota igual: 60 peticiones sin token
+    # agotaban el cubo global y a partir de ahi el usuario legitimo CON token
+    # recibia 429. Un DoS pre-auth, medido: 401 x60, luego 429 para todos.
+    # El init_app va mas abajo, despues de _requiere_token_panel.
     default_limits=LIMITES_POR_DEFECTO,
     storage_uri="memory://",
     # Se apaga con la MISMA variable que ya usan conftest.py y el desarrollo
@@ -96,13 +111,8 @@ limiter = Limiter(
     swallow_errors=False,
 )
 
-# Apagado bajo el mismo bypass explicito que ya usan conftest.py y el desarrollo
-# local. Con el limitador activo en la suite, cada test consume cuota del
-# siguiente y los resultados pasan a depender del orden de ejecucion.
-# Lectura directa de la variable, como la guarda de arranque y por lo mismo:
-# esto corre a nivel de modulo, antes de que _auth_desactivada() exista.
-if os.environ.get('PANEL_AUTH_DESACTIVADA') == '1':
-    limiter.enabled = False
+# El init_app() y el apagado van mas abajo, justo despues de registrar el gate
+# de token: ver la nota del constructor sobre el orden de los before_request.
 
 
 @app.errorhandler(429)
@@ -155,6 +165,36 @@ def _requiere_token_panel():
             session['dashboard_token'] = token  # recordar para la sesión del navegador
         return
     return jsonify({'ok': False, 'error': 'no autorizado'}), 401
+
+
+# ─── EL LIMITADOR SE ENGANCHA AQUI, NO ANTES ─────────────────────────────────
+# Despues de _requiere_token_panel a proposito: Flask ejecuta los before_request
+# en orden de registro y para en cuanto uno responde, asi que el gate de token
+# corta la peticion anonima ANTES de que consuma cuota. Con el orden al reves,
+# 60 peticiones sin token agotaban el cubo global y dejaban fuera al usuario
+# legitimo (medido: 401 x60 y luego 429 para todos, con token incluido).
+limiter.init_app(app)
+
+# Detras de Caddy, request.remote_addr es la IP del CONTENEDOR del proxy, no la
+# del cliente: sin esto TODAS las peticiones comparten un solo cubo y cualquier
+# visitante anonimo agota el limite de todo el panel. x_for=1 = un unico salto
+# de confianza (Caddy); Werkzeug toma el valor a 1 posicion desde la DERECHA de
+# X-Forwarded-For, asi que lo que el cliente antepone por la izquierda se
+# ignora y esto no reintroduce suplantacion.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+if os.environ.get('PANEL_AUTH_DESACTIVADA') == '1':
+    limiter.enabled = False
+    # RUIDOSO de verdad. El comentario del bypass decia "explicito y ruidoso" y
+    # era mudo: ni un log. Esta misma variable apaga la autenticacion Y el rate
+    # limiting, asi que si queda puesta por error en Railway o en el VPS el
+    # panel arranca abierto y sin limites, y la unica forma de enterarse era
+    # mirar las variables a mano. Es el patron exacto del incidente de las 38
+    # rutas expuestas que ya documenta CLAUDE.md.
+    print('*** PANEL_AUTH_DESACTIVADA=1: panel SIN autenticacion NI rate '
+          'limiting. Correcto en desarrollo y en tests; en un despliegue real '
+          'significa que el panel esta ABIERTO a internet. ***',
+          file=sys.stderr, flush=True)
 
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────
@@ -1023,12 +1063,16 @@ def _fila_valida(ws, fila):
     """
     try:
         fila = int(fila)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
+        # OverflowError: {"_row": 1e400} llega como float('inf'), que int() no
+        # puede convertir. Sin capturarlo daba 500 en vez de 400.
         raise FueraDeRango('fila no numerica')
     if fila < 2:
         raise FueraDeRango('la fila 1 son los encabezados y no se escribe')
     tope = getattr(ws, 'row_count', None)
-    if tope and fila > tope:
+    # `is not None` y no truthy: con row_count = 0 el tope superior desaparecia
+    # en silencio y solo quedaba la cota de fila >= 2.
+    if tope is not None and fila > tope:
         raise FueraDeRango(f'fila {fila} fuera de la hoja (tope {tope})')
     return fila
 
@@ -1036,12 +1080,12 @@ def _fila_valida(ws, fila):
 def _columna_valida(ws, col):
     try:
         col = int(col)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         raise FueraDeRango('columna no numerica')
     if col < 1:
         raise FueraDeRango('columna fuera de rango')
     tope = getattr(ws, 'col_count', None)
-    if tope and col > tope:
+    if tope is not None and col > tope:
         raise FueraDeRango(f'columna {col} fuera de la hoja (tope {tope})')
     return col
 
@@ -5183,6 +5227,14 @@ def _clave_contacto(nombre, direccion):
     return f"{nombre}|{direccion}"
 
 
+# Caracteres de formato de ancho cero, por CODEPOINT y no literales: un
+# invisible escrito tal cual en el fuente no se ve al revisar, y este proyecto
+# ya tuvo un byte que volvio un archivo invisible para el barrido de secretos.
+# lstrip() sin argumentos ya cubre TODO espacio unicode (NBSP, ideografico,
+# separadores de linea); estos cinco no son "espacio" para Python y van aparte.
+_INVISIBLES = ''.join(chr(c) for c in (0xFEFF, 0x200B, 0x200C, 0x200D, 0x2060))
+
+
 def _escapar_formula(valor):
     """Evita que Sheets interprete un texto como formula.
 
@@ -5208,7 +5260,10 @@ def _escapar_formula(valor):
     """
     if not isinstance(valor, str):
         return valor
-    sin_blancos = valor.lstrip(' \t\r\n\v\f﻿​‌‍⁠')
+    # lstrip() sin argumentos cubre TODO espacio unicode (NBSP, ideografico,
+    # separadores de linea): la lista fija anterior los dejaba pasar. Los cinco
+    # caracteres de formato no son "espacio" para Python y siguen aparte.
+    sin_blancos = valor.lstrip().lstrip(_INVISIBLES)
     if sin_blancos[:1] in ('=', '+', '-', '@'):
         return "'" + valor
     return valor
@@ -5675,6 +5730,7 @@ def importador_cancelar():
 
 
 @app.route('/api/importador/estado')
+@limiter.limit(LIMITE_SONDEO)
 def importador_estado():
     with _import_lock:
         snap = {
