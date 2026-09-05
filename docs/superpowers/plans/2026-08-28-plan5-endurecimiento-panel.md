@@ -456,7 +456,7 @@ va al respaldo fechado.
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
 | T5.0 | Tarea Cero: rama, respaldo, baseline y los 5 grep | ✅ **HECHA** | Rama `fix/endurecimiento-panel` desde `main` @ `82995c3` (decisión E5 del owner). Respaldo: 5 XLSX + `huellas.json`, 65 hojas, ninguno vacío. Baseline **388 passed, 1 skipped**. Los 5 grep con salida pegada en [`docs/auditoria/2026-09-04-t50-estado-de-partida.md`](../../auditoria/2026-09-04-t50-estado-de-partida.md) | 2026-09-04 |
-| T5.1 | Rate limiting en todas las rutas (M5) | PENDIENTE | | |
+| T5.1 | Rate limiting en todas las rutas (M5) **+ cotas de fila/columna** | ✅ **HECHA** | `942cc67` + `bafb4a0`. Flask-Limiter 4.1.1 en memoria (D5·A); límites global, importador, heartbeat y sondeo. Cotas `_fila_valida`/`_columna_valida` en las 3 rutas con índices crudos (cierra los 2 CRITICAL preexistentes de T5.2). 48 tests; suite **562 passed, 1 skipped**. Reviews: security-reviewer **2 CRITICAL introducidos por la tarea** (DoS pre-auth y falta de ProxyFix) resueltos; CE1 era un guarda que no podía fallar, corregido | 2026-09-04 |
 | T5.2 | Escapado de fórmulas en todas las escrituras (M14) | ✅ **HECHA** | `b78130b` + `b9b3216`. Inventario de 17 escrituras en [`docs/auditoria/2026-09-04-t52-inventario-escrituras.md`](../../auditoria/2026-09-04-t52-inventario-escrituras.md); escapan las 6 con USER_ENTERED efectivo (antes 1). 77 tests; suite **514 passed, 1 skipped**. Reviews: security-reviewer 1 HIGH + 1 MEDIUM resueltos, python-reviewer 1 HIGH resuelto, silent-failure-hunter 3 resueltos. ⚠️ 2 CRITICAL **preexistentes** sin cerrar (§5.1 del inventario) | 2026-09-04 |
 | T5.3 | Zona horaria explícita, dos capas (M2) | ✅ **HECHA** | `fe907b0` + `bdfa5cb`. Helper `nc.ahora_mexico()` (ZoneInfo) + `ENV TZ` + `tzdata`. 24 tests nuevos; suite **412 passed, 1 skipped**. Reviews: code-reviewer APPROVE, python-reviewer Warning, silent-failure-hunter 2 HIGH — todos resueltos. Histórico medido y NO corregido: 2 de 2,662 filas del panel (0.1 %) | 2026-09-04 |
 | T5.4 | Healthcheck del contenedor (M9) | PENDIENTE | | |
@@ -464,7 +464,7 @@ va al respaldo fechado.
 | T5.6 | Verificación integral | PENDIENTE | | |
 | T5.7 | Cierre: docs, PR, handoff | PENDIENTE | | |
 
-**Avance del plan: 3 / 8 tareas (38 %)**
+**Avance del plan: 4 / 8 tareas (50 %)**
 
 **Gates del owner asociados (reportar, no intentar):** rotar `TELEGRAM_TOKEN` (M7) y apagar
 el despliegue de Railway (M6). Ninguno lo cierra este plan, y ambos siguen siendo el riesgo
