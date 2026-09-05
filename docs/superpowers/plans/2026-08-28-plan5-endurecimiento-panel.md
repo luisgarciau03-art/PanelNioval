@@ -459,12 +459,12 @@ va al respaldo fechado.
 | T5.1 | Rate limiting en todas las rutas (M5) **+ cotas de fila/columna** | ✅ **HECHA** | `942cc67` + `bafb4a0`. Flask-Limiter 4.1.1 en memoria (D5·A); límites global, importador, heartbeat y sondeo. Cotas `_fila_valida`/`_columna_valida` en las 3 rutas con índices crudos (cierra los 2 CRITICAL preexistentes de T5.2). 48 tests; suite **562 passed, 1 skipped**. Reviews: security-reviewer **2 CRITICAL introducidos por la tarea** (DoS pre-auth y falta de ProxyFix) resueltos; CE1 era un guarda que no podía fallar, corregido | 2026-09-04 |
 | T5.2 | Escapado de fórmulas en todas las escrituras (M14) | ✅ **HECHA** | `b78130b` + `b9b3216`. Inventario de 17 escrituras en [`docs/auditoria/2026-09-04-t52-inventario-escrituras.md`](../../auditoria/2026-09-04-t52-inventario-escrituras.md); escapan las 6 con USER_ENTERED efectivo (antes 1). 77 tests; suite **514 passed, 1 skipped**. Reviews: security-reviewer 1 HIGH + 1 MEDIUM resueltos, python-reviewer 1 HIGH resuelto, silent-failure-hunter 3 resueltos. ⚠️ 2 CRITICAL **preexistentes** sin cerrar (§5.1 del inventario) | 2026-09-04 |
 | T5.3 | Zona horaria explícita, dos capas (M2) | ✅ **HECHA** | `fe907b0` + `bdfa5cb`. Helper `nc.ahora_mexico()` (ZoneInfo) + `ENV TZ` + `tzdata`. 24 tests nuevos; suite **412 passed, 1 skipped**. Reviews: code-reviewer APPROVE, python-reviewer Warning, silent-failure-hunter 2 HIGH — todos resueltos. Histórico medido y NO corregido: 2 de 2,662 filas del panel (0.1 %) | 2026-09-04 |
-| T5.4 | Healthcheck del contenedor (M9) | PENDIENTE | | |
+| T5.4 | Healthcheck del contenedor (M9) | ✅ **HECHA** *(CE8 abierto: gate del owner)* | `b256336` + `517362c`. Ruta `/salud` sin auth, sin tocar Google y sin filtrar nada; `HEALTHCHECK` en `Dockerfile` y compose, con `ProxyHandler` vacío. 40 tests; suite **620 passed, 1 skipped**. Reviews sin CRITICAL/HIGH. ⚠️ **CE8 no se cierra aquí**: Docker no está instalado. Verificado en su lugar que la sonda exacta da exit 0 contra el panel vivo y exit 1 con la ruta rota | 2026-09-04 |
 | T5.5 | Cierre ordenado del hilo del importador (M3) | ✅ **HECHA** | `7677bae` + `8ffb7a1`. Manejador de SIGTERM que **encadena** al de gunicorn (su `init_signals` corre antes de importar la app); 3 puntos de parada dentro de la categoría y `--graceful-timeout 120`, sin los cuales era un no-op. 18 tests; suite **580 passed, 1 skipped**. Reviews: python-reviewer **Block con 1 CRITICAL** (el manejador neutralizaba SIGTERM fuera de gunicorn) y silent-failure-hunter **1 ALTA** (la parada no llegaba antes del SIGKILL) — resueltos | 2026-09-04 |
 | T5.6 | Verificación integral | PENDIENTE | | |
 | T5.7 | Cierre: docs, PR, handoff | PENDIENTE | | |
 
-**Avance del plan: 5 / 8 tareas (63 %)**
+**Avance del plan: 6 / 8 tareas (75 %)**
 
 **Gates del owner asociados (reportar, no intentar):** rotar `TELEGRAM_TOKEN` (M7) y apagar
 el despliegue de Railway (M6). Ninguno lo cierra este plan, y ambos siguen siendo el riesgo
