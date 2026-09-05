@@ -189,7 +189,12 @@ class TestNoRompeElRateLimiting:
         with app.app.app_context():
             app.limiter.reset()
         try:
-            codigos = [app.app.test_client().get("/salud").status_code
+            # REMOTE_ADDR de fuera: la sonda LOCAL esta exenta a proposito (ver
+            # TestLaSondaLocalNoSeEnvenena), asi que con 127.0.0.1 este test no
+            # veria nunca un 429 y pasaria sin medir nada.
+            cli = app.app.test_client()
+            codigos = [cli.get("/salud",
+                               environ_base={"REMOTE_ADDR": "203.0.113.7"}).status_code
                        for _ in range(800)]
         finally:
             app.limiter.enabled = False
@@ -261,3 +266,81 @@ def test_el_dockerfile_y_el_compose_declaran_lo_mismo():
             "entero: un HTTP_PROXY ahi mandaria el healthcheck a la red."
         )
         assert "/salud" in texto
+
+
+class TestLaSondaLocalNoSeEnvenena:
+    """Interaccion que solo se ve mirando los cinco cambios juntos (auditoria
+    del conjunto, T5.6).
+
+    /salud es la unica ruta que un no autenticado empuja hasta el limitador, el
+    cubo es por IP, y la sonda de Docker corre DENTRO del contenedor, o sea con
+    clave 127.0.0.1. Sin exencion, cualquiera de la red `web` podia mandar 600
+    peticiones con `X-Forwarded-For: 127.0.0.1`, agotar ESE cubo y hacer que la
+    sonda propia recibiera 429 -> contenedor `unhealthy`.
+
+    Hoy solo seria ruido, porque `unhealthy` no reinicia nada. Se cierra AHORA
+    porque las dos formas de arreglar eso (sidecar autoheal, o health_uri en
+    Caddy) lo convertirian en un boton de reinicio remoto que ademas corta una
+    corrida del importador.
+    """
+
+    def _martillear(self, cliente, cabeceras=None, remota="203.0.113.7", n=800):
+        return [cliente.get("/salud", headers=cabeceras or {},
+                            environ_base={"REMOTE_ADDR": remota}).status_code
+                for _ in range(n)]
+
+    def test_la_sonda_local_nunca_recibe_429(self, client):
+        """Viene del propio contenedor: es la que decide si esta sano."""
+        app.limiter.enabled = True
+        with app.app.app_context():
+            app.limiter.reset()
+        try:
+            codigos = self._martillear(client, remota="127.0.0.1")
+        finally:
+            app.limiter.enabled = False
+            with app.app.app_context():
+                app.limiter.reset()
+        assert 429 not in codigos
+
+    def test_no_se_puede_agotar_el_cubo_de_la_sonda_falseando_la_cabecera(self, client):
+        """El ataque concreto. Se martillea desde fuera diciendo ser 127.0.0.1;
+        despues, la sonda local de verdad tiene que seguir contestando 200."""
+        app.limiter.enabled = True
+        with app.app.app_context():
+            app.limiter.reset()
+        try:
+            self._martillear(client, cabeceras={"X-Forwarded-For": "127.0.0.1"})
+            sonda = client.get("/salud",
+                               environ_base={"REMOTE_ADDR": "127.0.0.1"}).status_code
+        finally:
+            app.limiter.enabled = False
+            with app.app.app_context():
+                app.limiter.reset()
+        assert sonda == 200, (
+            "la sonda de Docker recibe 429 tras un flood externo que dice ser "
+            "127.0.0.1: el contenedor se marcaria unhealthy estando sano"
+        )
+
+    def test_la_exencion_mira_la_direccion_del_socket_y_no_la_cabecera(self):
+        """`request.remote_addr` es justo el valor que ProxyFix deja escribir a
+        quien manda X-Forwarded-For. Usarlo aqui habria sido el bug."""
+        import inspect
+        import sys as _sys
+
+        # Se quitan comentarios y cadenas ANTES de buscar: el docstring de
+        # `_es_sonda_local` menciona `request.remote_addr` para explicar por que
+        # NO se usa, y la primera version de este test se disparo con esa misma
+        # documentacion. Es la tercera variante de la misma trampa en el Plan 5
+        # (comentario, docstring, y ahora prosa que cita el patron prohibido),
+        # asi que se reutiliza el filtro que ya existe.
+        _sys.path.insert(0, str(RAIZ / "tests"))
+        from test_endurecimiento_zona_horaria import solo_codigo
+
+        import tempfile
+        f = pathlib.Path(tempfile.mkdtemp()) / "fragmento.py"
+        f.write_text(inspect.getsource(app._es_sonda_local), encoding="utf-8")
+        codigo = solo_codigo(f)
+        assert "werkzeug.proxy_fix.orig" in inspect.getsource(app._es_sonda_local)
+        assert "request.remote_addr" not in codigo, (
+            "la exencion mira la cabecera, que es falsificable"
+        )

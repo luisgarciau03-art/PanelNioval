@@ -205,7 +205,12 @@ limiter.init_app(app)
 # de confianza (Caddy); Werkzeug toma el valor a 1 posicion desde la DERECHA de
 # X-Forwarded-For, asi que lo que el cliente antepone por la izquierda se
 # ignora y esto no reintroduce suplantacion.
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+# Solo x_for. El limitador es el unico consumidor; x_proto y x_host no los usa
+# nadie (no hay url_for(_external=True), ni redirect, ni request.host en todo
+# app.py) y harian falsificables el Host y el esquema desde la red `web`. El dia
+# que alguien anada un enlace absoluto, eso seria inyeccion de Host sin haber
+# tocado una linea de seguridad. Minimo privilegio: coste funcional cero.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=0, x_host=0)
 
 if os.environ.get('PANEL_AUTH_DESACTIVADA') == '1':
     limiter.enabled = False
@@ -221,8 +226,31 @@ if os.environ.get('PANEL_AUTH_DESACTIVADA') == '1':
           file=sys.stderr, flush=True)
 
 
+def _es_sonda_local():
+    """True si la peticion viene del propio contenedor, sin poder falsearlo.
+
+    Se mira la REMOTE_ADDR que habia ANTES de ProxyFix, que es la del socket y
+    no la cabecera. Usar `request.remote_addr` aqui seria el bug: es justo el
+    valor que ProxyFix deja escribir a quien manda X-Forwarded-For.
+
+    Existe por una interaccion que solo se ve mirando los cinco cambios juntos:
+    /salud es la unica ruta que un no autenticado empuja hasta el limitador, el
+    cubo es por IP, y la sonda de Docker corre DENTRO del contenedor, o sea con
+    clave 127.0.0.1. Sin esto, cualquiera de la red `web` podia mandar 600
+    peticiones con `X-Forwarded-For: 127.0.0.1`, agotar ESE cubo y hacer que la
+    sonda propia de Docker recibiera 429 -> contenedor `unhealthy`.
+
+    Hoy eso solo seria ruido, porque `unhealthy` no reinicia nada. Se cierra
+    AHORA porque las dos formas de arreglar eso (sidecar autoheal, o health_uri
+    en Caddy) lo convertirian en un boton de reinicio remoto que ademas corta
+    una corrida del importador — justo lo que M3 existe para evitar.
+    """
+    original = request.environ.get('werkzeug.proxy_fix.orig', {})
+    return original.get('REMOTE_ADDR') in ('127.0.0.1', '::1')
+
+
 @app.route('/salud')
-@limiter.limit(LIMITE_SALUD)
+@limiter.limit(LIMITE_SALUD, exempt_when=_es_sonda_local)
 def salud():
     """Healthcheck del contenedor (Plan 5 · T5.4, M9).
 
@@ -4897,7 +4925,23 @@ _parada_solicitada = threading.Event()
 def _solicitar_parada_ordenada():
     """Pide al worker que cierre en el proximo punto seguro. Idempotente."""
     _parada_solicitada.set()
-    with _import_lock:
+    _marcar_corrida_interrumpida()
+
+
+def _marcar_corrida_interrumpida(espera=1.0):
+    """Marca la corrida en curso, sin bloquear indefinidamente.
+
+    Se llama desde un manejador de senal, y `_import_lock` no es reentrante. Un
+    timeout convierte el peor caso de "el apagado se cuelga hasta el SIGKILL" en
+    "la corrida no queda marcada": lo segundo se nota y no cuelga nada. La
+    bandera `_parada_solicitada` ya esta puesta, asi que el bucle para igual.
+    """
+    if not _import_lock.acquire(timeout=espera):
+        print('[importador] no se pudo marcar la corrida como interrumpida: '
+              'el lock estaba ocupado. La parada sigue en marcha.',
+              file=sys.stderr, flush=True)
+        return
+    try:
         if _import_job.get('status') == 'running':
             # La MISMA bandera que ya consulta el bucle entre categorias.
             _import_job['cancelado'] = True
@@ -4905,6 +4949,11 @@ def _solicitar_parada_ordenada():
         # que el contenedor se reinicie no son lo mismo, y la interfaz y el
         # registro persistido los muestran distinto.
         _import_job['parada_por_senal'] = True
+    finally:
+        # Sin esto el lock se adquiere y no se suelta nunca, y cuelga el panel
+        # entero. `with` lo daba gratis; al cambiar a acquire(timeout) hay que
+        # escribirlo a mano.
+        _import_lock.release()
 
 
 def _instalar_parada_ordenada():
@@ -4925,10 +4974,20 @@ def _instalar_parada_ordenada():
         anterior = signal.getsignal(signal.SIGTERM)
 
         def _manejar(sig, frame):
-            _solicitar_parada_ordenada()
+            # La bandera PRIMERO: no necesita lock y es lo que leen los puntos
+            # de parada del bucle.
+            _parada_solicitada.set()
+            # Encadenar ANTES de tocar el lock. `handle_exit` de gunicorn solo
+            # hace `alive = False`, y retrasarlo retrasa el apagado ordenado que
+            # este cambio existe para permitir. Ademas `_import_lock` NO es
+            # reentrante: si la senal cae dentro de un `with _import_lock:` del
+            # propio hilo principal, tomarlo aqui se autobloquea hasta el
+            # SIGKILL.
             if callable(anterior):
                 anterior(sig, frame)
+                _marcar_corrida_interrumpida()
                 return
+            _marcar_corrida_interrumpida()
             # SIG_DFL y SIG_IGN son enteros, no invocables, y aqui estuvo el
             # fallo peor de esta tarea: limitarse a `if callable(anterior)` y
             # volver NEUTRALIZA la senal. Sin gunicorn delante —pytest, CI,
@@ -5834,7 +5893,13 @@ def importador_page():
 
 
 @app.route('/api/importador/iniciar', methods=['POST'])
-@limiter.limit(LIMITE_IMPORTADOR)
+# deduct_when: solo descuenta si la corrida ARRANCO. El cubo es de 6/hora y el
+# almacenamiento es memoria, o sea que no hay forma de resetearlo sin reiniciar
+# el proceso. Sin esto, cada rechazo consumia cuota igual —ciudad vacia, "ya hay
+# una busqueda en curso", y sobre todo el 503 nuevo del apagado— y seis clics
+# inocentes durante un redespliegue dejaban el importador bloqueado una hora.
+@limiter.limit(LIMITE_IMPORTADOR,
+               deduct_when=lambda respuesta: respuesta.status_code < 400)
 def importador_iniciar():
     global _import_job
     ciudad       = request.json.get('ciudad', '').strip()

@@ -53,7 +53,7 @@ DEFECTOS = [
 
     ("M5 · el importador pierde su limite propio",
      "app.py",
-     "@limiter.limit(LIMITE_IMPORTADOR)\n",
+     "@limiter.limit(LIMITE_IMPORTADOR,\n               deduct_when=lambda respuesta: respuesta.status_code < 400)\n",
      "",
      "tests/test_endurecimiento_limites.py"),
 
@@ -65,7 +65,7 @@ DEFECTOS = [
 
     ("M5 · se retira ProxyFix (todos comparten cubo)",
      "app.py",
-     "app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)",
+     "app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=0, x_host=0)",
      "pass  # sin ProxyFix",
      "tests/test_endurecimiento_limites.py"),
 
@@ -77,8 +77,8 @@ DEFECTOS = [
 
     ("M3 · el manejador deja de encadenar al de gunicorn",
      "app.py",
-     "            if callable(anterior):\n                anterior(sig, frame)\n                return",
-     "            if False:\n                anterior(sig, frame)\n                return",
+     "            if callable(anterior):\n                anterior(sig, frame)\n                _marcar_corrida_interrumpida()\n                return",
+     "            if False:\n                anterior(sig, frame)\n                _marcar_corrida_interrumpida()\n                return",
      "tests/test_endurecimiento_parada.py"),
 
     ("M3 · la senal deja de llegar al bucle",
@@ -86,6 +86,12 @@ DEFECTOS = [
      "            _import_job['cancelado'] = True",
      "            pass",
      "tests/test_endurecimiento_parada.py"),
+
+    ("M9 · la exencion de la sonda mira la cabecera falsificable",
+     "app.py",
+     "    original = request.environ.get('werkzeug.proxy_fix.orig', {})\n    return original.get('REMOTE_ADDR') in ('127.0.0.1', '::1')",
+     "    return request.remote_addr in ('127.0.0.1', '::1')",
+     "tests/test_endurecimiento_salud.py"),
 
     ("M9 · /salud empieza a filtrar estado interno",
      "app.py",

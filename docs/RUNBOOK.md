@@ -12,6 +12,19 @@ Guía operativa para el owner. Arquitectura: **panel en Railway** + **worker loc
 
 ## Puesta en marcha del worker (PC del owner)
 
+### Antes de nada: instalar dependencias
+
+```
+pip install -r requirements-dev.txt
+```
+
+⚠️ **No saltarse este paso desde el 2026-09-04.** `nucleo_catalogo.py` fija la zona horaria
+con `ZoneInfo` **al importarse**, y Windows no trae base de zonas del sistema: sin el paquete
+`tzdata` el worker revienta con `ZoneInfoNotFoundError` **antes de hacer nada** y la Tarea
+Programada termina sin enviar un solo catálogo. Falla cerrado, que es lo correcto, pero falla
+en tu máquina y sin aviso previo.
+
+
 ```powershell
 # 1. Credencial de Google en la carpeta del proyecto (el .json del service account,
 #    p.ej. bubbly-subject-412101-c969f4a975c5.json) — o la env GOOGLE_CREDENTIALS_JSON.
