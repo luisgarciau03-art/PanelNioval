@@ -43,7 +43,7 @@ $ python tools/verificar_endurecimiento.py
   OK  M9 · /salud empieza a filtrar estado interno
   OK  M9 · el healthcheck pasa a usar curl (que la imagen no trae)
 
-13 de 13 guardas detectan su defecto.
+15 de 15 guardas detectan su defecto.
 ```
 
 **El arnés está comprobado en las dos direcciones también.** Se le inyectó un «defecto» que
@@ -64,7 +64,7 @@ Nunca se usa `git checkout` para restaurar: revierte a HEAD y se lleva lo no com
 
 ```
 $ python -m pytest tests/
-623 passed, 1 skipped
+626 passed, 1 skipped
 ```
 
 | Momento | Tests |
@@ -75,11 +75,12 @@ $ python -m pytest tests/
 | Tras T5.1 (límites y cotas) | 562 |
 | Tras T5.5 (parada ordenada) | 580 |
 | Tras T5.4 (healthcheck) | 620 |
-| Tras la auditoría del conjunto | **623** |
+| Tras la auditoría del conjunto | 623 |
+| Tras retirar Railway y cerrar H1/H3 | **626** |
 
-**+235 tests, ninguna regresión.** CE10 pedía ≥ 388 desde esta base.
+**+238 tests, ninguna regresión.** CE10 pedía ≥ 388 desde esta base.
 
-⚠️ Este 623 es de **Windows**. El runner Linux del CI dará **624**: el test que aquí se
+⚠️ Este 626 es de **Windows**. El runner Linux del CI dará **627**: el test que aquí se
 salta necesita `fcntl`. Ese +1 no es un test nuevo.
 
 ## 4. Barrido de secretos
@@ -162,8 +163,8 @@ corregidos** en `ac4c2d6`; uno queda abierto y reencuadra un criterio.
 | H5 | El manejador de señal tomaba un lock **no reentrante** antes de encadenar: retrasaba el apagado y podía autobloquearse | ✅ corregido |
 | H4 | `ProxyFix` concedía `x_proto`/`x_host` que **nadie consume**, haciendo falsificables el Host y el esquema | ✅ corregido |
 | — | El cubo de 6/hora del importador **se consumía al rechazar**: seis clics en un redespliegue lo bloqueaban una hora | ✅ corregido |
-| **H1** | **CE1 estaba mal encuadrado.** Ver abajo | ⚠️ **abierto** |
-| H3 | Ningún test ejercita la combinación de producción (auth ON + limitador ON) | ⚠️ abierto |
+| **H1** | CE1 estaba mal encuadrado: adivinar el token no estaba acotado por nada | ✅ **cerrado** (`3b9e7ef`): cubo de intentos fallidos por IP, 20/min, dentro del gate |
+| H3 | Ningún test ejercitaba la combinación de producción (auth ON + limitador ON) | ✅ **cerrado** (`3b9e7ef`) |
 
 ### H1 — CE1 es cierto de la tabla de rutas y falso del camino de la petición
 
@@ -206,7 +207,7 @@ Caddy.
 
 | # | Criterio | Estado |
 |---|---|---|
-| CE1 | Toda ruta tiene límite | ⚠️ **reencuadrado** (§7.1·H1): cierto de la tabla de rutas, falso del camino de la petición — una petición sin token no llega al limitador, así que adivinar el token no está acotado. Es control de abuso **autenticado** |
+| CE1 | Toda ruta tiene límite | ✅ **y ahora en los dos sentidos**: de la tabla de rutas (guarda por AST corregido) y del camino de la petición (cubo de intentos fallidos, `3b9e7ef`). El reencuadre de §7.1·H1 queda como historia de por qué |
 | CE2 | El importador tiene límite propio y más estricto | ✅ 6/hora, verificado por comportamiento |
 | CE3 | El límite responde 429 en JSON, no HTML | ✅ |
 | CE4 | Toda escritura a Sheets escapa fórmulas | ✅ las 6 con `USER_ENTERED` efectivo |
@@ -215,8 +216,7 @@ Caddy.
 | CE7 | La semana ISO es la correcta | ✅ |
 | CE8 | El healthcheck detecta un panel colgado | ⚠️ **abierto — gate 5 del owner** |
 | CE9 | `SIGTERM` no parte una escritura | ✅ y hubo que añadir puntos de parada dentro de la categoría: sin ellos no llegaba antes del `SIGKILL` |
-| CE10 | Baseline sin regresiones | ✅ 623 ≥ 388 |
+| CE10 | Baseline sin regresiones | ✅ 626 ≥ 388 |
 
-**8 de 10 cumplidos tal como estaban escritos.** CE8 depende de Docker y es del owner; CE1
-se cumple en su alcance real (abuso autenticado) pero **no** en la lectura amplia que su
-redacción sugería — ver §7.1·H1.
+**9 de 10 cumplidos.** Solo CE8 queda abierto, y depende de Docker: es el gate 5 del owner.
+CE1 se cumplía a medias hasta `3b9e7ef` y ahora es cierto en los dos sentidos.
