@@ -421,3 +421,133 @@ class TestLimiteDelSondeo:
         codigos = [client.get("/api/importador/estado").status_code
                    for _ in range(150)]
         assert 429 not in codigos, "el sondeo normal del panel chocaria con el limite"
+
+
+class TestLaCombinacionDeProduccion:
+    """H3 de la auditoria del conjunto: ningun test ejercitaba auth ON + limitador ON.
+
+    `conftest.py` fija PANEL_AUTH_DESACTIVADA antes del import, asi que toda la
+    suite corre con el limitador apagado; el fixture `limitador_activo` lo
+    enciende pero deja la auth apagada, porque esa SI se relee por peticion.
+    Resultado: la configuracion que corre en produccion no la cubria nada, y la
+    evidencia de que el flood anonimo no consume cuota era una corrida manual.
+
+    Es el patron que la memoria del proyecto llama "un fixture que neutraliza el
+    efecto que el test prueba".
+    """
+
+    @pytest.fixture
+    def produccion(self, monkeypatch):
+        """Auth activa Y limitador activo, como en el VPS."""
+        monkeypatch.delenv("PANEL_AUTH_DESACTIVADA", raising=False)
+        monkeypatch.setenv("PANEL_DASHBOARD_TOKEN", "t" * 32)
+        app.limiter.enabled = True
+        with app.app.app_context():
+            app.limiter.reset()
+        yield {"X-Dashboard-Token": "t" * 32}
+        app.limiter.enabled = False
+        with app.app.app_context():
+            app.limiter.reset()
+
+    def test_el_bypass_esta_de_verdad_apagado(self, produccion):
+        """Si esto fallara, el resto de la clase no probaria nada."""
+        assert app._auth_desactivada() is False
+        assert app.limiter.enabled is True
+
+    def test_un_flood_anonimo_no_deja_fuera_al_usuario_legitimo(self, client, produccion):
+        """El CRITICAL de T5.1, ahora como guarda y no como corrida manual.
+
+        Antes del arreglo: 60 peticiones sin token agotaban el cubo global y a
+        partir de ahi TODOS recibian 429, con token valido incluido.
+        """
+        anonimas = [client.get("/").status_code for _ in range(200)]
+        assert set(anonimas) <= {401, 429}, (
+            f"el flood anonimo dio algo que no es 401 ni 429: {sorted(set(anonimas))}"
+        )
+        assert 401 in anonimas, "el gate no esta rechazando"
+        # 429 aparece por el cubo de intentos FALLIDOS (H1), no por el global:
+        # ese es el arreglo, no un efecto colateral.
+        assert 429 in anonimas, "la fuerza bruta no esta acotada"
+
+        con_token = client.get("/", headers=produccion).status_code
+        assert con_token != 429, (
+            "el usuario legitimo recibe 429 tras un flood anonimo desde su misma "
+            "IP: o el limitador volvio a correr antes que la auth, o el cubo de "
+            "fallos esta contando los aciertos"
+        )
+
+    def test_la_ruta_publica_sigue_abierta_con_la_auth_activa(self, client, produccion):
+        """`/salud` tiene que responder sin token justo cuando la auth manda."""
+        assert client.get("/salud").status_code == 200
+
+
+class TestFuerzaBrutaDelToken:
+    """H1 de la auditoria del conjunto, y reencuadra CE1.
+
+    El arreglo del DoS pre-auth tiene una consecuencia simetrica: como el gate
+    corta ANTES del limitador, una peticion sin token nunca llegaba a el, asi
+    que los intentos de adivinar PANEL_DASHBOARD_TOKEN no estaban acotados por
+    NADA. Sin bloqueo, sin backoff y sin un solo log del 401. Caddy tampoco pone
+    nada delante.
+
+    O sea que «toda ruta tiene limite» era cierto de la TABLA DE RUTAS y falso
+    del CAMINO DE LA PETICION. Este cubo lo cierra sin tocar el orden que
+    arreglo el DoS: vive dentro del propio gate, antes del 401.
+    """
+
+    @pytest.fixture
+    def auth_activa(self, monkeypatch):
+        monkeypatch.delenv("PANEL_AUTH_DESACTIVADA", raising=False)
+        monkeypatch.setenv("PANEL_DASHBOARD_TOKEN", "t" * 32)
+        app.limiter.enabled = True
+        with app.app.app_context():
+            app.limiter.reset()
+        yield
+        app.limiter.enabled = False
+        with app.app.app_context():
+            app.limiter.reset()
+
+    def test_existe_el_limite_de_intentos_fallidos(self):
+        assert hasattr(app, "LIMITE_AUTH_FALLIDA")
+
+    def test_adivinar_el_token_acaba_en_429(self, client, auth_activa):
+        codigos = [client.get("/", headers={"X-Dashboard-Token": f"malo-{i}"}).status_code
+                   for i in range(60)]
+        assert 401 in codigos, "ni un 401: el gate no esta rechazando"
+        assert 429 in codigos, (
+            "60 intentos de adivinar el token sin un solo 429: la fuerza bruta "
+            "no esta acotada por nada"
+        )
+
+    def test_el_429_de_auth_tambien_es_json(self, client, auth_activa):
+        r = None
+        for i in range(60):
+            r = client.get("/", headers={"X-Dashboard-Token": f"malo-{i}"})
+            if r.status_code == 429:
+                break
+        assert r.status_code == 429
+        assert r.content_type.startswith("application/json")
+
+    def test_el_token_correcto_no_gasta_intentos(self, client, auth_activa):
+        """Solo cuentan los FALLOS. Si contaran los aciertos, el uso normal del
+        panel se bloquearia solo."""
+        # NO se usa /salud: esta exenta de la auth, asi que no pasa por el gate
+        # y el test no ejercitaria nada. Lo detecto el arnes de doble direccion,
+        # que dejo este guarda en verde con el defecto puesto.
+        buenas = [client.get("/", headers={"X-Dashboard-Token": "t" * 32}).status_code
+                  for _ in range(60)]
+        assert 429 not in buenas
+        # Y despues de 60 aciertos, un fallo sigue dando 401 y no 429.
+        assert client.get("/", headers={"X-Dashboard-Token": "malo"}).status_code == 401
+
+    def test_el_cubo_de_fallos_es_por_ip(self, client, auth_activa):
+        """Un atacante no puede dejar fuera al owner agotando el cubo."""
+        for i in range(60):
+            client.get("/", headers={"X-Dashboard-Token": f"malo-{i}"},
+                       environ_base={"REMOTE_ADDR": "203.0.113.9"})
+        otra = client.get("/", headers={"X-Dashboard-Token": "malo"},
+                          environ_base={"REMOTE_ADDR": "198.51.100.4"}).status_code
+        assert otra == 401, (
+            f"otra IP recibe {otra}: el cubo de fallos no esta separado por IP y "
+            "un atacante puede dejar fuera al owner"
+        )

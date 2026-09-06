@@ -8,6 +8,8 @@ from flask import Flask, jsonify, render_template_string, request, session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
+from limits import parse as limits_parse
+from limits.strategies import MovingWindowRateLimiter
 import secrets, threading
 try:
     import googlemaps
@@ -92,6 +94,18 @@ LIMITE_SONDEO = "240 per minute"
 # exento: CE1 exige que ninguna ruta lo este, y esta es la unica publica.
 LIMITE_SALUD = "600 per minute"
 
+# Intentos de autenticacion FALLIDOS, por IP. Cierra un hueco que abrio el
+# propio arreglo del DoS pre-auth: como el gate corta antes que el limitador,
+# una peticion sin token nunca llegaba a el y adivinar el token no estaba
+# acotado por nada — ni bloqueo, ni backoff, ni un log del 401.
+#
+# «Toda ruta tiene limite» era cierto de la TABLA DE RUTAS y falso del CAMINO DE
+# LA PETICION. Este cubo lo cierra sin tocar el orden: vive DENTRO del gate.
+#
+# 20/minuto deja sitio de sobra a alguien que se equivoca al pegar el token y
+# corta cualquier intento de adivinarlo.
+LIMITE_AUTH_FALLIDA = "20 per minute"
+
 limiter = Limiter(
     key_func=get_remote_address,
     # OJO: NO se pasa `app=` aqui. El constructor registra el before_request del
@@ -120,6 +134,29 @@ limiter = Limiter(
 
 # El init_app() y el apagado van mas abajo, justo despues de registrar el gate
 # de token: ver la nota del constructor sobre el orden de los before_request.
+
+
+def _registrar_fallo_de_auth():
+    """Cuenta un 401 y devuelve True si esta IP se paso de intentos.
+
+    Reutiliza el ALMACENAMIENTO del limitador en vez de montar uno propio: es
+    el mismo proceso y el mismo ciclo de vida, y dos almacenes distintos serian
+    dos cosas que mantener sincronizadas sin motivo.
+
+    Falla ABIERTO a proposito, y conviene entender por que: si el contador
+    reventara, la alternativa seria devolver 429 a todo el mundo, o sea
+    convertir un fallo del contador en una caida del panel. Un contador roto
+    debe dejar el panel como estaba —protegido por el token, que sigue ahi— y
+    no tumbarlo. Se avisa por stderr para que no sea silencioso.
+    """
+    if not limiter.enabled:
+        return False
+    try:
+        return not _ESTRATEGIA_AUTH.hit(_ITEM_AUTH_FALLIDA, get_remote_address())
+    except Exception as e:
+        print(f'[auth] el contador de intentos fallidos no responde: {e}',
+              file=sys.stderr, flush=True)
+        return False
 
 
 @app.errorhandler(429)
@@ -181,6 +218,7 @@ def _requiere_token_panel():
     token = os.environ.get('PANEL_DASHBOARD_TOKEN')
     if not token:
         return jsonify({'ok': False, 'error': 'no autorizado'}), 401
+    # A partir de aqui, cualquier 401 es un intento fallido y se cuenta.
     provisto = (request.headers.get('X-Dashboard-Token')
                 or request.args.get('token')
                 or session.get('dashboard_token'))
@@ -188,6 +226,11 @@ def _requiere_token_panel():
         if request.args.get('token') and hmac.compare_digest(str(request.args.get('token')), str(token)):
             session['dashboard_token'] = token  # recordar para la sesión del navegador
         return
+    if _registrar_fallo_de_auth():
+        return jsonify({
+            'ok': False,
+            'error': 'demasiados intentos de autenticacion',
+        }), 429
     return jsonify({'ok': False, 'error': 'no autorizado'}), 401
 
 
@@ -211,6 +254,9 @@ limiter.init_app(app)
 # que alguien anada un enlace absoluto, eso seria inyeccion de Host sin haber
 # tocado una linea de seguridad. Minimo privilegio: coste funcional cero.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=0, x_host=0)
+
+_ITEM_AUTH_FALLIDA = limits_parse(LIMITE_AUTH_FALLIDA)
+_ESTRATEGIA_AUTH = MovingWindowRateLimiter(limiter.storage)
 
 if os.environ.get('PANEL_AUTH_DESACTIVADA') == '1':
     limiter.enabled = False

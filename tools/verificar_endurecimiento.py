@@ -87,6 +87,18 @@ DEFECTOS = [
      "            pass",
      "tests/test_endurecimiento_parada.py"),
 
+    ("M5 · adivinar el token vuelve a no tener limite (H1)",
+     "app.py",
+     "    if _registrar_fallo_de_auth():",
+     "    if False:",
+     "tests/test_endurecimiento_limites.py"),
+
+    ("M5 · el cubo de fallos empieza a contar tambien los aciertos",
+     "app.py",
+     "        return\n    if _registrar_fallo_de_auth():",
+     "        _registrar_fallo_de_auth()\n        return\n    if _registrar_fallo_de_auth():",
+     "tests/test_endurecimiento_limites.py"),
+
     ("M9 · la exencion de la sonda mira la cabecera falsificable",
      "app.py",
      "    original = request.environ.get('werkzeug.proxy_fix.orig', {})\n    return original.get('REMOTE_ADDR') in ('127.0.0.1', '::1')",
