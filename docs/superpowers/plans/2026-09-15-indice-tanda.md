@@ -5,8 +5,8 @@
 
 **SESIÓN ACTUAL: 1** · **ÚLTIMO RELEVO: 2026-09-15, tras T1.0 ([`RELEVO-actual.md`](RELEVO-actual.md), apuntando a Plan 1 · T1.1)**
 
-**PROGRESO GLOBAL: 0 / 4 planes completados (0 %) · 1 / 34 tareas (2.9 %)**
-**Plan en curso: 1 (1/8) · Baseline vigente sobre `main`: 388 passed, 1 skipped** (el 626 es de `fix/endurecimiento-panel`/PR #44 — ver `docs/auditoria/2026-09-15-estado-de-partida-plan1.md` §2)
+**PROGRESO GLOBAL: 0 / 4 planes completados (0 %) · 2 / 34 tareas (5.9 %)**
+**Plan en curso: 1 (2/8) · Baseline vigente sobre `main`: 388 passed, 1 skipped** (el 626 es de `fix/endurecimiento-panel`/PR #44 — ver `docs/auditoria/2026-09-15-estado-de-partida-plan1.md` §2)
 
 **Biblioteca de herramientas leída en la sesión de diseño:**
 `C:\Users\PC 1\.claude\BIBLIOTECA-HERRAMIENTAS.md` — **653 herramientas (229 agentes + 424

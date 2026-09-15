@@ -378,7 +378,7 @@ previo. **Nada se borra:** lo retirado vive en `docs/auditoria/respaldos/2026-09
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
 | T1.0 | Tarea Cero: anclaje, rama, respaldo y revalidación | **HECHO** | `docs/auditoria/2026-09-15-estado-de-partida-plan1.md` · rama `feat/relevancia-nacional-produccion` desde `main` `82995c3` · baseline **388 passed, 1 skipped** exit 0 · PR #42 OPEN/MERGEABLE/CLEAN CI verde · catálogo 606 · respaldo en `docs/auditoria/respaldos/2026-09-15/` | 2026-09-15 |
-| T1.1 | Contexto previo y decisiones que no se reabren | PENDIENTE | | |
+| T1.1 | Contexto previo y decisiones que no se reabren | **HECHO** | `docs/investigacion/2026-09-15-contexto-plan1.md` · **9 decisiones cerradas con fuente** (ADR §2/§4/§5 + observaciones #17365/#17405/#17391/#17407) · abierto = A1/A2/A3 coincide con §0.2 · **SUSTITUCIÓN DE HERRAMIENTA:** `claude-mem:mem-search` caído (`CAPTURE_BROKEN`, issue #2188, desde 2026-09-05); se usó su transcripción verificada `docs/investigacion/2026-08-28-contexto-previo-importador.md` | 2026-09-15 |
 | T1.2 | Auditoría de cobertura del catálogo por región | PENDIENTE | | |
 | T1.3 | Cerrar la brecha de cobertura (TDD) | PENDIENTE | | |
 | T1.4 | Verificar orden nacional y filtro por región | PENDIENTE | | |
@@ -386,7 +386,7 @@ previo. **Nada se borra:** lo retirado vive en `docs/auditoria/respaldos/2026-09
 | T1.6 | Desplegar y verificar en producción | PENDIENTE | | |
 | T1.7 | Cierre: docs, PROGRESO y relevo | PENDIENTE | | |
 
-**Avance del plan: 1 / 8 tareas (12.5 %)**
+**Avance del plan: 2 / 8 tareas (25 %)**
 
 **Supuestos vivos de este plan:**
 - `SUPUESTO: «todas las ciudades de la región» = todo municipio con presencia ferretera real según umbral DENUE, no los 2,469 municipios del país. — afecta Plan 1, Tarea T1.2.`

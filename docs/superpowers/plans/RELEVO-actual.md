@@ -4,7 +4,7 @@
 > completo para arrancar una sesión nueva. Si la sesión muere de golpe, se pierde una tarea,
 > no el hilo del proyecto.
 >
-> **Estado: sesión 1 en curso · última tarea cerrada: Plan 1 · T1.0.**
+> **Estado: sesión 1 en curso · última tarea cerrada: Plan 1 · T1.1.**
 
 ---
 
@@ -42,7 +42,7 @@ hecho y **dos de los cuatro planes ya están construidos en PR abiertos**.
 
 ## AVANCE
 
-- **Global: 0 / 4 planes** · **Plan en curso: 1** · Tareas **1 / 8 (12.5 %)** · Tareas de la tanda: **1 / 34 (2.9 %)**
+- **Global: 0 / 4 planes** · **Plan en curso: 1** · Tareas **2 / 8 (25 %)** · Tareas de la tanda: **2 / 34 (5.9 %)**
 - **Planes cerrados y mergeados:** ninguno todavía.
 
 ---
@@ -59,13 +59,18 @@ hecho y **dos de los cuatro planes ya están construidos en PR abiertos**.
 | **T1.0** | **R6 despejado:** el generador descarga DENUE/Censo del INEGI en runtime; el umbral es un solo parámetro (`minimo_ferreterias`, `tools/generar_catalogo_ciudades.py:391-393`) | lectura del generador en la rama del PR |
 | **T1.0** | Respaldo creado **antes** de tocar código: `app.py`, `ciudades_mx.json`, salida del baseline | `docs/auditoria/respaldos/2026-09-15/` |
 | **T1.0** | Documento de estado de partida con los 5 números | `docs/auditoria/2026-09-15-estado-de-partida-plan1.md` |
+| **T1.1** | **9 decisiones cerradas con fuente** (pedía ≥5) + lo abierto = A1/A2/A3, coincide con §0.2 del plan | `docs/investigacion/2026-09-15-contexto-plan1.md` |
+| **T1.1** | ⚠️ **`claude-mem` caído**: `mem-search` da `Error calling Worker API: fetch failed`. `CAPTURE_BROKEN` desde **2026-09-05** (issue #2188, ruta `13.24.1` vs caché `13.24.23`), DB sin escribir desde el 6-sep. **La memoria NO está capturando esta tanda** | `~/.claude-mem/CAPTURE_BROKEN` |
+| **T1.1** | Sustitución declarada: se usó la transcripción verificada de agosto, que sí corrió `mcp-search` y dejó las 8 observaciones con ID | `docs/investigacion/2026-08-28-contexto-previo-importador.md` |
+| **T1.1** | **Confirmación independiente del baseline:** la verificación de agosto dice *«482 passed, 1 skipped (en `main` eran 388 + 1)»* — corrobora la corrección de T1.0 desde otra fuente y 17 días antes | `docs/investigacion/2026-08-29-verificacion-plan1.md` |
 
 ---
 
 ## ESTADO DE VERIFICACIÓN AHORA MISMO
 
 - **Baseline:** `python -m pytest tests/` → **PASA** — **388 passed, 1 skipped**, exit 0, medido el 2026-09-15 sobre `feat/relevancia-nacional-produccion` (base `main` `82995c3`).
-- **Gates de la última tarea (T1.0):** cerrados. T1.0 no lleva reviewers ni tests; su gate era *respaldo antes de tocar nada* (cumplido) y *baseline medido y anotado* (cumplido).
+- **Gates de la última tarea (T1.1):** cerrados. T1.1 no lleva reviewers ni tests (no toca código); su gate era *≥5 decisiones cerradas con fuente* → se entregaron **9**.
+- **Al mergear el PR #42, `main` pasará a 482 passed, 1 skipped** (388 + 94 tests nuevos). Ése es el gate de T1.5, no el 388.
 - **Árbol de trabajo:** en `feat/relevancia-nacional-produccion`, con el commit de T1.0 hecho.
 - **CI:** PR #42 con los dos checks en verde, **remedidos hoy** (no heredados de agosto).
 
@@ -73,26 +78,35 @@ hecho y **dos de los cuatro planes ya están construidos en PR abiertos**.
 
 ## SIGUIENTE PASO EXACTO
 
-**Plan 1, Tarea T1.1 — Recuperar el contexto previo y no re-litigar lo cerrado.**
+**Plan 1, Tarea T1.2 — Auditoría de cobertura: ¿606 municipios son «todas las ciudades de la región»?**
 
 ```
-ANCLA · Plan 1 Tarea T1.1 · importador nacional barato veraz profesional · avance 1/8 ·
- gates: >=5 decisiones cerradas con fuente (ADR o ID de observacion) · baseline: python -m pytest tests/
+ANCLA · Plan 1 Tarea T1.2 · importador nacional barato veraz profesional · avance 2/8 ·
+ gates: la brecha es un NUMERO, no un adjetivo · baseline: python -m pytest tests/
 ```
 
-Qué hacer, literal del plan:
-1. `claude-mem:mem-search` sobre: importador, ciudades, relevancia, DENUE, Places, PanelNioval.
-   Buscar en particular la observación *"City Relevance Algorithm Uses Only Existing Contact
-   Sheet Data — Not Industry Importance"*, origen de todo esto.
-2. Leer, **de la rama `origin/feat/relevancia-ciudades-nacional`** (no están en `main`):
-   `docs/adr/2026-08-28-modelo-relevancia-ciudades.md`,
-   `docs/investigacion/2026-08-28-relevancia-ferretera-mexico.md`,
-   `docs/investigacion/2026-08-29-verificacion-plan1.md`.
-   (También existe `docs/investigacion/2026-08-28-contexto-previo-importador.md`.)
-3. Producir `docs/investigacion/2026-09-15-contexto-plan1.md` con **qué está decidido y no se
-   reabre** y **qué quedó abierto** (debe coincidir con §0.2 del plan).
+**Ya medido en agosto — NO recalcular** (`docs/investigacion/2026-08-28-relevancia-ferretera-mexico.md` §4.2):
+≥1 ferretería → **2,227** · ≥10 → **995** · **≥20 (vigente) → 589** · ≥30 → **443** · ≥50 → **276** ·
+municipios con población en Censo 2020 → **2,469** · entidades **32/32**.
 
-**Herramientas asignadas a T1.1:** `claude-mem:mem-search` (claude-mem) · `claude-mem:timeline-report` [OPCIONAL, sólo si mem-search devuelve fragmentos sueltos].
+**Lo que SÍ es trabajo nuevo de T1.2 (los tres huecos reales):**
+1. El corte **≥5 nunca se calculó**.
+2. **Ninguna cifra está desagregada por macro-región** — y eso es exactamente lo que obliga el
+   requisito «todas las ciudades de la región»: un umbral pensado para el Bajío puede
+   sub-representar al Sureste.
+3. **Discrepancia por explicar: el ADR §5.2 fija ≥20 → 589, pero el catálogo tiene 606.**
+   Los 17 de diferencia hay que explicarlos ANTES de tocar el umbral (hipótesis: altas por
+   alias/nombre comercial — es hipótesis, no dato).
+
+**Restricción que no se puede romper:** CE3 — ninguna ciudad en 0. Mínimo actual del catálogo: **14.1**.
+
+**Herramientas asignadas a T1.2:** `Explore` (built-in) · `data-researcher` (catalogo-agentes) ·
+`market-research` (ECC) · `data-analyst` (catalogo-agentes) · `council` (community) ·
+`ads-math` [OPCIONAL, claude-ads: si el owner quiere traducir cobertura a pesos].
+
+**Salida:** `docs/investigacion/2026-09-15-cobertura-catalogo-ciudades.md` con tabla por región
+y recomendación. **Si la brecha es 0 con el umbral actual, T1.3 se cierra sin cambios y se anota
+así (no se borra la fila).**
 
 ---
 
@@ -108,6 +122,7 @@ Qué hacer, literal del plan:
 | **Rotar el token de Telegram** | Heredado de la tanda anterior (~14 copias) | **Acción del owner**, no automatizable |
 | **5 decisiones (D1–D5)** | Respuesta del owner | Mientras tanto, los planes avanzan con la opción recomendada |
 | **Descarga DENUE (T1.3)** | Requiere red hacia INEGI; ~50 MB el archivo de ferreterías | Conectividad en la sesión que ejecute T1.3 |
+| **`claude-mem` caído** | Captura rota desde 2026-09-05 (issue #2188); el worker de búsqueda no responde. **El relevo es la única persistencia entre sesiones** | Acción de entorno, fuera del alcance de la tanda |
 
 ---
 
@@ -141,6 +156,8 @@ Qué hacer, literal del plan:
 - **`app.py` tiene 6,098 líneas en `main`, no 6,610.** El 6,610 de la §0 del plan se midió sobre `fix/endurecimiento-panel`.
 - **El generador de catálogo descarga del INEGI en runtime**, no lee fuentes del repo; y valida tamaño mínimo porque *«el INEGI sirve archivos vacíos con HTTP 200»*.
 - **El heredoc de bash se atraganta con estos documentos largos** (acentos, `«»`, viñetas): usa la herramienta de escritura de archivos directa, no `cat <<'EOF'`. Falló una vez y dejó el archivo intacto — verifícalo siempre con `wc -c` antes de suponer escritura parcial.
+- **`claude-mem` no está disponible y su captura lleva rota desde el 2026-09-05.** No confíes en que la sesión se guarde sola: **el relevo y los documentos del repo son la única memoria**. Diagnóstico en `~/.claude-mem/CAPTURE_BROKEN`.
+- **Las tres URLs de DENUE tienen trampa:** `denue_00_46_csv.zip` responde **HTTP 200 con 0 bytes** y `denue_00_467_csv.zip` responde **HTTP 200 con HTML**. El generador valida tamaño mínimo: **no quitar esa validación**.
 - **`grep -ril` sobre la raíz de estos repos tarda minutos.** Usar `Grep` (ripgrep) con `--glob`.
 - **La caché de Places falsea la medición del ahorro.** Medir siempre ciudad virgen y ciudad trabajada por separado.
 - **Los planes 1 y 4 ya están construidos.** Quien no lea esto va a rediseñar ~40,000 líneas que ya existen con CI en verde.
