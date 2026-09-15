@@ -5,8 +5,8 @@
 
 **SESIÓN ACTUAL: 1** · **ÚLTIMO RELEVO: 2026-09-15, tras T1.0 ([`RELEVO-actual.md`](RELEVO-actual.md), apuntando a Plan 1 · T1.1)**
 
-**PROGRESO GLOBAL: 0 / 4 planes completados (0 %) · 2 / 34 tareas (5.9 %)**
-**Plan en curso: 1 (2/8) · Baseline vigente sobre `main`: 388 passed, 1 skipped** (el 626 es de `fix/endurecimiento-panel`/PR #44 — ver `docs/auditoria/2026-09-15-estado-de-partida-plan1.md` §2)
+**PROGRESO GLOBAL: 0 / 4 planes completados (0 %) · 3 / 34 tareas (8.8 %)**
+**Plan en curso: 1 (3/8) · Baseline vigente sobre `main`: 388 passed, 1 skipped** (el 626 es de `fix/endurecimiento-panel`/PR #44 — ver `docs/auditoria/2026-09-15-estado-de-partida-plan1.md` §2)
 
 **Biblioteca de herramientas leída en la sesión de diseño:**
 `C:\Users\PC 1\.claude\BIBLIOTECA-HERRAMIENTAS.md` — **653 herramientas (229 agentes + 424
@@ -267,6 +267,15 @@ recomendada mientras no respondas.**
 - *Mientras no respondas, el plan asume A.*
 
 ### D4 — Umbral de cobertura del catálogo de ciudades · afecta: **Plan 1, Tareas T1.2 y T1.3**
+
+> ✅ **RESUELTA el 2026-09-15 por T1.2, ejerciendo la opción A (decidir con datos).**
+> **Veredicto: umbral ≥10 ferreterías** (~995 municipios), ni la B (`≥5`) ni la C (`≥20`).
+> El dato que decide: los primeros 7.3 puntos de cobertura de masa ferretera cuestan 406
+> ciudades y los siguientes 4.0 cuestan 445 — ahí muere la utilidad marginal. Brecha medida
+> con el umbral vigente: **13.7 % de la masa ferretera nacional fuera; el Sureste al 65.6 %**.
+> Decidido con `council` (4 voces); el Arquitecto **cambió** su posición inicial de ≥5 a ≥10.
+> Evidencia: [`docs/investigacion/2026-09-15-cobertura-catalogo-ciudades.md`](../../investigacion/2026-09-15-cobertura-catalogo-ciudades.md).
+> **Revocable por el owner:** es un parámetro de una línea.
 
 - **A) Que T1.2 lo decida con datos** *(recomendada)* — la tarea mide la cobertura real por región y recomienda el umbral; decidirlo ahora sería elegir sin el número delante.
 - **B) Fijar `≥5 ferreterías` ya**, por máxima cobertura.
