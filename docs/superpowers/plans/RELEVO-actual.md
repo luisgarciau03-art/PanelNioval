@@ -1,19 +1,20 @@
 # RELEVO ACTUAL — PanelNioval · tanda 2026-09-15
 
 > **Archivo único que se SOBRESCRIBE al cerrar CADA tarea.** Siempre contiene el mensaje
-> completo para arrancar una sesión nueva. Si la sesión muere de golpe, se pierde una tarea,
-> no el hilo del proyecto.
+> completo para arrancar una sesión nueva.
 >
-> **Estado: sesión 1 en curso · última tarea cerrada: Plan 1 · T1.1.**
+> **Estado: sesión 1 CERRADA por umbral de relevo (3 tareas cerradas). Última tarea: Plan 1 · T1.2.**
 
 ---
 
-Continúas el proyecto **PanelNioval**. **Sesión 1.** NO empieces de cero: el diseño ya está
-hecho y **dos de los cuatro planes ya están construidos en PR abiertos**.
+Continúas el proyecto **PanelNioval**. **Sesión 2.** NO empieces de cero: el diseño ya está
+hecho, **dos de los cuatro planes ya están construidos en PR abiertos**, y la sesión 1 cerró
+T1.0, T1.1 y T1.2.
 
 **PROYECTO:** `C:\Users\PC 1\PanelNioval`
-**RAMA DE TRABAJO:** `feat/relevancia-nacional-produccion` — **ya creada** desde `main` (T1.0). Estás en ella.
-**ÚLTIMO COMMIT (en `main`):** `82995c3` — *docs(tanda): decisiones E1-E4 del owner y handoff del Plan 1 (#41)*
+**RAMA DE TRABAJO:** `feat/relevancia-nacional-produccion` — **ya creada y con 3 commits**. Estás en ella. Árbol limpio.
+**ÚLTIMO COMMIT (en la rama):** `3b4c4de` — *docs(plan1): T1.2 cerrada — la brecha de cobertura medida y D4 resuelta en >=10*
+**ÚLTIMO COMMIT (en `main`):** `82995c3` — sin cambios; nada se ha mergeado todavía.
 
 ---
 
@@ -21,9 +22,10 @@ hecho y **dos de los cuatro planes ya están construidos en PR abiertos**.
 
 1. `C:\Users\PC 1\.claude\BIBLIOTECA-HERRAMIENTAS.md` — 653 herramientas (229 agentes + 424 skills), 6 fuentes: `catalogo-agentes`, `ECC`, `claude-ads`, `community`, `claude-mem`, `superpowers`.
 2. `C:\Users\PC 1\PanelNioval\CLAUDE.md` — reglas del proyecto.
-3. `docs/superpowers/plans/2026-09-15-indice-tanda.md` — orden, dependencias y las **5 decisiones pendientes** (D1–D5, todas abiertas; se avanza con la recomendada).
-4. `docs/superpowers/plans/2026-09-15-plan1-relevancia-ciudades-nacional-produccion.md` — **bloque INVARIANTES + bloque de T1.1**.
-5. **`docs/auditoria/2026-09-15-estado-de-partida-plan1.md`** — ⚠️ **NUEVO, léelo**: corrige el baseline y la §0 del plan con medidas reales sobre `main`.
+3. `docs/superpowers/plans/2026-09-15-indice-tanda.md` — orden y dependencias. **D4 ya está RESUELTA** (§8); D1, D2, D3 y D5 siguen abiertas y se avanza con la recomendada.
+4. `docs/superpowers/plans/2026-09-15-plan1-relevancia-ciudades-nacional-produccion.md` — **bloque INVARIANTES + bloque de T1.3**.
+5. **`docs/investigacion/2026-09-15-cobertura-catalogo-ciudades.md`** — ⚠️ **imprescindible**: trae el umbral decidido, el test RED a escribir y las tres condiciones que acompañan al cambio.
+6. `docs/auditoria/2026-09-15-estado-de-partida-plan1.md` — corrige el baseline y la §0 del plan.
 
 ---
 
@@ -32,81 +34,88 @@ hecho y **dos de los cuatro planes ya están construidos en PR abiertos**.
 - **OBJETIVO DEL PROYECTO:** que el importador de PanelNioval ordene ciudades por relevancia ferretera **nacional**, cueste lo mínimo en Places, cuente la verdad y se vea profesional — **en producción**, no en una rama.
 - **DEFINICIÓN DE TERMINADO:** los 4 planes cerrados, sus PRs mergeados a `main`, el VPS sirviendo ese código y `python tools/smoke_panel.py https://panelnioval.duckdns.org --token <valor>` imprimiendo `Todo OK ✅`.
 - **RAMA:** una por plan, creada desde `main` actualizado · **NUNCA `main`** (el VPS auto-deploya `main`) · commits convencionales en español.
-- **BASELINE (nada avanza si falla):** `cd "C:\Users\PC 1\PanelNioval" && python -m pytest tests/`. ⚠️ **CORREGIDO EN T1.0:** el gate real sobre ramas basadas en `main` es **≥ 388 passed, 1 skipped**, exit 0. El **≥ 626** de este bloque es el baseline de `fix/endurecimiento-panel` (PR #44) y vuelve a aplicar en cuanto #44 aterrice (Plan 4, T4.6). **SIN `-q`**: `pytest.ini` ya lo trae; el segundo lo convierte en `-qq` y **oculta la línea del resumen**.
+- **BASELINE (nada avanza si falla):** `cd "C:\Users\PC 1\PanelNioval" && python -m pytest tests/`. ⚠️ **CORREGIDO EN T1.0:** el gate real sobre ramas basadas en `main` es **≥ 388 passed, 1 skipped**, exit 0. El **≥ 626** del plan es el baseline de `fix/endurecimiento-panel` (PR #44) y vuelve a aplicar en cuanto #44 aterrice (Plan 4, T4.6). **SIN `-q`**: `pytest.ini` ya lo trae; el segundo lo convierte en `-qq` y **oculta la línea del resumen**.
 - **GATES POR TAREA:** `python-reviewer` + `code-reviewer` [+ `security-reviewer` si toca auth, token, entrada de usuario, Places o Sheets] [+ `silent-failure-hunter` si toca `try/except` o fallbacks] [+ `typescript-reviewer` si toca `static/js/*`].
 - **PROHIBIDO:** (1) trabajar en `main`; (2) **borrar** — lo retirado va a `docs/auditoria/respaldos/<fecha>/`; (3) mergear con la suite en rojo o con CRITICAL/HIGH abierto; (4) commitear teléfonos o nombres de clientes — anonimizar a `+52…XXXX`; (5) rebasar, cerrar o reordenar los PR #42/#43/#44 fuera del orden de aterrizaje del índice.
-- **DECISIONES YA TOMADAS (no reabrir):** modelo de relevancia = logarítmico × `factor_nioval` (ADR `2026-08-28`, tres candidatos medidos sobre 589 municipios); HTML extraído a `templates/`+`static/` (PR #43); estado del importador compartido en disco (ADR `2026-08-27`); Places con `fields` explícitos + caché 30 d (PR #38, mergeado); `/salud` no revela versión ni commit.
-- **SECUENCIA:** **Plan 1 → Plan 4 → Plan 3 → Plan 2.** Es dependencia real: PR #43 está **apilado sobre** PR #42 (verificado en disco en T1.0), y el bug del Plan 3 debe arreglarse una sola vez, en la estructura final (`static/js/importador.js`).
+- **DECISIONES YA TOMADAS (no reabrir):** modelo de relevancia = logarítmico × `factor_nioval` (ADR `2026-08-28`); HTML extraído a `templates/`+`static/` (PR #43); estado del importador compartido en disco (ADR `2026-08-27`); Places con `fields` explícitos + caché 30 d (PR #38, mergeado); `/salud` no revela versión ni commit.
+- **SECUENCIA:** **Plan 1 → Plan 4 → Plan 3 → Plan 2.** Dependencia real: PR #43 está **apilado sobre** PR #42 (verificado en disco en T1.0).
 
 ---
 
 ## AVANCE
 
-- **Global: 0 / 4 planes** · **Plan en curso: 1** · Tareas **2 / 8 (25 %)** · Tareas de la tanda: **2 / 34 (5.9 %)**
-- **Planes cerrados y mergeados:** ninguno todavía.
+- **Global: 0 / 4 planes** · **Plan en curso: 1** · Tareas **3 / 8 (37.5 %)** · Tareas de la tanda: **3 / 34 (8.8 %)**
+- **Planes cerrados y mergeados:** ninguno todavía. **Nada ha llegado a producción.**
 
 ---
 
-## HECHO EN ESTA SESIÓN (con evidencia, no narrativa)
+## HECHO EN LA SESIÓN 1 (con evidencia, no narrativa)
 
 | Tarea | Qué quedó | Evidencia |
 |---|---|---|
-| **T1.0** | Rama `feat/relevancia-nacional-produccion` creada desde `origin/main` (`82995c3`) | `git branch --show-current` |
-| **T1.0** | Baseline medido y **corregido**: **388 passed, 1 skipped**, exit 0 (49.4 s) | `docs/auditoria/respaldos/2026-09-15/baseline-T1.0-rama-produccion.txt` |
-| **T1.0** | Demostrado que el hueco 388→626 **no es regresión**: 0 failed, 0 errors, ningún test borrado; las 5 suites de endurecimiento (2,447 líneas) sólo existen en PR #44 | `git diff --diff-filter=D … -- tests/` → vacío |
-| **T1.0** | PR #42 revalidado: **OPEN · MERGEABLE · CLEAN**, head `499d41b`, 17 archivos, +12,345/−138, **ambos checks SUCCESS** | `gh pr view 42` |
-| **T1.0** | Apilamiento **#43 sobre #42 confirmado en disco** (no asumido) | `git merge-base --is-ancestor` → 0 |
-| **T1.0** | **R6 despejado:** el generador descarga DENUE/Censo del INEGI en runtime; el umbral es un solo parámetro (`minimo_ferreterias`, `tools/generar_catalogo_ciudades.py:391-393`) | lectura del generador en la rama del PR |
-| **T1.0** | Respaldo creado **antes** de tocar código: `app.py`, `ciudades_mx.json`, salida del baseline | `docs/auditoria/respaldos/2026-09-15/` |
-| **T1.0** | Documento de estado de partida con los 5 números | `docs/auditoria/2026-09-15-estado-de-partida-plan1.md` |
-| **T1.1** | **9 decisiones cerradas con fuente** (pedía ≥5) + lo abierto = A1/A2/A3, coincide con §0.2 del plan | `docs/investigacion/2026-09-15-contexto-plan1.md` |
-| **T1.1** | ⚠️ **`claude-mem` caído**: `mem-search` da `Error calling Worker API: fetch failed`. `CAPTURE_BROKEN` desde **2026-09-05** (issue #2188, ruta `13.24.1` vs caché `13.24.23`), DB sin escribir desde el 6-sep. **La memoria NO está capturando esta tanda** | `~/.claude-mem/CAPTURE_BROKEN` |
-| **T1.1** | Sustitución declarada: se usó la transcripción verificada de agosto, que sí corrió `mcp-search` y dejó las 8 observaciones con ID | `docs/investigacion/2026-08-28-contexto-previo-importador.md` |
-| **T1.1** | **Confirmación independiente del baseline:** la verificación de agosto dice *«482 passed, 1 skipped (en `main` eran 388 + 1)»* — corrobora la corrección de T1.0 desde otra fuente y 17 días antes | `docs/investigacion/2026-08-29-verificacion-plan1.md` |
+| **T1.0** | Rama creada desde `origin/main` (`82995c3`); respaldo hecho **antes** de tocar nada | commit `a9938ed` · `docs/auditoria/respaldos/2026-09-15/` |
+| **T1.0** | **Baseline corregido a 388 passed, 1 skipped.** El 626 del plan es de otra rama; se demostró que no es regresión (0 failed, 0 errors, ningún test borrado; las 5 suites de endurecimiento sólo existen en PR #44) | `docs/auditoria/2026-09-15-estado-de-partida-plan1.md` §2 |
+| **T1.0** | PR #42 revalidado **OPEN · MERGEABLE · CLEAN**, head `499d41b`, ambos checks SUCCESS; apilamiento #43→#42 confirmado con `git merge-base` | `gh pr view 42` |
+| **T1.0** | **R6 despejado:** el generador descarga DENUE/Censo del INEGI en runtime | `tools/generar_catalogo_ciudades.py` |
+| **T1.1** | **9 decisiones cerradas con fuente** (pedía ≥5); lo abierto = A1/A2/A3, coincide con §0.2 | commit `53aa56a` · `docs/investigacion/2026-09-15-contexto-plan1.md` |
+| **T1.1** | ⚠️ **`claude-mem` caído** desde 2026-09-05 (`CAPTURE_BROKEN`, issue #2188). Sustitución **declarada**: se usó la transcripción de agosto con las 8 observaciones y su ID | `~/.claude-mem/CAPTURE_BROKEN` |
+| **T1.2** | **La brecha, en números:** 1,621 municipios fuera, **ninguno llega a 20** (el mayor excluido del país tiene 19). **13.7 % de la masa ferretera nacional fuera; Sureste al 65.6 % contra 97.2 % del Valle de México** | commit `3b4c4de` · `docs/investigacion/2026-09-15-cobertura-catalogo-ciudades.md` |
+| **T1.2** | Verificación en las dos direcciones: pipeline independiente **reproduce exactamente** las 4 cifras de agosto (75,726 / 2,227 / 995 / 589) y 0 del catálogo caen fuera del universo | `tools/auditar_cobertura_ciudades.py` |
+| **T1.2** | **Discrepancia 589 vs 606 resuelta** (era hipótesis en T1.1): 589 por umbral + 17 por herencia legacy vía `resolver_array_viejo()` | §3 del documento |
+| **T1.2** | **D4 RESUELTA: umbral ≥10.** Vía `council`; el Arquitecto cambió su posición inicial de ≥5 a ≥10 | índice §8 · documento §6-7 |
+| **T1.2** | Gate `data-analyst` levantó **3 objeciones y las 3 se aplicaron** (non-sequitur de la métrica, hecho vs juicio, y el 75 % elegido post-hoc) | §12 del documento |
 
 ---
 
 ## ESTADO DE VERIFICACIÓN AHORA MISMO
 
-- **Baseline:** `python -m pytest tests/` → **PASA** — **388 passed, 1 skipped**, exit 0, medido el 2026-09-15 sobre `feat/relevancia-nacional-produccion` (base `main` `82995c3`).
-- **Gates de la última tarea (T1.1):** cerrados. T1.1 no lleva reviewers ni tests (no toca código); su gate era *≥5 decisiones cerradas con fuente* → se entregaron **9**.
-- **Al mergear el PR #42, `main` pasará a 482 passed, 1 skipped** (388 + 94 tests nuevos). Ése es el gate de T1.5, no el 388.
-- **Árbol de trabajo:** en `feat/relevancia-nacional-produccion`, con el commit de T1.0 hecho.
-- **CI:** PR #42 con los dos checks en verde, **remedidos hoy** (no heredados de agosto).
+- **Baseline:** `python -m pytest tests/` → **PASA** — **388 passed, 1 skipped**, exit 0 (medido dos veces: T1.0 y T1.2).
+- **Gates de la última tarea (T1.2):** **cerrados.** `data-analyst` ejecutado, sus 3 objeciones aplicadas al documento; la brecha es un número.
+- **Árbol de trabajo:** **limpio**, 3 commits sobre `origin/main`, sin pushear.
+- **CI:** PR #42 con los dos checks en verde, remedidos el 2026-09-15.
+- ⚠️ **Nada mergeado, nada desplegado.** El operador todavía no ve ningún cambio.
 
 ---
 
 ## SIGUIENTE PASO EXACTO
 
-**Plan 1, Tarea T1.2 — Auditoría de cobertura: ¿606 municipios son «todas las ciudades de la región»?**
+**Plan 1, Tarea T1.3 — Cerrar la brecha de cobertura (TDD).** **NO se salta:** T1.2 midió
+brecha real (13.7 % de la masa nacional fuera).
 
 ```
-ANCLA · Plan 1 Tarea T1.2 · importador nacional barato veraz profesional · avance 2/8 ·
- gates: la brecha es un NUMERO, no un adjetivo · baseline: python -m pytest tests/
+ANCLA · Plan 1 Tarea T1.3 · importador nacional barato veraz profesional · avance 3/8 ·
+ gates: TDD RED antes que GREEN + python-reviewer + code-reviewer + security-reviewer + CE1 y CE3 verdes ·
+ baseline: python -m pytest tests/
 ```
 
-**Ya medido en agosto — NO recalcular** (`docs/investigacion/2026-08-28-relevancia-ferretera-mexico.md` §4.2):
-≥1 ferretería → **2,227** · ≥10 → **995** · **≥20 (vigente) → 589** · ≥30 → **443** · ≥50 → **276** ·
-municipios con población en Censo 2020 → **2,469** · entidades **32/32**.
+**Qué hacer, en este orden (TDD, literal del plan):**
 
-**Lo que SÍ es trabajo nuevo de T1.2 (los tres huecos reales):**
-1. El corte **≥5 nunca se calculó**.
-2. **Ninguna cifra está desagregada por macro-región** — y eso es exactamente lo que obliga el
-   requisito «todas las ciudades de la región»: un umbral pensado para el Bajío puede
-   sub-representar al Sureste.
-3. **Discrepancia por explicar: el ADR §5.2 fija ≥20 → 589, pero el catálogo tiene 606.**
-   Los 17 de diferencia hay que explicarlos ANTES de tocar el umbral (hipótesis: altas por
-   alias/nombre comercial — es hipótesis, no dato).
+1. **RED** — test en `tests/test_catalogo_ciudades.py`:
+   *«ninguna macro-región cubre menos del **75 %** de la masa ferretera de su región»*.
+   Hoy el Sureste da **65.6 %** → **debe fallar**. Con ≥10 da **80.4 %** → pasa.
+   ⚠️ El 75 % es un umbral **normativo**, elegido después de ver los datos (declarado como
+   tal en §10 del documento de T1.2). No lo presentes como derivado del dato.
+2. **GREEN** — cambiar `minimo_ferreterias` de **20** a **10** en
+   `tools/generar_catalogo_ciudades.py:391-393` y **regenerar** el catálogo.
+   ⚠️ **Regenerar descarga ~117 MB del INEGI** (ferreterías 60 MB + mayoreo 18 MB +
+   construcción 2.7 MB + Censo 36 MB). Requiere red. **No quitar la validación de tamaño
+   mínimo**: el INEGI sirve `denue_00_46_csv.zip` con **HTTP 200 y 0 bytes**.
+3. **Verificar CE3** — `min(potencial_mercado) > 5`. Riesgo bajo: el catálogo ya contiene un
+   municipio de **1 sola ferretería** (Ejutla) que puntúa **14.1**, 2.8× por encima del piso.
+4. **Condición del consejo, no opcional:** verificar que las **~406 ciudades nuevas tienen
+   nombre de búsqueda resuelto** (homónimos: `Benito Juárez`, `Hidalgo`, `Juárez`,
+   `Zaragoza`, `Morelos`). El nombre viaja literal a Places y ese fallo ya costó dinero.
+5. **Anexar al ADR** `docs/adr/2026-08-28-modelo-relevancia-ciudades.md` una sección
+   «Revisión 2026-09-15». **Anexo, no reescritura.**
+6. Correr la suite completa: las 4 suites del catálogo deben seguir verdes.
 
-**Restricción que no se puede romper:** CE3 — ninguna ciudad en 0. Mínimo actual del catálogo: **14.1**.
+**Número objetivo:** ~995 municipios por umbral + los heredados que queden por debajo.
+**El modelo de puntuación NO se toca** (decisión cerrada).
 
-**Herramientas asignadas a T1.2:** `Explore` (built-in) · `data-researcher` (catalogo-agentes) ·
-`market-research` (ECC) · `data-analyst` (catalogo-agentes) · `council` (community) ·
-`ads-math` [OPCIONAL, claude-ads: si el owner quiere traducir cobertura a pesos].
-
-**Salida:** `docs/investigacion/2026-09-15-cobertura-catalogo-ciudades.md` con tabla por región
-y recomendación. **Si la brecha es 0 con el umbral actual, T1.3 se cierra sin cambios y se anota
-así (no se borra la fila).**
+**Herramientas asignadas a T1.3:** `superpowers:test-driven-development` (superpowers) ·
+`tdd-guide` (catalogo-agentes) · `python-pro` (catalogo-agentes) · `python-patterns` (ECC) ·
+`architecture-decision-records` (ECC) · `django-build-resolver` [OPCIONAL, sólo si rompe
+imports o pip] · gates `python-reviewer` + `code-reviewer` + `security-reviewer`.
 
 ---
 
@@ -114,51 +123,52 @@ así (no se borra la fila).**
 
 | Asunto | Qué falta | Qué lo desbloquea |
 |---|---|---|
-| **PR #42** (Plan 1) | Verificar cobertura por región, mergear, desplegar | Plan 1, T1.2 → T1.6 |
+| **PR #42** (Plan 1) | Verificar orden nacional (T1.4), mergear (T1.5), desplegar (T1.6) | T1.3 → T1.6 |
 | **PR #43** (Plan 4) | Aprobación de la dirección visual + aterrizaje | Plan 4, T4.2 y T4.4 |
-| **PR #44** (endurecimiento) | 5 conflictos **contra #43** (contra `main` está MERGEABLE) | Plan 4, T4.6 (rebase tras mergear #43) |
+| **PR #44** (endurecimiento) | 5 conflictos **contra #43** (contra `main` está MERGEABLE) | Plan 4, T4.6 |
 | **Bug de conteo** | Diagnóstico H1/H2/H3 — **sin hacer** | Plan 3, T3.1 y T3.2 |
-| **Gasto en pesos de Places** | Sin acceso a Google Cloud billing | **Gate del owner** — decisión D5 |
-| **Rotar el token de Telegram** | Heredado de la tanda anterior (~14 copias) | **Acción del owner**, no automatizable |
-| **5 decisiones (D1–D5)** | Respuesta del owner | Mientras tanto, los planes avanzan con la opción recomendada |
-| **Descarga DENUE (T1.3)** | Requiere red hacia INEGI; ~50 MB el archivo de ferreterías | Conectividad en la sesión que ejecute T1.3 |
-| **`claude-mem` caído** | Captura rota desde 2026-09-05 (issue #2188); el worker de búsqueda no responde. **El relevo es la única persistencia entre sesiones** | Acción de entorno, fuera del alcance de la tanda |
+| **T1.3 necesita red** | ~117 MB del INEGI para regenerar | Conectividad (verificada OK el 2026-09-15) |
+| **`claude-mem` caído** | Captura rota desde 2026-09-05 (issue #2188) | **El relevo es la única persistencia.** Acción de entorno |
+| **Gasto en pesos de Places** | Sin acceso a Google Cloud billing | Gate del owner — **D5** |
+| **Rotar el token de Telegram** | Heredado (~14 copias) | **Acción del owner**, no automatizable |
+| **Decisiones D1, D2, D3, D5** | Respuesta del owner | Se avanza con la recomendada. **D4 ya resuelta** |
 
 ---
 
-## SUPUESTOS VIVOS (se asumieron sin confirmar; siguen vigentes salvo indicación contraria)
+## SUPUESTOS VIVOS
 
-- `SUPUESTO: el trabajo va sobre PanelNioval, no sobre BruceWhatsapp (la ruta dada en el encargo). — afecta los 4 planes.`
-- `SUPUESTO: el gate «≥ 626» de INVARIANTES se reinterpreta como «≥ baseline de la rama base», hoy 388 sobre main. No se relaja el criterio: se corrige la referencia. — afecta los 4 planes. NUEVO en T1.0.`
-- `SUPUESTO: «todas las ciudades de la región» = todo municipio con presencia ferretera real según umbral DENUE, no los 2,469 del país. — afecta Plan 1, T1.2.`
-- `SUPUESTO: «tokens de la API» = consumo facturable de Google Places (PanelNioval no usa ningún LLM). — afecta Plan 2 completo. Ver D2.`
-- `SUPUESTO: si la fuga de Details medida en T2.1 es < 10 %, la migración no se paga sola y T2.2–T2.4 se saltan. — afecta Plan 2, T2.2–T2.4.`
+- `SUPUESTO: el trabajo va sobre PanelNioval, no sobre BruceWhatsapp. — afecta los 4 planes.`
+- `SUPUESTO: el gate «≥ 626» se reinterpreta como «≥ baseline de la rama base», hoy 388 sobre main. — afecta los 4 planes. (T1.0)`
+- `SUPUESTO: «todas las ciudades de la región» = municipio con presencia ferretera real. RESUELTO en T1.2: el corte queda en ≥10 ferreterías.`
+- `SUPUESTO: «tokens de la API» = consumo facturable de Google Places. — afecta Plan 2. Ver D2.`
+- `SUPUESTO: si la fuga de Details medida en T2.1 es < 10 %, T2.2–T2.4 se saltan. — afecta Plan 2.`
 - `SUPUESTO: el síntoma del conteo se observó en producción, no en una rama local. — afecta Plan 3, T3.1.`
-- `SUPUESTO: PR #44 se conserva y se rebasa tras #43, no se descarta. — afecta Plan 4, T4.6. Ver D3.`
+- `SUPUESTO: PR #44 se conserva y se rebasa tras #43. — afecta Plan 4, T4.6. Ver D3.`
 
 ---
 
-## DECISIONES CERRADAS (NO reabrir ni re-discutir)
+## DECISIONES CERRADAS (NO reabrir)
 
-- **Modelo de relevancia = logarítmico × `factor_nioval`** — tres candidatos calculados de verdad sobre 589 municipios; los lineales dejaban 2 de cada 3 ciudades empatadas.
-- **HTML fuera de `app.py`, en `templates/`+`static/`** — el monolito es insostenible.
-- **Estado del importador compartido en disco** — el `council` eligió A sobre la B del plan: la premisa de B era falsa (`daemon=True` muere igual).
-- **Places legacy con `fields` explícitos, no migrar «en ese plan»** — se pagaban 50 campos para leer 3. La migración es materia del Plan 2.
-- **`/salud` no revela versión ni commit** — decisión de seguridad; complica el diagnóstico del Plan 3 y aun así **no se revierte**.
+- **Modelo = logarítmico × `factor_nioval`** — tres candidatos medidos sobre 589 municipios.
+- **HTML fuera de `app.py`, en `templates/`+`static/`**.
+- **Estado del importador compartido en disco**.
+- **Places legacy con `fields` explícitos**; la migración es materia del Plan 2.
+- **`/salud` no revela versión ni commit** — decisión de seguridad; no se revierte.
+- **NUEVA (T1.2) · D4 → umbral ≥10 ferreterías.** Ni ≥5 ni ≥20. Revocable por el owner (es un parámetro de una línea), pero **no se re-litiga sin dato nuevo**.
 
 ---
 
 ## TRAMPAS DESCUBIERTAS (lo que costó tiempo y no está en ningún otro documento)
 
-- **El baseline es por rama, y el 626 no es el de `main`.** Un gate absoluto («≥ 626») es inalcanzable desde una rama basada en `main`: el número real ahí es **388**. Comprobar siempre contra la rama base, y demostrar que la diferencia son tests *añadidos* por otra rama, no tests rotos (`--diff-filter=D` sobre `tests/`).
-- **`pytest -q` oculta el resultado.** `pytest.ini` ya trae `addopts = -q`; añadir otro lo vuelve `-qq` y **suprime la línea del resumen**. Correr `python -m pytest tests/` a secas.
-- **`docs/auditoria/respaldos/` está en `.gitignore`** (`.gitignore:22`). Los respaldos viven en disco, **no** se commitean: `git add` no los mete y no hay que forzarlos. Hay 10 fechas previas ahí, ninguna trackeada.
-- **`app.py` tiene 6,098 líneas en `main`, no 6,610.** El 6,610 de la §0 del plan se midió sobre `fix/endurecimiento-panel`.
-- **El generador de catálogo descarga del INEGI en runtime**, no lee fuentes del repo; y valida tamaño mínimo porque *«el INEGI sirve archivos vacíos con HTTP 200»*.
-- **El heredoc de bash se atraganta con estos documentos largos** (acentos, `«»`, viñetas): usa la herramienta de escritura de archivos directa, no `cat <<'EOF'`. Falló una vez y dejó el archivo intacto — verifícalo siempre con `wc -c` antes de suponer escritura parcial.
-- **`claude-mem` no está disponible y su captura lleva rota desde el 2026-09-05.** No confíes en que la sesión se guarde sola: **el relevo y los documentos del repo son la única memoria**. Diagnóstico en `~/.claude-mem/CAPTURE_BROKEN`.
-- **Las tres URLs de DENUE tienen trampa:** `denue_00_46_csv.zip` responde **HTTP 200 con 0 bytes** y `denue_00_467_csv.zip` responde **HTTP 200 con HTML**. El generador valida tamaño mínimo: **no quitar esa validación**.
-- **`grep -ril` sobre la raíz de estos repos tarda minutos.** Usar `Grep` (ripgrep) con `--glob`.
+- **El baseline es por rama, y el 626 no es el de `main`:** ahí son **388**. Comprobar siempre contra la rama base y demostrar que la diferencia son tests *añadidos* por otra rama (`git diff --diff-filter=D -- tests/`), no tests rotos.
+- **`pytest -q` oculta el resultado.** `pytest.ini` ya trae `addopts = -q`; otro lo vuelve `-qq`. Correr `python -m pytest tests/` a secas.
+- **`docs/auditoria/respaldos/` está en `.gitignore`** (`.gitignore:22`). Los respaldos viven en disco y **no se commitean**; no hay que forzarlos.
+- **`claude-mem` no está disponible y su captura lleva rota desde el 2026-09-05.** No confíes en que la sesión se guarde sola.
+- **El heredoc de bash se atraganta con estos documentos largos** (acentos, `«»`): usa la herramienta de escritura directa, no `cat <<'EOF'`. Falló una vez; verifica con `wc -c` antes de suponer escritura parcial.
+- **No pases rutas MSYS (`/c/Users/…`) a Python**: es un Python de Windows (`C:\Python314`) y da `FileNotFoundError`. Usa `C:/Users/…`.
+- **Las URLs de DENUE tienen trampa:** `denue_00_46_csv.zip` responde **HTTP 200 con 0 bytes** y `denue_00_467_csv.zip` responde **HTTP 200 con HTML**. Validar tamaño mínimo, nunca el status code.
+- **El ZIP de ferreterías pesa 60,209,960 bytes exactos** (igual que en agosto) y tarda ~2 min. Es la comprobación barata de integridad.
+- **`app.py` tiene 6,098 líneas en `main`, no 6,610.**
 - **La caché de Places falsea la medición del ahorro.** Medir siempre ciudad virgen y ciudad trabajada por separado.
 - **Los planes 1 y 4 ya están construidos.** Quien no lea esto va a rediseñar ~40,000 líneas que ya existen con CI en verde.
 
