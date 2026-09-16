@@ -3,7 +3,7 @@
 > **Archivo único que se SOBRESCRIBE al cerrar CADA tarea.** Siempre contiene el mensaje
 > completo para arrancar una sesión nueva.
 >
-> **Estado: PLAN 1 CERRADO Y EN PRODUCCIÓN (8/8). Sesión 2 cerrada.** Siguiente: **Plan 4 · T4.0**.
+> **Estado: Plan 1 CERRADO Y EN PRODUCCIÓN (8/8) · Plan 4 EN CURSO (T4.0 hecha).** Siguiente: **Plan 4 · T4.1**.
 
 ---
 
@@ -15,7 +15,7 @@ PR abiertos.
 **`main`:** **`28eacfe`** — Plan 1 completo (PR #42) + su cierre documental (PR #45).
 **En el VPS corre `8bac782`**, y está bien: el PR #45 es sólo documentación, no hay nada que redesplegar.
 **RAMA DEL PLAN 1:** `feat/relevancia-nacional-produccion` — **mergeada dos veces y agotada.** No sigas en ella.
-**RAMA A CREAR:** `feat/rediseno-aterrizaje`, desde `main` actualizado.
+**RAMA DE TRABAJO:** **`feat/rediseno-aterrizaje`** — ya creada desde `main` `a97b494` y empujada. Último commit `59df79f`.
 
 ---
 
@@ -68,7 +68,7 @@ Verifica siempre después: `ssh root@155.138.200.66 'cd /srv/panel/app && git lo
 
 ## AVANCE
 
-- **Global: 1 / 4 planes (25 %)** · Tareas **8 / 34 (23.5 %)**
+- **Global: 1 / 4 planes (25 %)** · Tareas **9 / 34 (26.5 %)** · **Plan 4 en curso (1/12)**
 - **Plan 1: CERRADO, MERGEADO Y DESPLEGADO.** El operador ve **1,004 ciudades** donde había 606.
 
 ---
@@ -102,58 +102,40 @@ del RUNBOOK no funcionaba sobre HEAD desacoplado.
 
 ---
 
+## HECHO EN T4.0 (commit `2ed61e7`)
+
+| Qué | Evidencia |
+|---|---|
+| Rama desde `main` `a97b494`, respaldo **antes** de tocar nada, baseline **525** | `docs/auditoria/2026-09-15-estado-de-partida-plan4.md` |
+| **9 capturas** del «antes», de producción, 3 superficies × 320/768/1440 | `docs/diseno/antes-2026-09-15/` |
+| ⚠️ **Las del formulario traían nombre y teléfono de un cliente real.** Rehechas anonimizando **en el origen** (interceptando el endpoint): la PII nunca llegó a disco | §2.1 del informe |
+| **Línea base CE6:** dashboard 1440 **CLS 0.1924**, importador 320 **CLS 0.1073** — los dos sobre el umbral de 0.1. LCP máximo 548 ms | `docs/diseno/antes-2026-09-15/metricas-base.json` |
+| PR #43 y #44 reverificados: **los dos CONFLICTING** (riesgo R7, que el plan anticipaba) | §5 del informe |
+
+**Lo más útil que dejó T4.0:** el dashboard **ya falla CLS antes del rediseño**. CE6 dice «no
+empeorar», y sobre 0.1924 ese listón es demasiado bajo. **Apunta a bajar de 0.1**, y si no se
+consigue, dilo con el número delante en vez de esconderte tras un «no empeoró».
+
+---
+
 ## SIGUIENTE PASO EXACTO
 
-**Plan 4, Tarea T4.0 — Tarea Cero: rama, respaldo y evidencia del «antes».**
+**Plan 4, Tarea T4.1 — Auditoría del rediseño construido: ¿cumple lo que pediste?**
 
 ```
-ANCLA · Plan 4 Tarea T4.0 · importador nacional barato veraz profesional · avance 8/34 ·
- gate: 9 capturas del «antes» + métricas base ANTES de tocar nada ·
+ANCLA · Plan 4 Tarea T4.1 · importador nacional barato veraz profesional · avance 9/34 ·
  baseline: python -m pytest tests/  -> 525 passed, 1 skipped
 ```
 
-**Qué hacer (literal del plan):**
+Lee el bloque de T4.1 en `docs/superpowers/plans/2026-09-15-plan4-rediseno-profesional-aterrizaje.md`.
+El instrumento de medición ya existe: **usa las 9 capturas y las 6 métricas de T4.0**, no
+vuelvas a generarlas.
 
-1. Rama **`feat/rediseno-aterrizaje`** desde `main` actualizado (ya con el Plan 1).
-2. Baseline `python -m pytest tests/`. **Anotar el número exacto** (debe dar 525).
-3. **Capturas del «antes»** de las 3 superficies a **320, 768 y 1440 px**, **desde el panel en
-   producción**, a `docs/diseno/antes-2026-09-15/`.
-   💡 Producción ya sirve el Plan 1, así que el «antes» del Plan 4 **incluye las 1,004 ciudades**.
-   Necesitas el token para entrar: **léelo del archivo, no lo pegues** (ver abajo).
-4. Medir **LCP y CLS** del «antes» (línea base de CE6).
-5. Reverificar `gh pr view 43` y `gh pr view 44`: estado, mergeable, CI.
-6. Respaldo a `docs/auditoria/respaldos/2026-09-15-plan4/`.
-
-**Criterio de cierre.** Las 9 capturas y las métricas **existen antes** de tocar nada. Sin
-ellas, CE6 no se puede evaluar y el plan se queda sin instrumento de medición.
-
-**Ojo con el PR #44:** pasó a `CONFLICTING` contra `main` tras el merge del #42 (`CLAUDE.md`,
-`app.py`, `2026-08-27-indice-tanda.md`), **además** de sus 5 conflictos contra el #43. Su rebase
-es T4.6 y **el trabajo creció**.
-
-### 🚨 Y ojo MAYOR con el PR #43: reintroduce las afirmaciones falsas
-
-El #43 **reescribe las mismas líneas de `CLAUDE.md`** que T1.7 acaba de corregir, y su versión
-vuelve a decir:
-
-- *«`GOOGLE_CREDENTIALS_JSON`, `TELEGRAM_TOKEN`… van por variables de entorno en **Railway**»*
-- *«nunca trabajar directo en `main` (**Railway auto-deploya**)»*
-
-**Las dos son falsas** desde el 2026-08-19. Si el #43 se mergea resolviendo el conflicto «a
-favor de la rama», **borra la corrección y el invariante falso vuelve a `main`** — y con él, el
-fallo que costó todo el diagnóstico de T1.6.
-
-**Ya ocurrió:** el PR #45 aterrizó esos docs en `main` (`28eacfe`) y **el #43 pasó de
-`MERGEABLE` a `CONFLICTING`**. Fue una decisión consciente, con su coste declarado: se cambió
-un merge limpio por un conflicto de **un solo archivo** a cambio de que la corrección no se
-pierda. **Por eso los docs de T1.6/T1.7 se aterrizaron a `main` a propósito**: el conflicto en
-`CLAUDE.md` es una **defensa**, no un estorbo. Obliga a decidir a mano en vez de revertir en
-silencio. **Al resolverlo, conserva SIEMPRE la versión de T1.7** en las líneas de Railway,
-despliegue, secretos y baseline; toma del #43 lo suyo (arquitectura de `templates/`+`static/`,
-Chart.js auto-hospedado, sistema de diseño, `.gitattributes`, `test_pii_repositorio.py`).
-
-El baseline del #43 (**900 passed, 2 skipped**) sale de la rama del Plan 1, no de `main`; tras
-el merge del #42 hay que remedirlo, no copiarlo.
+**Si necesitas capturar producción otra vez, dos cosas obligatorias:**
+1. **El formulario muestra datos de un cliente real.** Anonimiza interceptando
+   `/api/formulario/siguiente` antes de que la página pinte — el script está en el informe. No
+   difumines píxeles: si la PII llegó a disco, ya es tarde.
+2. **Mira las capturas antes de commitearlas.** Las nueve se abrieron una por una.
 
 ---
 
@@ -161,7 +143,7 @@ el merge del #42 hay que remedirlo, no copiarlo.
 
 | Asunto | Qué falta | De quién |
 |---|---|---|
-| **CE5 del Plan 1** | Las **3 capturas** de `/importador` en producción (contador nuevo, filtro por región, ciudad sin historial puntuando > 0). Todo lo automatizable está verde | **Owner** |
+| **CE5 del Plan 1** | ⚠️ **Dos de los tres puntos ya están cubiertos sin querer:** `docs/diseno/antes-2026-09-15/importador-1440.png` (de T4.0) muestra «CIUDADES (1004) — ORDENADAS POR PRIORIDAD» y el desplegable en «Todas (1004)». Falta el tercero: una ciudad sin historial puntuando > 0 y no al final | **Owner**, o una captura más |
 | 🔒 **PII en `sin_clasificar`** | El endpoint publica **8 teléfonos y 1 correo** de clientes contra lo que promete su docstring. Tras token; **no lo introdujo el Plan 1** (el endpoint viejo ya lo hacía). O se sanea la salida conservando el aviso, o se corrige la promesa | **Owner decide**; ver RUNBOOK § «Ciudades sin clasificar» |
 | **El smoke no cubre el importador** | Dio `Todo OK ✅` contra un panel sin desplegar. Añadirle `/api/importador/ciudades` | Tarea pendiente, sin asignar |
 | **El smoke revienta en Windows** | `UnicodeEncodeError` al imprimir el `✅`; **sale con código ≠ 0 aunque los 5 chequeos pasen**. Se sortea con `PYTHONIOENCODING=utf-8` | Tarea pendiente, sin asignar |
@@ -230,6 +212,15 @@ el merge del #42 hay que remedirlo, no copiarlo.
 - **🆕 Un guard por subcadena se engaña con un comentario.** Limpia comentarios antes de buscar.
 - **🆕 Prueba las guardas por mutación.** Planta el defecto y comprueba que falla; si no, su
   verde no vale nada.
+- **🆕 `add_init_script` EJECUTA el string, no lo llama.** Pasarle `() => {...}` define una
+  función y la tira: el `PerformanceObserver` nunca se registra y **LCP y CLS salen 0.0 sin un
+  solo error**. Envuelve en IIFE, y trata un `LCP = 0` como fallo de medición, no como valor.
+- **🆕 Las capturas de producción llevan PII.** El formulario muestra nombre y teléfono de un
+  cliente real, el teléfono dos veces. Anonimiza **en el origen** interceptando el endpoint;
+  difuminar después ya es tarde. Y **abre las capturas antes de commitearlas**.
+- **🆕 El `.gitignore` volvió a morder:** `metricas-base.json` quedaba fuera del repo por la
+  regla global `*.json`, en silencio. Ya tiene excepción. **Cualquier `.json` nuevo que deba
+  versionarse la necesita** — compruébalo con `git check-ignore -v`.
 - **El baseline es por rama:** 388 / 482 / 491 / 525.
 - **`pytest -q` oculta el resultado.** Correr `python -m pytest tests/` a secas.
 - **`.gitignore` ignora `*.json` global** con excepción por ruta exacta para
