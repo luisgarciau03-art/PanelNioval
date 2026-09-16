@@ -15,6 +15,15 @@
 # patron sigue vigente: en disco, en Windows, son CRLF.
 * text=auto
 
+# Terceros auto-hospedados: NUNCA se normalizan. Su integridad se comprueba por
+# sha256 contra el archivo EN DISCO (tests/test_plan4_accesibilidad.py,
+# TestElPanelNoDependeDeUnCdnParaPintar), y `text=auto` lo convertia a CRLF al
+# hacer checkout en Windows: 20 saltos de linea de diferencia, 20 bytes mas y un
+# hash distinto. El test pasaba en el runner de Linux y fallaba en la maquina del
+# owner, que es justo donde se mira. Un artefacto de terceros tiene que quedarse
+# byte a byte como se descargo y se reviso.
+static/js/vendor/** binary
+
 # Binarios: que git no intente normalizarlos nunca.
 *.png binary
 *.jpg binary

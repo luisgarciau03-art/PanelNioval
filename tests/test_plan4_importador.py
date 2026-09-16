@@ -113,9 +113,17 @@ class TestLosChipsNoSeReconstruyenAlFiltrar:
             "el filtro no usa el texto precalculado"
         )
         # UNA conversion por pulsacion -la del texto tecleado- y ninguna sobre
-        # los nombres de las 606 ciudades.
-        assert filtro.count("toLowerCase") == 1, (
-            "el nombre de cada ciudad se vuelve a pasar a minusculas en cada tecla"
+        # los nombres de las ciudades.
+        #
+        # El proxy cambio en la T4.3: la conversion dejo de ser `toLowerCase()`
+        # suelto y paso a `sinAcentos()`, que ademas quita la tilde. La
+        # invariante que este test protege es la misma -no recorrer el catalogo
+        # en cada tecla- y se sigue midiendo igual: UNA llamada en el filtro.
+        assert filtro.count("sinAcentos") == 1, (
+            "el nombre de cada ciudad se vuelve a normalizar en cada tecla"
+        )
+        assert "toLowerCase" not in filtro, (
+            "quedo una conversion suelta fuera de sinAcentos()"
         )
 
     def test_el_filtro_sigue_combinando_region_y_texto(self, js):
@@ -608,3 +616,59 @@ def _cuerpo(js: str, nombre: str) -> str:
                               js.find("\nconst ", i + 10),
                               js.find("\ndocument.getElementById", i + 10)) if j > 0]
     return js[i:min(siguientes)] if siguientes else js[i:]
+
+
+# ───────────────── el buscador y los acentos (Plan 4, T4.3) ─────────────────
+
+class TestElBuscadorIgnoraLosAcentos:
+    """Hallazgo B5 de la auditoria de T4.1.
+
+    El filtro hacia `toLowerCase()` y nada mas. En JavaScript eso NO quita la
+    tilde, asi que teclear `leon` no encontraba `Leon` con tilde. Medido contra
+    el catalogo real de produccion: **319 de las 1,004 ciudades (31.8 %)** llevan
+    al menos un caracter acentuado, y **39 estan en el top-100** por prioridad --
+    Leon, Merida, Queretaro, Nezahualcoyotl, Juarez, Torreon, San Luis Potosi.
+
+    Y el fallo era MUDO: la lista quedaba vacia y el operador no podia distinguir
+    "esta ciudad no esta en el catalogo" de "el buscador me la esta escondiendo".
+
+    El proyecto ya tiene esta funcion en Python (`normalizar()` del generador de
+    catalogo); lo que faltaba era su gemela en JavaScript.
+    """
+
+    def test_el_texto_buscable_se_guarda_sin_acentos(self, js):
+        cuerpo = _sin_comentarios_js(_cuerpo(js, "renderChips"))
+        assert "sinAcentos(" in cuerpo, (
+            "el texto buscable se guarda con acentos: 319 ciudades quedan "
+            "fuera de alcance para quien teclee sin tildes"
+        )
+
+    def test_lo_tecleado_tambien_se_normaliza(self, js):
+        """Normalizar un solo lado no sirve de nada: hay que quitar la tilde en
+        las DOS puntas de la comparacion."""
+        cuerpo = _sin_comentarios_js(_cuerpo(js, "filtrarCiudades"))
+        assert "normalize(" in cuerpo or "sinAcentos" in cuerpo, (
+            "lo que teclea el operador no se normaliza"
+        )
+
+    def test_se_usa_el_rango_unicode_de_marcas_diacriticas(self, js):
+        """`NFD` separa la letra de su tilde y el rango U+0300-U+036F es el que
+        las borra. Sin el segundo paso, `normalize('NFD')` no quita nada."""
+        limpio = _sin_comentarios_js(js)
+        assert "NFD" in limpio, "no se descompone: normalize() sin NFD no separa la tilde"
+        assert re.search(r"0300.*036[fF]", limpio), (
+            "no se borran las marcas diacriticas (rango U+0300-U+036F)"
+        )
+
+    def test_normalizar_sigue_siendo_una_vez_al_construir(self, js):
+        """La correccion NO puede deshacer la optimizacion de la T4.9: el coste
+        de una pulsacion bajo de 713 ms a 3.1 ms precisamente por no recorrer
+        las ciudades en cada tecla."""
+        filtro = _sin_comentarios_js(_cuerpo(js, "filtrarCiudades"))
+        assert filtro.count("normalize(") <= 1, (
+            "se normaliza dentro del bucle del filtro: son 1,004 normalizaciones "
+            "por tecla y devuelve el problema que la T4.9 arreglo"
+        )
+        assert "c.buscable.includes(q)" in filtro, (
+            "el filtro dejo de usar el texto precalculado"
+        )

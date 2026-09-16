@@ -367,3 +367,45 @@ class TestLoQueEncontraronLosGates:
         destino = salto.group(1)
         etiqueta = re.search(r'id="%s"[^>]*' % re.escape(destino), html).group(0)
         assert 'tabindex="-1"' in etiqueta, etiqueta[:80]
+
+
+class TestSinTarjetasDentroDeTarjetas:
+    """Hallazgo B3 de la auditoria de T4.1.
+
+    Las reglas del entorno lo prohiben por su nombre, y el propio importador
+    escribe la intencion contraria (`importador.css`: "separacion por filete, no
+    por tarjeta dentro de tarjeta"). En Mensajes se incumplia: `.men-card` nacia
+    con fondo, borde Y sombra dentro de `.table-box`, que ya tiene fondo y
+    sombra. Blanco sobre blanco con dos sombras azules.
+    """
+
+    def _css(self, nombre):
+        return _texto(CSS / nombre)
+
+    def _bloque(self, css, selector):
+        m = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css)
+        assert m, "no existe el selector %s" % selector
+        return m.group(1)
+
+    def test_la_tarjeta_de_mensajes_no_lleva_sombra_propia(self):
+        """Va DENTRO de .table-box, que ya la tiene. Dos sombras apiladas es
+        justo el defecto: la separacion la da el filete de color, no una
+        elevacion que compite con la del contenedor."""
+        bloque = self._bloque(self._css("dashboard.css"), ".men-card")
+        assert "box-shadow" not in bloque, (
+            ".men-card sigue elevandose dentro de .table-box"
+        )
+
+    def test_la_tarjeta_de_mensajes_conserva_su_filete(self):
+        """Quitar la sombra no puede dejarla sin separacion: el filete
+        izquierdo es lo que la distingue, y es lo que el sistema declara."""
+        bloque = self._bloque(self._css("dashboard.css"), ".men-card")
+        assert "border-left" in bloque, (
+            "se quito la sombra y tambien el filete: ahora no se distingue"
+        )
+
+    def test_el_contenedor_si_conserva_la_suya(self):
+        """El control negativo: la elevacion tiene que seguir estando, pero en
+        el contenedor, que es donde corresponde."""
+        bloque = self._bloque(self._css("dashboard.css"), ".table-box")
+        assert "box-shadow" in bloque
