@@ -128,6 +128,27 @@ ellas, CE6 no se puede evaluar y el plan se queda sin instrumento de medición.
 `app.py`, `2026-08-27-indice-tanda.md`), **además** de sus 5 conflictos contra el #43. Su rebase
 es T4.6 y **el trabajo creció**.
 
+### 🚨 Y ojo MAYOR con el PR #43: reintroduce las afirmaciones falsas
+
+El #43 **reescribe las mismas líneas de `CLAUDE.md`** que T1.7 acaba de corregir, y su versión
+vuelve a decir:
+
+- *«`GOOGLE_CREDENTIALS_JSON`, `TELEGRAM_TOKEN`… van por variables de entorno en **Railway**»*
+- *«nunca trabajar directo en `main` (**Railway auto-deploya**)»*
+
+**Las dos son falsas** desde el 2026-08-19. Si el #43 se mergea resolviendo el conflicto «a
+favor de la rama», **borra la corrección y el invariante falso vuelve a `main`** — y con él, el
+fallo que costó todo el diagnóstico de T1.6.
+
+**Por eso los docs de T1.6/T1.7 se aterrizaron a `main` a propósito**: el conflicto en
+`CLAUDE.md` es una **defensa**, no un estorbo. Obliga a decidir a mano en vez de revertir en
+silencio. **Al resolverlo, conserva SIEMPRE la versión de T1.7** en las líneas de Railway,
+despliegue, secretos y baseline; toma del #43 lo suyo (arquitectura de `templates/`+`static/`,
+Chart.js auto-hospedado, sistema de diseño, `.gitattributes`, `test_pii_repositorio.py`).
+
+El baseline del #43 (**900 passed, 2 skipped**) sale de la rama del Plan 1, no de `main`; tras
+el merge del #42 hay que remedirlo, no copiarlo.
+
 ---
 
 ## PENDIENTES Y BLOQUEOS
