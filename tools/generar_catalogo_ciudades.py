@@ -237,8 +237,14 @@ def agregar_por_municipio(cache: pathlib.Path) -> dict:
                 continue
             d = mun[fila["cve_ent"] + fila["cve_mun"]]
             d[campo] += 1
-            d["nombre"] = fila["municipio"]
-            d["estado"] = fila["entidad"]
+            # .strip() NO es cosmetico: el DENUE rellena `municipio` con espacios
+            # en algunas filas ("Dzitbalche" trae 70 detras) y ese relleno llegaba
+            # intacto al catalogo, asi que se le pedia a Places "Ferreterias en
+            # Dzitbalche                    ". No falla: gasta la llamada igual.
+            # normalizar() colapsa espacios, por eso ningun test de duplicados lo
+            # veia. Se limpia en el origen, no ciudad por ciudad mas abajo.
+            d["nombre"] = fila["municipio"].strip()
+            d["estado"] = fila["entidad"].strip()
             if campo == "ferreterias":
                 estrato = fila["per_ocu"]
                 if estrato not in PUNTO_MEDIO_OCUPADOS:
@@ -509,8 +515,8 @@ def main(argv=None):
     p.add_argument("--cache", default=str(pathlib.Path.home() / ".cache" / "inegi"),
                    help="Donde guardar los zips del INEGI entre corridas")
     p.add_argument("--salida", default=str(SALIDA_POR_DEFECTO))
-    p.add_argument("--min-ferreterias", type=int, default=20,
-                   help="Corte del catalogo. 20 -> ~589 municipios (ver el ADR)")
+    p.add_argument("--min-ferreterias", type=int, default=10,
+                   help="Corte del catalogo. 10 -> 995 por umbral (1,004 con las heredadas); 20 -> 589 (ver el ADR)")
     p.add_argument("--verificar", action="store_true",
                    help="No escribe: solo compara contra el catalogo ya versionado")
     args = p.parse_args(argv)

@@ -387,7 +387,7 @@ y no lo es.
 ## Catálogo de ciudades del importador (desde 2026-08-28)
 
 El importador ya **no** trae la lista de ciudades escrita a mano en `app.py`. La sirve
-`/api/importador/ciudades` desde **`datos/ciudades_mx.json`**: 606 municipios con clave
+`/api/importador/ciudades` desde **`datos/ciudades_mx.json`**: 1,004 municipios con clave
 INEGI, estado, macro-región, alias, potencial de mercado e indicadores.
 
 **El archivo se versiona.** El `.gitignore` cubre `*.json` para atrapar credenciales, y hay
@@ -409,7 +409,7 @@ pago**: son descargas estáticas.
 | Opción | Para qué |
 |---|---|
 | `--cache DIR` | Dónde guardar los zips entre corridas |
-| `--min-ferreterias N` | Corte del catálogo. Por defecto **20** → ~589 municipios, más los del array viejo y los rescates de cobertura estatal = 606 |
+| `--min-ferreterias N` | Corte del catálogo. Por defecto **10** → 995 municipios, más los del array viejo y los rescates de cobertura estatal = **1,004**. Bajó de 20 a 10 el 2026-09-15 (Plan 1, T1.3): ver la sección 9 del ADR `2026-08-28-modelo-relevancia-ciudades.md` |
 | `--verificar` | **No escribe**: compara el catálogo en disco contra lo que dan las fuentes hoy y devuelve 1 si difieren |
 | `--salida ARCHIVO` | Escribir a otra ruta |
 

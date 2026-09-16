@@ -6688,6 +6688,21 @@
   }
  },
  {
+  "nombre": "Jalpa de Méndez",
+  "estado": "Tabasco",
+  "clave_inegi": "27010",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 44.8,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 6.8,
+   "mayoreo_construccion": 18,
+   "empresas_construccion": 6,
+   "poblacion": 91185
+  }
+ },
+ {
   "nombre": "Cihuatlán",
   "estado": "Jalisco",
   "clave_inegi": "14022",
@@ -7208,6 +7223,23 @@
   }
  },
  {
+  "nombre": "Tequila, Jalisco",
+  "estado": "Jalisco",
+  "clave_inegi": "14094",
+  "region": "Occidente",
+  "alias": [
+   "Tequila"
+  ],
+  "potencial_mercado": 43.5,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 11.5,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 4,
+   "poblacion": 44353
+  }
+ },
+ {
   "nombre": "Ayotlán",
   "estado": "Jalisco",
   "clave_inegi": "14016",
@@ -7418,6 +7450,23 @@
   }
  },
  {
+  "nombre": "Jiménez, Chihuahua",
+  "estado": "Chihuahua",
+  "clave_inegi": "08036",
+  "region": "Noreste",
+  "alias": [
+   "Jiménez"
+  ],
+  "potencial_mercado": 43.1,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 5.1,
+   "mayoreo_construccion": 15,
+   "empresas_construccion": 6,
+   "poblacion": 40859
+  }
+ },
+ {
   "nombre": "Amealco de Bonfil",
   "estado": "Querétaro",
   "clave_inegi": "22001",
@@ -7612,6 +7661,21 @@
    "mayoreo_construccion": 13,
    "empresas_construccion": 3,
    "poblacion": 27945
+  }
+ },
+ {
+  "nombre": "Santiago Miahuatlán",
+  "estado": "Puebla",
+  "clave_inegi": "21149",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 42.8,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 13.4,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 1,
+   "poblacion": 30309
   }
  },
  {
@@ -7825,6 +7889,21 @@
   }
  },
  {
+  "nombre": "Elota",
+  "estado": "Sinaloa",
+  "clave_inegi": "25008",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 42.5,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 4.9,
+   "mayoreo_construccion": 16,
+   "empresas_construccion": 5,
+   "poblacion": 55339
+  }
+ },
+ {
   "nombre": "Zimatlán de Álvarez",
   "estado": "Oaxaca",
   "clave_inegi": "20570",
@@ -8020,6 +8099,21 @@
   }
  },
  {
+  "nombre": "Ixtapan de la Sal",
+  "estado": "México",
+  "clave_inegi": "15040",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 42.1,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 15,
+   "empresas_construccion": 5,
+   "poblacion": 36911
+  }
+ },
+ {
   "nombre": "Tepetitla de Lardizábal",
   "estado": "Tlaxcala",
   "clave_inegi": "29019",
@@ -8131,6 +8225,36 @@
   }
  },
  {
+  "nombre": "Misantla",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30109",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 41.8,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 26,
+   "empresas_construccion": 1,
+   "poblacion": 65761
+  }
+ },
+ {
+  "nombre": "San Antonio de la Cal",
+  "estado": "Oaxaca",
+  "clave_inegi": "20107",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 41.8,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 5.8,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 13,
+   "poblacion": 26282
+  }
+ },
+ {
   "nombre": "Chiconcuac",
   "estado": "México",
   "clave_inegi": "15030",
@@ -8158,6 +8282,36 @@
    "mayoreo_construccion": 14,
    "empresas_construccion": 0,
    "poblacion": 51498
+  }
+ },
+ {
+  "nombre": "Reforma",
+  "estado": "Chiapas",
+  "clave_inegi": "07074",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 41.7,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 13,
+   "empresas_construccion": 5,
+   "poblacion": 44829
+  }
+ },
+ {
+  "nombre": "Miguel Auza",
+  "estado": "Zacatecas",
+  "clave_inegi": "32029",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 41.7,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 8.9,
+   "mayoreo_construccion": 13,
+   "empresas_construccion": 6,
+   "poblacion": 23713
   }
  },
  {
@@ -8191,6 +8345,21 @@
   }
  },
  {
+  "nombre": "Parras",
+  "estado": "Coahuila de Zaragoza",
+  "clave_inegi": "05024",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 41.6,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 15,
+   "empresas_construccion": 2,
+   "poblacion": 44472
+  }
+ },
+ {
   "nombre": "San Miguel el Alto",
   "estado": "Jalisco",
   "clave_inegi": "14078",
@@ -8203,6 +8372,36 @@
    "mayoreo_construccion": 11,
    "empresas_construccion": 5,
    "poblacion": 31965
+  }
+ },
+ {
+  "nombre": "El Grullo",
+  "estado": "Jalisco",
+  "clave_inegi": "14037",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 41.5,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 5.4,
+   "mayoreo_construccion": 14,
+   "empresas_construccion": 3,
+   "poblacion": 25920
+  }
+ },
+ {
+  "nombre": "San Juan de Sabinas",
+  "estado": "Coahuila de Zaragoza",
+  "clave_inegi": "05032",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 41.5,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 7.9,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 5,
+   "poblacion": 42260
   }
  },
  {
@@ -8266,6 +8465,21 @@
   }
  },
  {
+  "nombre": "Jalpa",
+  "estado": "Zacatecas",
+  "clave_inegi": "32019",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 41.4,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 4.2,
+   "mayoreo_construccion": 17,
+   "empresas_construccion": 5,
+   "poblacion": 25296
+  }
+ },
+ {
   "nombre": "Tecozautla",
   "estado": "Hidalgo",
   "clave_inegi": "13059",
@@ -8323,6 +8537,38 @@
    "mayoreo_construccion": 9,
    "empresas_construccion": 2,
    "poblacion": 30135
+  }
+ },
+ {
+  "nombre": "Magdalena, Sonora",
+  "estado": "Sonora",
+  "clave_inegi": "26036",
+  "region": "Noroeste",
+  "alias": [
+   "Magdalena"
+  ],
+  "potencial_mercado": 41.2,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 4.7,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 10,
+   "poblacion": 33049
+  }
+ },
+ {
+  "nombre": "San Jacinto Amilpas",
+  "estado": "Oaxaca",
+  "clave_inegi": "20157",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 41.2,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 6.3,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 13,
+   "poblacion": 16827
   }
  },
  {
@@ -8386,6 +8632,36 @@
   }
  },
  {
+  "nombre": "Puente de Ixtla",
+  "estado": "Morelos",
+  "clave_inegi": "17017",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 41.0,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 5.1,
+   "mayoreo_construccion": 14,
+   "empresas_construccion": 1,
+   "poblacion": 40018
+  }
+ },
+ {
+  "nombre": "Villa de Reyes",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24050",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 40.9,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 17,
+   "empresas_construccion": 2,
+   "poblacion": 52912
+  }
+ },
+ {
   "nombre": "Xico",
   "estado": "Veracruz de Ignacio de la Llave",
   "clave_inegi": "30092",
@@ -8398,6 +8674,68 @@
    "mayoreo_construccion": 12,
    "empresas_construccion": 1,
    "poblacion": 39623
+  }
+ },
+ {
+  "nombre": "Arteaga, Coahuila de Zaragoza",
+  "estado": "Coahuila de Zaragoza",
+  "clave_inegi": "05004",
+  "region": "Noreste",
+  "alias": [
+   "Arteaga"
+  ],
+  "potencial_mercado": 40.8,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 5.3,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 5,
+   "poblacion": 29578
+  }
+ },
+ {
+  "nombre": "Zapotiltic",
+  "estado": "Jalisco",
+  "clave_inegi": "14121",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 40.8,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 5,
+   "poblacion": 33713
+  }
+ },
+ {
+  "nombre": "Malinalco",
+  "estado": "México",
+  "clave_inegi": "15052",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 40.8,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 14,
+   "empresas_construccion": 4,
+   "poblacion": 28155
+  }
+ },
+ {
+  "nombre": "Etchojoa",
+  "estado": "Sonora",
+  "clave_inegi": "26026",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 40.8,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 4.3,
+   "mayoreo_construccion": 13,
+   "empresas_construccion": 2,
+   "poblacion": 61309
   }
  },
  {
@@ -8431,6 +8769,53 @@
   }
  },
  {
+  "nombre": "Alvarado",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30011",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 40.6,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 5.2,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 3,
+   "poblacion": 57035
+  }
+ },
+ {
+  "nombre": "Morelos, México",
+  "estado": "México",
+  "clave_inegi": "15056",
+  "region": "Valle de Mexico",
+  "alias": [
+   "Morelos"
+  ],
+  "potencial_mercado": 40.5,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 4,
+   "poblacion": 33164
+  }
+ },
+ {
+  "nombre": "Totolac",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29036",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 40.5,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 5,
+   "poblacion": 22529
+  }
+ },
+ {
   "nombre": "Castaños",
   "estado": "Coahuila de Zaragoza",
   "clave_inegi": "05006",
@@ -8461,6 +8846,81 @@
   }
  },
  {
+  "nombre": "Pijijiapan",
+  "estado": "Chiapas",
+  "clave_inegi": "07069",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 40.4,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 4.6,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 3,
+   "poblacion": 51193
+  }
+ },
+ {
+  "nombre": "Meoqui",
+  "estado": "Chihuahua",
+  "clave_inegi": "08045",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 40.4,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 4.9,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 3,
+   "poblacion": 44853
+  }
+ },
+ {
+  "nombre": "Tarimoro",
+  "estado": "Guanajuato",
+  "clave_inegi": "11039",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 40.4,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 15,
+   "empresas_construccion": 2,
+   "poblacion": 35905
+  }
+ },
+ {
+  "nombre": "Atlatlahucan",
+  "estado": "Morelos",
+  "clave_inegi": "17002",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 40.4,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 22,
+   "empresas_construccion": 2,
+   "poblacion": 25232
+  }
+ },
+ {
+  "nombre": "Apetatitlán de Antonio Carvajal",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29002",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 40.4,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 8,
+   "poblacion": 16003
+  }
+ },
+ {
   "nombre": "Cocula, Jalisco",
   "estado": "Jalisco",
   "clave_inegi": "14024",
@@ -8475,6 +8935,21 @@
    "mayoreo_construccion": 10,
    "empresas_construccion": 1,
    "poblacion": 29267
+  }
+ },
+ {
+  "nombre": "Tlahuelilpan",
+  "estado": "Hidalgo",
+  "clave_inegi": "13070",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 40.3,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 16,
+   "empresas_construccion": 3,
+   "poblacion": 19067
   }
  },
  {
@@ -8510,6 +8985,66 @@
   }
  },
  {
+  "nombre": "San Agustín Tlaxiaca",
+  "estado": "Hidalgo",
+  "clave_inegi": "13052",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 40.2,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 3,
+   "poblacion": 38891
+  }
+ },
+ {
+  "nombre": "Santa María Colotepec",
+  "estado": "Oaxaca",
+  "clave_inegi": "20401",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 40.2,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 5.5,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 2,
+   "poblacion": 27046
+  }
+ },
+ {
+  "nombre": "Chilón",
+  "estado": "Chiapas",
+  "clave_inegi": "07031",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 40.2,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 4.7,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 5,
+   "poblacion": 137262
+  }
+ },
+ {
+  "nombre": "Bacalar",
+  "estado": "Quintana Roo",
+  "clave_inegi": "23010",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 40.2,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 8.3,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 4,
+   "poblacion": 41754
+  }
+ },
+ {
   "nombre": "Nuevo Parangaricutiro",
   "estado": "Michoacán de Ocampo",
   "clave_inegi": "16058",
@@ -8537,6 +9072,51 @@
    "mayoreo_construccion": 9,
    "empresas_construccion": 3,
    "poblacion": 14197
+  }
+ },
+ {
+  "nombre": "Villa Corzo",
+  "estado": "Chiapas",
+  "clave_inegi": "07107",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 40.1,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 15,
+   "empresas_construccion": 1,
+   "poblacion": 65643
+  }
+ },
+ {
+  "nombre": "San Lorenzo Cacaotepec",
+  "estado": "Oaxaca",
+  "clave_inegi": "20227",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 40.1,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 7.2,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 2,
+   "poblacion": 18339
+  }
+ },
+ {
+  "nombre": "Teapa",
+  "estado": "Tabasco",
+  "clave_inegi": "27016",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 40.1,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 8.5,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 7,
+   "poblacion": 58718
   }
  },
  {
@@ -8600,6 +9180,36 @@
   }
  },
  {
+  "nombre": "Ario",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16009",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 40.0,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 3,
+   "poblacion": 36268
+  }
+ },
+ {
+  "nombre": "José María Morelos",
+  "estado": "Quintana Roo",
+  "clave_inegi": "23006",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 40.0,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 4.6,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 3,
+   "poblacion": 39165
+  }
+ },
+ {
   "nombre": "Sinaloa",
   "estado": "Sinaloa",
   "clave_inegi": "25017",
@@ -8612,6 +9222,36 @@
    "mayoreo_construccion": 8,
    "empresas_construccion": 1,
    "poblacion": 78670
+  }
+ },
+ {
+  "nombre": "Hunucmá",
+  "estado": "Yucatán",
+  "clave_inegi": "31038",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 39.9,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 4.6,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 2,
+   "poblacion": 35137
+  }
+ },
+ {
+  "nombre": "Mapimí",
+  "estado": "Durango",
+  "clave_inegi": "10013",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 39.9,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 4,
+   "poblacion": 26932
   }
  },
  {
@@ -8675,6 +9315,23 @@
   }
  },
  {
+  "nombre": "Villa Hidalgo, Jalisco",
+  "estado": "Jalisco",
+  "clave_inegi": "14116",
+  "region": "Occidente",
+  "alias": [
+   "Villa Hidalgo"
+  ],
+  "potencial_mercado": 39.8,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 5.6,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 5,
+   "poblacion": 20088
+  }
+ },
+ {
   "nombre": "Jerécuaro",
   "estado": "Guanajuato",
   "clave_inegi": "11019",
@@ -8687,6 +9344,21 @@
    "mayoreo_construccion": 13,
    "empresas_construccion": 0,
    "poblacion": 49517
+  }
+ },
+ {
+  "nombre": "Chignautla",
+  "estado": "Puebla",
+  "clave_inegi": "21054",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 39.7,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.9,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 1,
+   "poblacion": 35223
   }
  },
  {
@@ -8767,6 +9439,36 @@
   }
  },
  {
+  "nombre": "Arcelia",
+  "estado": "Guerrero",
+  "clave_inegi": "12007",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 39.6,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 18,
+   "empresas_construccion": 0,
+   "poblacion": 33267
+  }
+ },
+ {
+  "nombre": "Huitzilac",
+  "estado": "Morelos",
+  "clave_inegi": "17009",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 39.6,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 14,
+   "empresas_construccion": 1,
+   "poblacion": 24515
+  }
+ },
+ {
   "nombre": "Simojovel",
   "estado": "Chiapas",
   "clave_inegi": "07081",
@@ -8779,6 +9481,126 @@
    "mayoreo_construccion": 13,
    "empresas_construccion": 0,
    "poblacion": 52935
+  }
+ },
+ {
+  "nombre": "Jaral del Progreso",
+  "estado": "Guanajuato",
+  "clave_inegi": "11018",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 39.5,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 2,
+   "poblacion": 38782
+  }
+ },
+ {
+  "nombre": "Cuauhtémoc, Colima",
+  "estado": "Colima",
+  "clave_inegi": "06005",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 39.5,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 5,
+   "poblacion": 31267
+  }
+ },
+ {
+  "nombre": "Banderilla",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30026",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 39.5,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 8,
+   "poblacion": 25993
+  }
+ },
+ {
+  "nombre": "San Martín de las Pirámides",
+  "estado": "México",
+  "clave_inegi": "15075",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 39.4,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 2,
+   "poblacion": 29182
+  }
+ },
+ {
+  "nombre": "Cárdenas, San Luis Potosí",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24005",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 39.4,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 3,
+   "poblacion": 18317
+  }
+ },
+ {
+  "nombre": "Nanacamilpa de Mariano Arista",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29021",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 39.4,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 5,
+   "poblacion": 18686
+  }
+ },
+ {
+  "nombre": "Huimilpan",
+  "estado": "Querétaro",
+  "clave_inegi": "22008",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 39.4,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 4,
+   "poblacion": 36808
+  }
+ },
+ {
+  "nombre": "Tila",
+  "estado": "Chiapas",
+  "clave_inegi": "07096",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 39.4,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 13,
+   "empresas_construccion": 3,
+   "poblacion": 83505
   }
  },
  {
@@ -8812,6 +9634,96 @@
   }
  },
  {
+  "nombre": "Cerritos",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24008",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 39.3,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 19,
+   "empresas_construccion": 0,
+   "poblacion": 22075
+  }
+ },
+ {
+  "nombre": "Peribán",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16068",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 39.3,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 4,
+   "poblacion": 29389
+  }
+ },
+ {
+  "nombre": "San Sebastián Tutla",
+  "estado": "Oaxaca",
+  "clave_inegi": "20350",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 39.3,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 4.9,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 13,
+   "poblacion": 16878
+  }
+ },
+ {
+  "nombre": "Panotla",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29024",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 39.3,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 3,
+   "poblacion": 28357
+  }
+ },
+ {
+  "nombre": "Nealtican",
+  "estado": "Puebla",
+  "clave_inegi": "21102",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 39.3,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 15,
+   "empresas_construccion": 2,
+   "poblacion": 14075
+  }
+ },
+ {
+  "nombre": "Oxkutzcab",
+  "estado": "Yucatán",
+  "clave_inegi": "31056",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 39.3,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 5.1,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 1,
+   "poblacion": 33854
+  }
+ },
+ {
   "nombre": "Aldama, Tamaulipas",
   "estado": "Tamaulipas",
   "clave_inegi": "28002",
@@ -8826,6 +9738,21 @@
    "mayoreo_construccion": 6,
    "empresas_construccion": 2,
    "poblacion": 28725
+  }
+ },
+ {
+  "nombre": "Villanueva",
+  "estado": "Zacatecas",
+  "clave_inegi": "32055",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 39.2,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 15,
+   "empresas_construccion": 1,
+   "poblacion": 31558
   }
  },
  {
@@ -8859,6 +9786,36 @@
   }
  },
  {
+  "nombre": "Ciudad Ixtepec",
+  "estado": "Oaxaca",
+  "clave_inegi": "20014",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 39.1,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 4.3,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 3,
+   "poblacion": 28082
+  }
+ },
+ {
+  "nombre": "Emiliano Zapata, Tabasco",
+  "estado": "Tabasco",
+  "clave_inegi": "27007",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 39.1,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 4.8,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 4,
+   "poblacion": 32181
+  }
+ },
+ {
   "nombre": "Chalcatongo de Hidalgo",
   "estado": "Oaxaca",
   "clave_inegi": "20026",
@@ -8871,6 +9828,36 @@
    "mayoreo_construccion": 10,
    "empresas_construccion": 0,
    "poblacion": 9035
+  }
+ },
+ {
+  "nombre": "Degollado",
+  "estado": "Jalisco",
+  "clave_inegi": "14033",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 39.0,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 4,
+   "poblacion": 21226
+  }
+ },
+ {
+  "nombre": "Tepeyahualco",
+  "estado": "Puebla",
+  "clave_inegi": "21170",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 39.0,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 15,
+   "empresas_construccion": 1,
+   "poblacion": 19200
   }
  },
  {
@@ -8889,6 +9876,141 @@
   }
  },
  {
+  "nombre": "Cuencamé",
+  "estado": "Durango",
+  "clave_inegi": "10004",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 38.9,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 2,
+   "poblacion": 34955
+  }
+ },
+ {
+  "nombre": "San Martín Hidalgo",
+  "estado": "Jalisco",
+  "clave_inegi": "14077",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 38.9,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 5.3,
+   "mayoreo_construccion": 13,
+   "empresas_construccion": 0,
+   "poblacion": 28102
+  }
+ },
+ {
+  "nombre": "Salinas",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24025",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 38.9,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 19,
+   "empresas_construccion": 0,
+   "poblacion": 31107
+  }
+ },
+ {
+  "nombre": "Tamuín",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24040",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 38.9,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 3,
+   "poblacion": 36968
+  }
+ },
+ {
+  "nombre": "Nava",
+  "estado": "Coahuila de Zaragoza",
+  "clave_inegi": "05022",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 38.9,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 4.5,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 5,
+   "poblacion": 33129
+  }
+ },
+ {
+  "nombre": "Villa de Ramos",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24049",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 38.8,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 0,
+   "poblacion": 38389
+  }
+ },
+ {
+  "nombre": "Las Rosas",
+  "estado": "Chiapas",
+  "clave_inegi": "07075",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 38.8,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 1,
+   "poblacion": 28829
+  }
+ },
+ {
+  "nombre": "Jamay",
+  "estado": "Jalisco",
+  "clave_inegi": "14047",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 38.8,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 5.1,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 1,
+   "poblacion": 24894
+  }
+ },
+ {
+  "nombre": "Doctor Arroyo",
+  "estado": "Nuevo León",
+  "clave_inegi": "19014",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 38.8,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 17,
+   "empresas_construccion": 7,
+   "poblacion": 36088
+  }
+ },
+ {
   "nombre": "Tingambato",
   "estado": "Michoacán de Ocampo",
   "clave_inegi": "16090",
@@ -8901,6 +10023,96 @@
    "mayoreo_construccion": 9,
    "empresas_construccion": 1,
    "poblacion": 16325
+  }
+ },
+ {
+  "nombre": "Ajacuba",
+  "estado": "Hidalgo",
+  "clave_inegi": "13005",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 38.7,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 2,
+   "poblacion": 18872
+  }
+ },
+ {
+  "nombre": "Nuevo Ideal",
+  "estado": "Durango",
+  "clave_inegi": "10039",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 38.7,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 5.5,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 2,
+   "poblacion": 27981
+  }
+ },
+ {
+  "nombre": "Yehualtepec",
+  "estado": "Puebla",
+  "clave_inegi": "21205",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 38.6,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 14,
+   "empresas_construccion": 0,
+   "poblacion": 26392
+  }
+ },
+ {
+  "nombre": "Isla",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30077",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 38.6,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 4.3,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 2,
+   "poblacion": 42807
+  }
+ },
+ {
+  "nombre": "Venustiano Carranza, Michoacán de Ocampo",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16103",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 38.6,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 15,
+   "empresas_construccion": 1,
+   "poblacion": 23469
+  }
+ },
+ {
+  "nombre": "Huitzuco de los Figueroa",
+  "estado": "Guerrero",
+  "clave_inegi": "12034",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 38.6,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 4.6,
+   "mayoreo_construccion": 13,
+   "empresas_construccion": 1,
+   "poblacion": 36593
   }
  },
  {
@@ -8934,6 +10146,83 @@
   }
  },
  {
+  "nombre": "Villa de Arista",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24056",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 38.5,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 2,
+   "poblacion": 17258
+  }
+ },
+ {
+  "nombre": "Amatlán de los Reyes",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30014",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 38.5,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 15,
+   "empresas_construccion": 2,
+   "poblacion": 46955
+  }
+ },
+ {
+  "nombre": "Coatzintla",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30040",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 38.5,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 4,
+   "poblacion": 55016
+  }
+ },
+ {
+  "nombre": "Xoxocotla, Morelos",
+  "estado": "Morelos",
+  "clave_inegi": "17035",
+  "region": "Centro-Sur",
+  "alias": [
+   "Xoxocotla"
+  ],
+  "potencial_mercado": 38.4,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 2,
+   "poblacion": 27805
+  }
+ },
+ {
+  "nombre": "Cotija",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16019",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 38.4,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 6.7,
+   "mayoreo_construccion": 14,
+   "empresas_construccion": 4,
+   "poblacion": 20198
+  }
+ },
+ {
   "nombre": "Chiautzingo",
   "estado": "Puebla",
   "clave_inegi": "21048",
@@ -8946,6 +10235,111 @@
    "mayoreo_construccion": 10,
    "empresas_construccion": 0,
    "poblacion": 22039
+  }
+ },
+ {
+  "nombre": "Pajacuarán",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16062",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 38.3,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 0,
+   "poblacion": 21028
+  }
+ },
+ {
+  "nombre": "Suchiate",
+  "estado": "Chiapas",
+  "clave_inegi": "07087",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 38.3,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 2,
+   "poblacion": 41672
+  }
+ },
+ {
+  "nombre": "Coeneo",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16016",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 38.3,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 6.0,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 3,
+   "poblacion": 20965
+  }
+ },
+ {
+  "nombre": "Buenaventura",
+  "estado": "Chihuahua",
+  "clave_inegi": "08010",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 38.2,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 2,
+   "poblacion": 25146
+  }
+ },
+ {
+  "nombre": "Villa de Cos",
+  "estado": "Zacatecas",
+  "clave_inegi": "32051",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 38.2,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 1,
+   "poblacion": 34623
+  }
+ },
+ {
+  "nombre": "Rafael Lara Grajales",
+  "estado": "Puebla",
+  "clave_inegi": "21117",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 38.2,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 5.5,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 2,
+   "poblacion": 15952
+  }
+ },
+ {
+  "nombre": "Zongolica",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30201",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 38.2,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 4.2,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 2,
+   "poblacion": 45028
   }
  },
  {
@@ -8964,6 +10358,186 @@
   }
  },
  {
+  "nombre": "El Carmen Tequexquitla",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29007",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 38.1,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 2,
+   "poblacion": 17332
+  }
+ },
+ {
+  "nombre": "Axtla de Terrazas",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24053",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 38.1,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 4.5,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 1,
+   "poblacion": 32544
+  }
+ },
+ {
+  "nombre": "Quechultenango",
+  "estado": "Guerrero",
+  "clave_inegi": "12051",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 38.0,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 0,
+   "poblacion": 36143
+  }
+ },
+ {
+  "nombre": "Xiutetelco",
+  "estado": "Puebla",
+  "clave_inegi": "21199",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 38.0,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 0,
+   "poblacion": 42943
+  }
+ },
+ {
+  "nombre": "Tlaquiltenango",
+  "estado": "Morelos",
+  "clave_inegi": "17025",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 38.0,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 1,
+   "poblacion": 33789
+  }
+ },
+ {
+  "nombre": "Zacoalco de Torres",
+  "estado": "Jalisco",
+  "clave_inegi": "14119",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 38.0,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 2,
+   "poblacion": 30472
+  }
+ },
+ {
+  "nombre": "Ojuelos de Jalisco",
+  "estado": "Jalisco",
+  "clave_inegi": "14064",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 38.0,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 18,
+   "empresas_construccion": 2,
+   "poblacion": 33588
+  }
+ },
+ {
+  "nombre": "Jaltenco",
+  "estado": "México",
+  "clave_inegi": "15044",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 37.9,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 2,
+   "poblacion": 28217
+  }
+ },
+ {
+  "nombre": "Santa María Atzompa",
+  "estado": "Oaxaca",
+  "clave_inegi": "20399",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 37.9,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 1,
+   "poblacion": 41921
+  }
+ },
+ {
+  "nombre": "Ciudad del Maíz",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24010",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 37.9,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 2,
+   "poblacion": 30320
+  }
+ },
+ {
+  "nombre": "Tamasopo",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24036",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 37.8,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 0,
+   "poblacion": 29184
+  }
+ },
+ {
+  "nombre": "Bochil",
+  "estado": "Chiapas",
+  "clave_inegi": "07013",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 37.8,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 13,
+   "empresas_construccion": 0,
+   "poblacion": 37263
+  }
+ },
+ {
   "nombre": "Tula",
   "estado": "Tamaulipas",
   "clave_inegi": "28039",
@@ -8978,6 +10552,81 @@
    "mayoreo_construccion": 9,
    "empresas_construccion": 1,
    "poblacion": 28230
+  }
+ },
+ {
+  "nombre": "Ursulo Galván",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30191",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 37.8,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 4.1,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 1,
+   "poblacion": 30097
+  }
+ },
+ {
+  "nombre": "Chamula",
+  "estado": "Chiapas",
+  "clave_inegi": "07023",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 37.8,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 4.2,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 0,
+   "poblacion": 101967
+  }
+ },
+ {
+  "nombre": "Juchitepec",
+  "estado": "México",
+  "clave_inegi": "15050",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 37.7,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 0,
+   "poblacion": 27116
+  }
+ },
+ {
+  "nombre": "Turicato",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16097",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 37.7,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 1,
+   "poblacion": 29056
+  }
+ },
+ {
+  "nombre": "El Naranjo",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24058",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 37.7,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 4,
+   "poblacion": 20959
   }
  },
  {
@@ -9026,6 +10675,36 @@
   }
  },
  {
+  "nombre": "Tancítaro",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16083",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 37.6,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.7,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 3,
+   "poblacion": 33453
+  }
+ },
+ {
+  "nombre": "Jalpan de Serra",
+  "estado": "Querétaro",
+  "clave_inegi": "22009",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 37.6,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 17,
+   "empresas_construccion": 1,
+   "poblacion": 27343
+  }
+ },
+ {
   "nombre": "Xalatlaco",
   "estado": "México",
   "clave_inegi": "15043",
@@ -9038,6 +10717,21 @@
    "mayoreo_construccion": 4,
    "empresas_construccion": 0,
    "poblacion": 30687
+  }
+ },
+ {
+  "nombre": "Axapusco",
+  "estado": "México",
+  "clave_inegi": "15016",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 37.5,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 29128
   }
  },
  {
@@ -9056,6 +10750,21 @@
   }
  },
  {
+  "nombre": "Coatepec Harinas",
+  "estado": "México",
+  "clave_inegi": "15021",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 37.4,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 0,
+   "poblacion": 38643
+  }
+ },
+ {
   "nombre": "Galeana",
   "estado": "Nuevo León",
   "clave_inegi": "19017",
@@ -9071,6 +10780,111 @@
   }
  },
  {
+  "nombre": "Gutiérrez Zamora",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30069",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 37.4,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 1,
+   "poblacion": 24085
+  }
+ },
+ {
+  "nombre": "Colotlán",
+  "estado": "Jalisco",
+  "clave_inegi": "14025",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 37.4,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 2,
+   "poblacion": 19689
+  }
+ },
+ {
+  "nombre": "Angostura",
+  "estado": "Sinaloa",
+  "clave_inegi": "25002",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 37.4,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 4.9,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 1,
+   "poblacion": 44093
+  }
+ },
+ {
+  "nombre": "Nogales, Veracruz de Ignacio de la Llave",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30115",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 37.4,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 2,
+   "poblacion": 37314
+  }
+ },
+ {
+  "nombre": "Heroica Ciudad de Ejutla de Crespo",
+  "estado": "Oaxaca",
+  "clave_inegi": "20028",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 37.4,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 5.0,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 4,
+   "poblacion": 23148
+  }
+ },
+ {
+  "nombre": "San Matías Tlalancaleca",
+  "estado": "Puebla",
+  "clave_inegi": "21134",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 37.3,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 1,
+   "poblacion": 20974
+  }
+ },
+ {
+  "nombre": "Santiago Tuxtla",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30143",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 37.3,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.9,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 0,
+   "poblacion": 57085
+  }
+ },
+ {
   "nombre": "Izamal",
   "estado": "Yucatán",
   "clave_inegi": "31040",
@@ -9083,6 +10897,413 @@
    "mayoreo_construccion": 11,
    "empresas_construccion": 0,
    "poblacion": 28555
+  }
+ },
+ {
+  "nombre": "Juan Rodríguez Clara",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30094",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 37.3,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.7,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 0,
+   "poblacion": 38367
+  }
+ },
+ {
+  "nombre": "San Pablo Huixtepec",
+  "estado": "Oaxaca",
+  "clave_inegi": "20295",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 37.2,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 1,
+   "poblacion": 10020
+  }
+ },
+ {
+  "nombre": "Tochtepec",
+  "estado": "Puebla",
+  "clave_inegi": "21189",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 37.2,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 22454
+  }
+ },
+ {
+  "nombre": "Escuintla",
+  "estado": "Chiapas",
+  "clave_inegi": "07032",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 37.2,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 30896
+  }
+ },
+ {
+  "nombre": "Acaponeta",
+  "estado": "Nayarit",
+  "clave_inegi": "18001",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 37.2,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 4.5,
+   "mayoreo_construccion": 14,
+   "empresas_construccion": 0,
+   "poblacion": 37232
+  }
+ },
+ {
+  "nombre": "Tepalcingo",
+  "estado": "Morelos",
+  "clave_inegi": "17019",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 37.1,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 28122
+  }
+ },
+ {
+  "nombre": "Cuajinicuilapa",
+  "estado": "Guerrero",
+  "clave_inegi": "12023",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 37.1,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 4.6,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 0,
+   "poblacion": 26627
+  }
+ },
+ {
+  "nombre": "Tepalcatepec",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16089",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 37.1,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 3,
+   "poblacion": 24074
+  }
+ },
+ {
+  "nombre": "Mexicaltzingo",
+  "estado": "México",
+  "clave_inegi": "15055",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 37.1,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 10.5,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 1,
+   "poblacion": 13807
+  }
+ },
+ {
+  "nombre": "Tolimán, Querétaro",
+  "estado": "Querétaro",
+  "clave_inegi": "22018",
+  "region": "Centro-Norte",
+  "alias": [
+   "Tolimán"
+  ],
+  "potencial_mercado": 37.0,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 0,
+   "poblacion": 27916
+  }
+ },
+ {
+  "nombre": "Bocoyna",
+  "estado": "Chihuahua",
+  "clave_inegi": "08009",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 37.0,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 7.3,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 23351
+  }
+ },
+ {
+  "nombre": "Oxchuc",
+  "estado": "Chiapas",
+  "clave_inegi": "07064",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 37.0,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 1,
+   "poblacion": 54932
+  }
+ },
+ {
+  "nombre": "Saucillo",
+  "estado": "Chihuahua",
+  "clave_inegi": "08062",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 37.0,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 3,
+   "poblacion": 29862
+  }
+ },
+ {
+  "nombre": "Cuapiaxtla",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29008",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.9,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 1,
+   "poblacion": 16222
+  }
+ },
+ {
+  "nombre": "Namiquipa",
+  "estado": "Chihuahua",
+  "clave_inegi": "08048",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 36.9,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 4.1,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 1,
+   "poblacion": 22712
+  }
+ },
+ {
+  "nombre": "San Diego de la Unión",
+  "estado": "Guanajuato",
+  "clave_inegi": "11029",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 36.9,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 1,
+   "poblacion": 41054
+  }
+ },
+ {
+  "nombre": "San Salvador Huixcolotla",
+  "estado": "Puebla",
+  "clave_inegi": "21144",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.9,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 20,
+   "empresas_construccion": 0,
+   "poblacion": 16790
+  }
+ },
+ {
+  "nombre": "Angel R. Cabada",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30015",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 36.9,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 1,
+   "poblacion": 33839
+  }
+ },
+ {
+  "nombre": "Etzatlán",
+  "estado": "Jalisco",
+  "clave_inegi": "14036",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 36.9,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 7.0,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 1,
+   "poblacion": 20011
+  }
+ },
+ {
+  "nombre": "Atempan",
+  "estado": "Puebla",
+  "clave_inegi": "21017",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.9,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 4,
+   "poblacion": 29742
+  }
+ },
+ {
+  "nombre": "Anáhuac",
+  "estado": "Nuevo León",
+  "clave_inegi": "19005",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 36.8,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 2,
+   "poblacion": 18030
+  }
+ },
+ {
+  "nombre": "Aldama, Chihuahua",
+  "estado": "Chihuahua",
+  "clave_inegi": "08002",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 36.8,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 3,
+   "poblacion": 26047
+  }
+ },
+ {
+  "nombre": "Poanas",
+  "estado": "Durango",
+  "clave_inegi": "10022",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 36.8,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 0,
+   "poblacion": 25623
+  }
+ },
+ {
+  "nombre": "Canatlán",
+  "estado": "Durango",
+  "clave_inegi": "10001",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 36.8,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 1,
+   "poblacion": 31454
+  }
+ },
+ {
+  "nombre": "Tulcingo",
+  "estado": "Puebla",
+  "clave_inegi": "21191",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.7,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 3,
+   "poblacion": 9871
+  }
+ },
+ {
+  "nombre": "Hueyapan de Ocampo",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30073",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 36.7,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 2,
+   "poblacion": 41670
+  }
+ },
+ {
+  "nombre": "San Rafael",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30211",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 36.7,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 4.8,
+   "mayoreo_construccion": 14,
+   "empresas_construccion": 0,
+   "poblacion": 30351
   }
  },
  {
@@ -9103,6 +11324,203 @@
   }
  },
  {
+  "nombre": "Nopalucan",
+  "estado": "Puebla",
+  "clave_inegi": "21104",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.6,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 1,
+   "poblacion": 32772
+  }
+ },
+ {
+  "nombre": "Chapa de Mota",
+  "estado": "México",
+  "clave_inegi": "15026",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 36.5,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 31737
+  }
+ },
+ {
+  "nombre": "Vicente Guerrero, Puebla",
+  "estado": "Puebla",
+  "clave_inegi": "21195",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.5,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 26559
+  }
+ },
+ {
+  "nombre": "Tzompantepec",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29038",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.5,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 4,
+   "poblacion": 18006
+  }
+ },
+ {
+  "nombre": "Calnali",
+  "estado": "Hidalgo",
+  "clave_inegi": "13014",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.5,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 13,
+   "empresas_construccion": 0,
+   "poblacion": 16150
+  }
+ },
+ {
+  "nombre": "San Salvador",
+  "estado": "Hidalgo",
+  "clave_inegi": "13054",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.5,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 1,
+   "poblacion": 36796
+  }
+ },
+ {
+  "nombre": "El Arenal, Jalisco",
+  "estado": "Jalisco",
+  "clave_inegi": "14009",
+  "region": "Occidente",
+  "alias": [
+   "El Arenal"
+  ],
+  "potencial_mercado": 36.4,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 5.4,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 2,
+   "poblacion": 21115
+  }
+ },
+ {
+  "nombre": "Nopaltepec",
+  "estado": "México",
+  "clave_inegi": "15061",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 36.4,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 1,
+   "poblacion": 10351
+  }
+ },
+ {
+  "nombre": "Chilchotla",
+  "estado": "Puebla",
+  "clave_inegi": "21058",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.4,
+  "indicadores": {
+   "unidades_ferreteras": 17,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 0,
+   "poblacion": 21002
+  }
+ },
+ {
+  "nombre": "Casimiro Castillo",
+  "estado": "Jalisco",
+  "clave_inegi": "14021",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 36.4,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 4.2,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 1,
+   "poblacion": 20548
+  }
+ },
+ {
+  "nombre": "Acapetahua",
+  "estado": "Chiapas",
+  "clave_inegi": "07003",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 36.4,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 3,
+   "poblacion": 26899
+  }
+ },
+ {
+  "nombre": "San Ignacio",
+  "estado": "Sinaloa",
+  "clave_inegi": "25016",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 36.4,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 2,
+   "poblacion": 19505
+  }
+ },
+ {
+  "nombre": "Armería",
+  "estado": "Colima",
+  "clave_inegi": "06001",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 36.4,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.7,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 4,
+   "poblacion": 27626
+  }
+ },
+ {
   "nombre": "Tototlán",
   "estado": "Jalisco",
   "clave_inegi": "14105",
@@ -9115,6 +11533,953 @@
    "mayoreo_construccion": 3,
    "empresas_construccion": 0,
    "poblacion": 23573
+  }
+ },
+ {
+  "nombre": "San Juan Bautista Valle Nacional",
+  "estado": "Oaxaca",
+  "clave_inegi": "20559",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 36.3,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 23067
+  }
+ },
+ {
+  "nombre": "Mazamitla",
+  "estado": "Jalisco",
+  "clave_inegi": "14059",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 36.3,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 3,
+   "poblacion": 14043
+  }
+ },
+ {
+  "nombre": "Candelaria",
+  "estado": "Campeche",
+  "clave_inegi": "04011",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 36.3,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 1,
+   "poblacion": 46913
+  }
+ },
+ {
+  "nombre": "Tapalpa",
+  "estado": "Jalisco",
+  "clave_inegi": "14086",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 36.3,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 20,
+   "empresas_construccion": 0,
+   "poblacion": 21245
+  }
+ },
+ {
+  "nombre": "Tuxpan, Michoacán de Ocampo",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16098",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 36.3,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 1,
+   "poblacion": 25757
+  }
+ },
+ {
+  "nombre": "Lázaro Cárdenas, Quintana Roo",
+  "estado": "Quintana Roo",
+  "clave_inegi": "23007",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 36.3,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 4.8,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 0,
+   "poblacion": 29171
+  }
+ },
+ {
+  "nombre": "Miguel Alemán",
+  "estado": "Tamaulipas",
+  "clave_inegi": "28025",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 36.3,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 6.5,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 7,
+   "poblacion": 26237
+  }
+ },
+ {
+  "nombre": "Soteapan",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30149",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 36.2,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 1,
+   "poblacion": 34385
+  }
+ },
+ {
+  "nombre": "Rafael Delgado",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30135",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 36.2,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 3,
+   "poblacion": 24127
+  }
+ },
+ {
+  "nombre": "Cuilápam de Guerrero",
+  "estado": "Oaxaca",
+  "clave_inegi": "20023",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 36.2,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 1,
+   "poblacion": 26882
+  }
+ },
+ {
+  "nombre": "Chietla",
+  "estado": "Puebla",
+  "clave_inegi": "21051",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.2,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 0,
+   "poblacion": 37030
+  }
+ },
+ {
+  "nombre": "Tlalixcoyan",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30181",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 36.1,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 1,
+   "poblacion": 37795
+  }
+ },
+ {
+  "nombre": "Cuetzalan del Progreso",
+  "estado": "Puebla",
+  "clave_inegi": "21043",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.1,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 2,
+   "poblacion": 49864
+  }
+ },
+ {
+  "nombre": "Altepexi",
+  "estado": "Puebla",
+  "clave_inegi": "21013",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.0,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 22629
+  }
+ },
+ {
+  "nombre": "Calakmul",
+  "estado": "Campeche",
+  "clave_inegi": "04010",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 36.0,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 1,
+   "poblacion": 31714
+  }
+ },
+ {
+  "nombre": "San Gregorio Atzompa",
+  "estado": "Puebla",
+  "clave_inegi": "21125",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.0,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 2,
+   "poblacion": 9671
+  }
+ },
+ {
+  "nombre": "Madera",
+  "estado": "Chihuahua",
+  "clave_inegi": "08040",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 36.0,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 5.2,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 1,
+   "poblacion": 25144
+  }
+ },
+ {
+  "nombre": "Guadalupe Victoria, Puebla",
+  "estado": "Puebla",
+  "clave_inegi": "21067",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.0,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 1,
+   "poblacion": 18784
+  }
+ },
+ {
+  "nombre": "Tepatlaxco de Hidalgo",
+  "estado": "Puebla",
+  "clave_inegi": "21163",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.0,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 16,
+   "empresas_construccion": 1,
+   "poblacion": 18854
+  }
+ },
+ {
+  "nombre": "Alto Lucero de Gutiérrez Barrios",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30009",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 36.0,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 3,
+   "poblacion": 28184
+  }
+ },
+ {
+  "nombre": "Juan R. Escudero",
+  "estado": "Guerrero",
+  "clave_inegi": "12039",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 36.0,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 7.4,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 0,
+   "poblacion": 26093
+  }
+ },
+ {
+  "nombre": "Tonatico",
+  "estado": "México",
+  "clave_inegi": "15107",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 35.9,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.9,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 2,
+   "poblacion": 12912
+  }
+ },
+ {
+  "nombre": "Angel Albino Corzo",
+  "estado": "Chiapas",
+  "clave_inegi": "07008",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.9,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 5.1,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 31947
+  }
+ },
+ {
+  "nombre": "Tizapán el Alto",
+  "estado": "Jalisco",
+  "clave_inegi": "14096",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 35.9,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 4.5,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 22758
+  }
+ },
+ {
+  "nombre": "Tetela de Ocampo",
+  "estado": "Puebla",
+  "clave_inegi": "21172",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 35.9,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 1,
+   "poblacion": 27216
+  }
+ },
+ {
+  "nombre": "Nanchital de Lázaro Cárdenas del Río",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30206",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.8,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 4.1,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 1,
+   "poblacion": 29209
+  }
+ },
+ {
+  "nombre": "Las Vigas de Ramírez",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30132",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.8,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 4.5,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 20300
+  }
+ },
+ {
+  "nombre": "Leonardo Bravo",
+  "estado": "Guerrero",
+  "clave_inegi": "12040",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 35.8,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 15,
+   "empresas_construccion": 0,
+   "poblacion": 26357
+  }
+ },
+ {
+  "nombre": "Peto",
+  "estado": "Yucatán",
+  "clave_inegi": "31058",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 35.8,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 5.7,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 25954
+  }
+ },
+ {
+  "nombre": "Xilitla",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24054",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 35.8,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.9,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 2,
+   "poblacion": 49741
+  }
+ },
+ {
+  "nombre": "Tixkokob",
+  "estado": "Yucatán",
+  "clave_inegi": "31093",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 35.8,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 5.5,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 1,
+   "poblacion": 18420
+  }
+ },
+ {
+  "nombre": "Ixhuatlancillo",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30081",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.7,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 1,
+   "poblacion": 27295
+  }
+ },
+ {
+  "nombre": "Villa Victoria",
+  "estado": "México",
+  "clave_inegi": "15114",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 35.7,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 1,
+   "poblacion": 108196
+  }
+ },
+ {
+  "nombre": "Santiago Jamiltepec",
+  "estado": "Oaxaca",
+  "clave_inegi": "20467",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.7,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 1,
+   "poblacion": 19112
+  }
+ },
+ {
+  "nombre": "La Huacana",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16035",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 35.7,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 4.8,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 2,
+   "poblacion": 30627
+  }
+ },
+ {
+  "nombre": "Paso del Macho",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30125",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.7,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 2,
+   "poblacion": 31894
+  }
+ },
+ {
+  "nombre": "Agua Dulce",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30204",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.7,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 5.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 3,
+   "poblacion": 44104
+  }
+ },
+ {
+  "nombre": "Larráinzar",
+  "estado": "Chiapas",
+  "clave_inegi": "07049",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.6,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 31259
+  }
+ },
+ {
+  "nombre": "Altamirano",
+  "estado": "Chiapas",
+  "clave_inegi": "07004",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.6,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 4.7,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 36160
+  }
+ },
+ {
+  "nombre": "Isla Mujeres",
+  "estado": "Quintana Roo",
+  "clave_inegi": "23003",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 35.6,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 4.5,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 4,
+   "poblacion": 22686
+  }
+ },
+ {
+  "nombre": "Tenancingo, Tlaxcala",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29027",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 35.5,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 0,
+   "poblacion": 12974
+  }
+ },
+ {
+  "nombre": "Mineral del Monte",
+  "estado": "Hidalgo",
+  "clave_inegi": "13039",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 35.5,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 3,
+   "poblacion": 14324
+  }
+ },
+ {
+  "nombre": "San Francisco Telixtlahuaca",
+  "estado": "Oaxaca",
+  "clave_inegi": "20150",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.4,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.6,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 13856
+  }
+ },
+ {
+  "nombre": "Cocotitlán",
+  "estado": "México",
+  "clave_inegi": "15022",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 35.4,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 1,
+   "poblacion": 15107
+  }
+ },
+ {
+  "nombre": "Ecuandureo",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16030",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 35.4,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 3,
+   "poblacion": 11850
+  }
+ },
+ {
+  "nombre": "Villa de Tamazulápam del Progreso",
+  "estado": "Oaxaca",
+  "clave_inegi": "20540",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.4,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 14,
+   "empresas_construccion": 0,
+   "poblacion": 8326
+  }
+ },
+ {
+  "nombre": "Tapilula",
+  "estado": "Chiapas",
+  "clave_inegi": "07091",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.4,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 2,
+   "poblacion": 13592
+  }
+ },
+ {
+  "nombre": "Tepetlixpa",
+  "estado": "México",
+  "clave_inegi": "15094",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 35.4,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 4.3,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 20500
+  }
+ },
+ {
+  "nombre": "Luvianos",
+  "estado": "México",
+  "clave_inegi": "15123",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 35.4,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 5.2,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 1,
+   "poblacion": 28822
+  }
+ },
+ {
+  "nombre": "Tlayacapan",
+  "estado": "Morelos",
+  "clave_inegi": "17026",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 35.4,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 16,
+   "empresas_construccion": 1,
+   "poblacion": 19408
+  }
+ },
+ {
+  "nombre": "Tomatlán, Jalisco",
+  "estado": "Jalisco",
+  "clave_inegi": "14100",
+  "region": "Occidente",
+  "alias": [
+   "Tomatlán"
+  ],
+  "potencial_mercado": 35.3,
+  "indicadores": {
+   "unidades_ferreteras": 19,
+   "tamano_medio": 4.7,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 36316
+  }
+ },
+ {
+  "nombre": "Tolcayuca",
+  "estado": "Hidalgo",
+  "clave_inegi": "13075",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 35.3,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.7,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 1,
+   "poblacion": 21362
+  }
+ },
+ {
+  "nombre": "Villa Purificación",
+  "estado": "Jalisco",
+  "clave_inegi": "14068",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 35.3,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 3,
+   "poblacion": 11303
+  }
+ },
+ {
+  "nombre": "Pajapan",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30122",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.3,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 8.1,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 18051
+  }
+ },
+ {
+  "nombre": "Chicomuselo",
+  "estado": "Chiapas",
+  "clave_inegi": "07030",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.3,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 2,
+   "poblacion": 36785
+  }
+ },
+ {
+  "nombre": "Charcas",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24015",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 35.2,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 21814
+  }
+ },
+ {
+  "nombre": "Acala",
+  "estado": "Chiapas",
+  "clave_inegi": "07002",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.2,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 1,
+   "poblacion": 21187
+  }
+ },
+ {
+  "nombre": "Benemérito de las Américas",
+  "estado": "Chiapas",
+  "clave_inegi": "07114",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.2,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 5.2,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 1,
+   "poblacion": 23603
+  }
+ },
+ {
+  "nombre": "Pueblo Nuevo Solistahuacán",
+  "estado": "Chiapas",
+  "clave_inegi": "07072",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.2,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 14,
+   "empresas_construccion": 0,
+   "poblacion": 29636
+  }
+ },
+ {
+  "nombre": "Atlapexco",
+  "estado": "Hidalgo",
+  "clave_inegi": "13011",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 35.2,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 2,
+   "poblacion": 19812
+  }
+ },
+ {
+  "nombre": "Ahualulco de Mercado",
+  "estado": "Jalisco",
+  "clave_inegi": "14003",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 35.2,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 5.5,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 1,
+   "poblacion": 23630
+  }
+ },
+ {
+  "nombre": "Matlapa",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24057",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 35.2,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.9,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 2,
+   "poblacion": 28996
+  }
+ },
+ {
+  "nombre": "Tempoal",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30161",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.2,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 4.5,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 0,
+   "poblacion": 34408
   }
  },
  {
@@ -9148,6 +12513,291 @@
   }
  },
  {
+  "nombre": "Metlatónoc",
+  "estado": "Guerrero",
+  "clave_inegi": "12043",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 35.1,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 13,
+   "empresas_construccion": 0,
+   "poblacion": 18859
+  }
+ },
+ {
+  "nombre": "Marquelia",
+  "estado": "Guerrero",
+  "clave_inegi": "12077",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 35.1,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 1,
+   "poblacion": 14280
+  }
+ },
+ {
+  "nombre": "Tacotalpa",
+  "estado": "Tabasco",
+  "clave_inegi": "27015",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.1,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 5.2,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 47905
+  }
+ },
+ {
+  "nombre": "San Martín Peras",
+  "estado": "Oaxaca",
+  "clave_inegi": "20242",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 35.0,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 12436
+  }
+ },
+ {
+  "nombre": "Ruíz",
+  "estado": "Nayarit",
+  "clave_inegi": "18011",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 35.0,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 4.3,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 24096
+  }
+ },
+ {
+  "nombre": "Hidalgo, Nuevo León",
+  "estado": "Nuevo León",
+  "clave_inegi": "19047",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 35.0,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 4.8,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 1,
+   "poblacion": 16086
+  }
+ },
+ {
+  "nombre": "Xicoténcatl",
+  "estado": "Tamaulipas",
+  "clave_inegi": "28043",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 35.0,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 1,
+   "poblacion": 22229
+  }
+ },
+ {
+  "nombre": "Oriental",
+  "estado": "Puebla",
+  "clave_inegi": "21108",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.9,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 19903
+  }
+ },
+ {
+  "nombre": "Mazatecochco de José María Morelos",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29017",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.9,
+  "indicadores": {
+   "unidades_ferreteras": 16,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 11592
+  }
+ },
+ {
+  "nombre": "Mascota",
+  "estado": "Jalisco",
+  "clave_inegi": "14058",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 34.9,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 14451
+  }
+ },
+ {
+  "nombre": "Santa Ana Maya",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16078",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 34.9,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 0,
+   "poblacion": 12812
+  }
+ },
+ {
+  "nombre": "Terrenate",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29030",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.9,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 4.6,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 2,
+   "poblacion": 15475
+  }
+ },
+ {
+  "nombre": "Yahualica de González Gallo",
+  "estado": "Jalisco",
+  "clave_inegi": "14118",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 34.9,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 5.2,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 22394
+  }
+ },
+ {
+  "nombre": "Zaragoza, Coahuila de Zaragoza",
+  "estado": "Coahuila de Zaragoza",
+  "clave_inegi": "05038",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 34.9,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 5.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 2,
+   "poblacion": 13135
+  }
+ },
+ {
+  "nombre": "Chiautla, Puebla",
+  "estado": "Puebla",
+  "clave_inegi": "21047",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.9,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 13,
+   "empresas_construccion": 0,
+   "poblacion": 21699
+  }
+ },
+ {
+  "nombre": "San Miguel Xoxtla",
+  "estado": "Puebla",
+  "clave_inegi": "21136",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.9,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 3,
+   "poblacion": 12461
+  }
+ },
+ {
+  "nombre": "Santa Isabel Cholula",
+  "estado": "Puebla",
+  "clave_inegi": "21148",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.9,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 3,
+   "poblacion": 11498
+  }
+ },
+ {
+  "nombre": "Cerro Azul",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30034",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 34.8,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 1,
+   "poblacion": 25011
+  }
+ },
+ {
+  "nombre": "Tlanchinol",
+  "estado": "Hidalgo",
+  "clave_inegi": "13073",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.8,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 12,
+   "empresas_construccion": 0,
+   "poblacion": 37722
+  }
+ },
+ {
   "nombre": "Juanacatlán",
   "estado": "Jalisco",
   "clave_inegi": "14051",
@@ -9160,6 +12810,396 @@
    "mayoreo_construccion": 1,
    "empresas_construccion": 0,
    "poblacion": 30855
+  }
+ },
+ {
+  "nombre": "Doctor Mora",
+  "estado": "Guanajuato",
+  "clave_inegi": "11013",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 34.7,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 0,
+   "poblacion": 27390
+  }
+ },
+ {
+  "nombre": "Nombre de Dios",
+  "estado": "Durango",
+  "clave_inegi": "10016",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 34.7,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 5.5,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 2,
+   "poblacion": 19060
+  }
+ },
+ {
+  "nombre": "Tehuipango",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30159",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 34.6,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 29686
+  }
+ },
+ {
+  "nombre": "Arteaga, Michoacán de Ocampo",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16010",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 34.6,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 5.2,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 20332
+  }
+ },
+ {
+  "nombre": "General Pánfilo Natera",
+  "estado": "Zacatecas",
+  "clave_inegi": "32016",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 34.6,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 23526
+  }
+ },
+ {
+  "nombre": "Tecolotlán",
+  "estado": "Jalisco",
+  "clave_inegi": "14088",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 34.6,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.9,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 2,
+   "poblacion": 16603
+  }
+ },
+ {
+  "nombre": "Rayón, San Luis Potosí",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24023",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 34.6,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 5.2,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 1,
+   "poblacion": 15301
+  }
+ },
+ {
+  "nombre": "Tetela del Volcán",
+  "estado": "Morelos",
+  "clave_inegi": "17022",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.5,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 14853
+  }
+ },
+ {
+  "nombre": "Jiquipilco",
+  "estado": "México",
+  "clave_inegi": "15047",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 34.5,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 76826
+  }
+ },
+ {
+  "nombre": "Choix",
+  "estado": "Sinaloa",
+  "clave_inegi": "25007",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 34.5,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 3,
+   "poblacion": 29334
+  }
+ },
+ {
+  "nombre": "Huehuetán",
+  "estado": "Chiapas",
+  "clave_inegi": "07037",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 34.5,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 2,
+   "poblacion": 36333
+  }
+ },
+ {
+  "nombre": "Ixtlahuacán del Río",
+  "estado": "Jalisco",
+  "clave_inegi": "14045",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 34.5,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 5.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 1,
+   "poblacion": 20465
+  }
+ },
+ {
+  "nombre": "San Francisco Tetlanohcan",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29050",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.4,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 0,
+   "poblacion": 11761
+  }
+ },
+ {
+  "nombre": "Tabasco",
+  "estado": "Zacatecas",
+  "clave_inegi": "32044",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 34.4,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 16588
+  }
+ },
+ {
+  "nombre": "Ascensión",
+  "estado": "Chihuahua",
+  "clave_inegi": "08005",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 34.4,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 5.7,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 1,
+   "poblacion": 26093
+  }
+ },
+ {
+  "nombre": "Ocuilan",
+  "estado": "México",
+  "clave_inegi": "15063",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 34.4,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 2,
+   "poblacion": 36223
+  }
+ },
+ {
+  "nombre": "Jonacatepec de Leandro Valle",
+  "estado": "Morelos",
+  "clave_inegi": "17013",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.4,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.5,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 3,
+   "poblacion": 16694
+  }
+ },
+ {
+  "nombre": "San Nicolás de los Ranchos",
+  "estado": "Puebla",
+  "clave_inegi": "21138",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.3,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 11780
+  }
+ },
+ {
+  "nombre": "Vega de Alatorre",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30192",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 34.3,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 20204
+  }
+ },
+ {
+  "nombre": "Zinacatepec",
+  "estado": "Puebla",
+  "clave_inegi": "21214",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.3,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 0,
+   "poblacion": 18359
+  }
+ },
+ {
+  "nombre": "Jiquipilas",
+  "estado": "Chiapas",
+  "clave_inegi": "07046",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 34.3,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.9,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 41063
+  }
+ },
+ {
+  "nombre": "Mezcalapa",
+  "estado": "Chiapas",
+  "clave_inegi": "07124",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 34.3,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.9,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 23847
+  }
+ },
+ {
+  "nombre": "Ajuchitlán del Progreso",
+  "estado": "Guerrero",
+  "clave_inegi": "12003",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.3,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 0,
+   "poblacion": 37655
+  }
+ },
+ {
+  "nombre": "Jesús Carranza",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30091",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 34.3,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 5.5,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 28524
+  }
+ },
+ {
+  "nombre": "Tlanalapa",
+  "estado": "Hidalgo",
+  "clave_inegi": "13072",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 34.2,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 1,
+   "poblacion": 11113
+  }
+ },
+ {
+  "nombre": "Tecalitlán",
+  "estado": "Jalisco",
+  "clave_inegi": "14087",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 34.2,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 4.8,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 16705
   }
  },
  {
@@ -9178,6 +13218,81 @@
   }
  },
  {
+  "nombre": "Santa Catarina Juquila",
+  "estado": "Oaxaca",
+  "clave_inegi": "20364",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 34.1,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 18654
+  }
+ },
+ {
+  "nombre": "Juchipila",
+  "estado": "Zacatecas",
+  "clave_inegi": "32023",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 34.1,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 0,
+   "poblacion": 12251
+  }
+ },
+ {
+  "nombre": "Acatic",
+  "estado": "Jalisco",
+  "clave_inegi": "14001",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 34.1,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 11,
+   "empresas_construccion": 0,
+   "poblacion": 23175
+  }
+ },
+ {
+  "nombre": "Chapultepec",
+  "estado": "México",
+  "clave_inegi": "15027",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 34.0,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 0,
+   "poblacion": 12772
+  }
+ },
+ {
+  "nombre": "Teotitlán de Flores Magón",
+  "estado": "Oaxaca",
+  "clave_inegi": "20545",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 34.0,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 2,
+   "poblacion": 10099
+  }
+ },
+ {
   "nombre": "Ayutla",
   "estado": "Jalisco",
   "clave_inegi": "14017",
@@ -9190,6 +13305,841 @@
    "mayoreo_construccion": 6,
    "empresas_construccion": 2,
    "poblacion": 12880
+  }
+ },
+ {
+  "nombre": "Zaragoza, Puebla",
+  "estado": "Puebla",
+  "clave_inegi": "21211",
+  "region": "Centro-Sur",
+  "alias": [
+   "Zaragoza"
+  ],
+  "potencial_mercado": 33.9,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 16752
+  }
+ },
+ {
+  "nombre": "Villa de Tezontepec",
+  "estado": "Hidalgo",
+  "clave_inegi": "13066",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 33.9,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 10,
+   "empresas_construccion": 0,
+   "poblacion": 13032
+  }
+ },
+ {
+  "nombre": "Sain Alto",
+  "estado": "Zacatecas",
+  "clave_inegi": "32040",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 33.8,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 21844
+  }
+ },
+ {
+  "nombre": "Tepexi de Rodríguez",
+  "estado": "Puebla",
+  "clave_inegi": "21169",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 33.7,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 22331
+  }
+ },
+ {
+  "nombre": "Benito Juárez, Sonora",
+  "estado": "Sonora",
+  "clave_inegi": "26071",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 33.7,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 21692
+  }
+ },
+ {
+  "nombre": "Hecelchakán",
+  "estado": "Campeche",
+  "clave_inegi": "04005",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 33.7,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.9,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 31917
+  }
+ },
+ {
+  "nombre": "Seybaplaya",
+  "estado": "Campeche",
+  "clave_inegi": "04012",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 33.7,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 1,
+   "poblacion": 15297
+  }
+ },
+ {
+  "nombre": "Esperanza",
+  "estado": "Puebla",
+  "clave_inegi": "21063",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 33.7,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.7,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 1,
+   "poblacion": 14766
+  }
+ },
+ {
+  "nombre": "Zoquitlán",
+  "estado": "Puebla",
+  "clave_inegi": "21217",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 33.6,
+  "indicadores": {
+   "unidades_ferreteras": 18,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 20335
+  }
+ },
+ {
+  "nombre": "Tonanitla",
+  "estado": "México",
+  "clave_inegi": "15125",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 33.6,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 14883
+  }
+ },
+ {
+  "nombre": "Tepezalá",
+  "estado": "Aguascalientes",
+  "clave_inegi": "01009",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 33.6,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 22485
+  }
+ },
+ {
+  "nombre": "Ahualulco",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24001",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 33.6,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 18974
+  }
+ },
+ {
+  "nombre": "Contepec",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16017",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 33.6,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 35070
+  }
+ },
+ {
+  "nombre": "Álvaro Obregón, Michoacán de Ocampo",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16003",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 33.5,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 23000
+  }
+ },
+ {
+  "nombre": "Indaparapeo",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16040",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 33.5,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 18385
+  }
+ },
+ {
+  "nombre": "Calpan",
+  "estado": "Puebla",
+  "clave_inegi": "21026",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 33.5,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 15271
+  }
+ },
+ {
+  "nombre": "Ixtenco",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29016",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 33.5,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 2,
+   "poblacion": 7504
+  }
+ },
+ {
+  "nombre": "Tlalpujahua",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16093",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 33.5,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 28556
+  }
+ },
+ {
+  "nombre": "Huayacocotla",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30072",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 33.5,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 1,
+   "poblacion": 21796
+  }
+ },
+ {
+  "nombre": "Pahuatlán",
+  "estado": "Puebla",
+  "clave_inegi": "21109",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 33.5,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 1,
+   "poblacion": 20274
+  }
+ },
+ {
+  "nombre": "Citlaltépetl",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30035",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 33.4,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 11165
+  }
+ },
+ {
+  "nombre": "Rayón, México",
+  "estado": "México",
+  "clave_inegi": "15072",
+  "region": "Valle de Mexico",
+  "alias": [
+   "Rayón"
+  ],
+  "potencial_mercado": 33.4,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 15972
+  }
+ },
+ {
+  "nombre": "Trancoso",
+  "estado": "Zacatecas",
+  "clave_inegi": "32057",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 33.4,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 20455
+  }
+ },
+ {
+  "nombre": "Panindícuaro",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16063",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 33.3,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 14889
+  }
+ },
+ {
+  "nombre": "Ocampo, Michoacán de Ocampo",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16061",
+  "region": "Occidente",
+  "alias": [
+   "Ocampo"
+  ],
+  "potencial_mercado": 33.3,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 24774
+  }
+ },
+ {
+  "nombre": "Lerdo de Tejada",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30097",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 33.3,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 8,
+   "empresas_construccion": 0,
+   "poblacion": 19123
+  }
+ },
+ {
+  "nombre": "Naolinco",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30112",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 33.3,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 1,
+   "poblacion": 22835
+  }
+ },
+ {
+  "nombre": "Jala",
+  "estado": "Nayarit",
+  "clave_inegi": "18007",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 33.2,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 19321
+  }
+ },
+ {
+  "nombre": "Tatahuicapan de Juárez",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30209",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 33.2,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.7,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 15044
+  }
+ },
+ {
+  "nombre": "Joquicingo",
+  "estado": "México",
+  "clave_inegi": "15049",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 33.2,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 15428
+  }
+ },
+ {
+  "nombre": "Parácuaro",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16064",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 33.2,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 26832
+  }
+ },
+ {
+  "nombre": "Ixtapa",
+  "estado": "Chiapas",
+  "clave_inegi": "07044",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 33.2,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 28999
+  }
+ },
+ {
+  "nombre": "Santa Isabel Xiloxoxtla",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29060",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 33.2,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 4,
+   "poblacion": 5443
+  }
+ },
+ {
+  "nombre": "Unión de Tula",
+  "estado": "Jalisco",
+  "clave_inegi": "14110",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 33.1,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 4.2,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 13799
+  }
+ },
+ {
+  "nombre": "Soledad de Doblado",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30148",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 33.1,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 0,
+   "poblacion": 28130
+  }
+ },
+ {
+  "nombre": "Xochistlahuaca",
+  "estado": "Guerrero",
+  "clave_inegi": "12071",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 33.0,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 29891
+  }
+ },
+ {
+  "nombre": "Actopan, Veracruz de Ignacio de la Llave",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30004",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 33.0,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 1,
+   "poblacion": 41742
+  }
+ },
+ {
+  "nombre": "Ziracuaretiro",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16111",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 33.0,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.7,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 18402
+  }
+ },
+ {
+  "nombre": "Santa Ana Nopalucan",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29056",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 32.9,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 7952
+  }
+ },
+ {
+  "nombre": "Villa Corona",
+  "estado": "Jalisco",
+  "clave_inegi": "14114",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 32.9,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 19063
+  }
+ },
+ {
+  "nombre": "Villa Comaltitlán",
+  "estado": "Chiapas",
+  "clave_inegi": "07071",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 32.9,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 2,
+   "poblacion": 30297
+  }
+ },
+ {
+  "nombre": "Tlahualilo",
+  "estado": "Durango",
+  "clave_inegi": "10036",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 32.9,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 21143
+  }
+ },
+ {
+  "nombre": "Gómez Farías, Jalisco",
+  "estado": "Jalisco",
+  "clave_inegi": "14079",
+  "region": "Occidente",
+  "alias": [
+   "Gómez Farías"
+  ],
+  "potencial_mercado": 32.9,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 2,
+   "poblacion": 16431
+  }
+ },
+ {
+  "nombre": "Temozón",
+  "estado": "Yucatán",
+  "clave_inegi": "31085",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 32.9,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 4.5,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 16680
+  }
+ },
+ {
+  "nombre": "Platón Sánchez",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30129",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 32.9,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 0,
+   "poblacion": 18053
+  }
+ },
+ {
+  "nombre": "Acuitzio",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16001",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 32.8,
+  "indicadores": {
+   "unidades_ferreteras": 15,
+   "tamano_medio": 3.3,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 11301
+  }
+ },
+ {
+  "nombre": "Mazatán, Chiapas",
+  "estado": "Chiapas",
+  "clave_inegi": "07054",
+  "region": "Sureste",
+  "alias": [
+   "Mazatán"
+  ],
+  "potencial_mercado": 32.8,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 28250
+  }
+ },
+ {
+  "nombre": "Mexquitic de Carmona",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24021",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 32.8,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 1,
+   "poblacion": 58469
+  }
+ },
+ {
+  "nombre": "Tlachichuca",
+  "estado": "Puebla",
+  "clave_inegi": "21179",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 32.7,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.7,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 31639
+  }
+ },
+ {
+  "nombre": "Cuyoaco",
+  "estado": "Puebla",
+  "clave_inegi": "21044",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 32.7,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 17139
+  }
+ },
+ {
+  "nombre": "Oluta",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30116",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 32.6,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 17027
+  }
+ },
+ {
+  "nombre": "Villa Aldama",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30194",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 32.6,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 4.5,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 12492
+  }
+ },
+ {
+  "nombre": "Jesús María, Jalisco",
+  "estado": "Jalisco",
+  "clave_inegi": "14048",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 32.6,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 18982
+  }
+ },
+ {
+  "nombre": "Temoac",
+  "estado": "Morelos",
+  "clave_inegi": "17033",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 32.6,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 0,
+   "poblacion": 16574
+  }
+ },
+ {
+  "nombre": "Mocorito",
+  "estado": "Sinaloa",
+  "clave_inegi": "25013",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 32.6,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 1,
+   "poblacion": 40358
   }
  },
  {
@@ -9208,6 +14158,653 @@
   }
  },
  {
+  "nombre": "Ocuituco",
+  "estado": "Morelos",
+  "clave_inegi": "17016",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 32.4,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 19219
+  }
+ },
+ {
+  "nombre": "Akil",
+  "estado": "Yucatán",
+  "clave_inegi": "31003",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 32.4,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 12285
+  }
+ },
+ {
+  "nombre": "Texcaltitlán",
+  "estado": "México",
+  "clave_inegi": "15097",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 32.4,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 18482
+  }
+ },
+ {
+  "nombre": "Villa de Arriaga",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24046",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 32.4,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 6,
+   "empresas_construccion": 0,
+   "poblacion": 18206
+  }
+ },
+ {
+  "nombre": "Santa Ana",
+  "estado": "Sonora",
+  "clave_inegi": "26058",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 32.3,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 5.2,
+   "mayoreo_construccion": 0,
+   "empresas_construccion": 3,
+   "poblacion": 16203
+  }
+ },
+ {
+  "nombre": "Filomeno Mata",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30067",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 32.3,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.9,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 19179
+  }
+ },
+ {
+  "nombre": "Azoyú",
+  "estado": "Guerrero",
+  "clave_inegi": "12013",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 32.3,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.7,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 15099
+  }
+ },
+ {
+  "nombre": "San Juan Cotzocón",
+  "estado": "Oaxaca",
+  "clave_inegi": "20190",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 32.3,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 1,
+   "poblacion": 22444
+  }
+ },
+ {
+  "nombre": "Tlazazalca",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16094",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 32.2,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 6420
+  }
+ },
+ {
+  "nombre": "Tingüindín",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16091",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 32.2,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 14934
+  }
+ },
+ {
+  "nombre": "San Pedro Quiatoni",
+  "estado": "Oaxaca",
+  "clave_inegi": "20325",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 32.2,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 11930
+  }
+ },
+ {
+  "nombre": "Cosolapa",
+  "estado": "Oaxaca",
+  "clave_inegi": "20021",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 32.1,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 4.2,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 14488
+  }
+ },
+ {
+  "nombre": "Molango de Escamilla",
+  "estado": "Hidalgo",
+  "clave_inegi": "13042",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 32.1,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.8,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 11578
+  }
+ },
+ {
+  "nombre": "Amatepec",
+  "estado": "México",
+  "clave_inegi": "15008",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 32.1,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 25244
+  }
+ },
+ {
+  "nombre": "Santo Tomás Hueyotlipan",
+  "estado": "Puebla",
+  "clave_inegi": "21151",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 32.1,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 1,
+   "poblacion": 9315
+  }
+ },
+ {
+  "nombre": "Atzacan",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30022",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 32.0,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 22651
+  }
+ },
+ {
+  "nombre": "Tarandacuao",
+  "estado": "Guanajuato",
+  "clave_inegi": "11038",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 32.0,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 11304
+  }
+ },
+ {
+  "nombre": "Juárez, Michoacán de Ocampo",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16046",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 32.0,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 14936
+  }
+ },
+ {
+  "nombre": "Siltepec",
+  "estado": "Chiapas",
+  "clave_inegi": "07080",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 32.0,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 25937
+  }
+ },
+ {
+  "nombre": "Singuilucan",
+  "estado": "Hidalgo",
+  "clave_inegi": "13057",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 32.0,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 15142
+  }
+ },
+ {
+  "nombre": "Polotitlán",
+  "estado": "México",
+  "clave_inegi": "15071",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 32.0,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 14985
+  }
+ },
+ {
+  "nombre": "Huehuetlán el Chico",
+  "estado": "Puebla",
+  "clave_inegi": "21073",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 32.0,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 7,
+   "empresas_construccion": 0,
+   "poblacion": 9760
+  }
+ },
+ {
+  "nombre": "Bácum",
+  "estado": "Sonora",
+  "clave_inegi": "26012",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 32.0,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 1,
+   "poblacion": 23151
+  }
+ },
+ {
+  "nombre": "Juchique de Ferrer",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30095",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 32.0,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 15059
+  }
+ },
+ {
+  "nombre": "Concepción de Buenos Aires",
+  "estado": "Jalisco",
+  "clave_inegi": "14026",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 31.9,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 2,
+   "poblacion": 6334
+  }
+ },
+ {
+  "nombre": "Padilla",
+  "estado": "Tamaulipas",
+  "clave_inegi": "28030",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 31.9,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 1,
+   "poblacion": 13618
+  }
+ },
+ {
+  "nombre": "Tierra Nueva",
+  "estado": "San Luis Potosí",
+  "clave_inegi": "24043",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 31.8,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 7966
+  }
+ },
+ {
+  "nombre": "Chalchihuites",
+  "estado": "Zacatecas",
+  "clave_inegi": "32009",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 31.8,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 10086
+  }
+ },
+ {
+  "nombre": "Cojumatlán de Régules",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16074",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 31.8,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 10553
+  }
+ },
+ {
+  "nombre": "Santiago de Anaya",
+  "estado": "Hidalgo",
+  "clave_inegi": "13055",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 31.8,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 18329
+  }
+ },
+ {
+  "nombre": "Tekit",
+  "estado": "Yucatán",
+  "clave_inegi": "31080",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 31.7,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 4,
+   "empresas_construccion": 0,
+   "poblacion": 11020
+  }
+ },
+ {
+  "nombre": "Tzimol",
+  "estado": "Chiapas",
+  "clave_inegi": "07104",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 31.7,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 1,
+   "poblacion": 16560
+  }
+ },
+ {
+  "nombre": "Ahuacuotzingo",
+  "estado": "Guerrero",
+  "clave_inegi": "12002",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 31.7,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.7,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 25205
+  }
+ },
+ {
+  "nombre": "Sanctórum de Lázaro Cárdenas",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29020",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 31.6,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 9432
+  }
+ },
+ {
+  "nombre": "Huanímaro",
+  "estado": "Guanajuato",
+  "clave_inegi": "11016",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 31.6,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 1,
+   "poblacion": 21128
+  }
+ },
+ {
+  "nombre": "Almoloya del Río",
+  "estado": "México",
+  "clave_inegi": "15006",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 31.6,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 12694
+  }
+ },
+ {
+  "nombre": "Huaquechula",
+  "estado": "Puebla",
+  "clave_inegi": "21069",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 31.6,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 29233
+  }
+ },
+ {
+  "nombre": "Temamatla",
+  "estado": "México",
+  "clave_inegi": "15083",
+  "region": "Valle de Mexico",
+  "alias": [],
+  "potencial_mercado": 31.5,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 14130
+  }
+ },
+ {
+  "nombre": "San Juan Cacahuatepec",
+  "estado": "Oaxaca",
+  "clave_inegi": "20185",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 31.5,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 5.2,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 8939
+  }
+ },
+ {
+  "nombre": "San Felipe Teotlalcingo",
+  "estado": "Puebla",
+  "clave_inegi": "21122",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 31.5,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.7,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 11063
+  }
+ },
+ {
+  "nombre": "Socoltenango",
+  "estado": "Chiapas",
+  "clave_inegi": "07083",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 31.4,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 19092
+  }
+ },
+ {
+  "nombre": "Huehuetla, Hidalgo",
+  "estado": "Hidalgo",
+  "clave_inegi": "13027",
+  "region": "Centro-Sur",
+  "alias": [
+   "Huehuetla"
+  ],
+  "potencial_mercado": 31.4,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 22846
+  }
+ },
+ {
+  "nombre": "Acacoyagua",
+  "estado": "Chiapas",
+  "clave_inegi": "07001",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 31.4,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 17994
+  }
+ },
+ {
   "nombre": "Jaumave",
   "estado": "Tamaulipas",
   "clave_inegi": "28017",
@@ -9223,6 +14820,312 @@
   }
  },
  {
+  "nombre": "Gustavo Díaz Ordaz",
+  "estado": "Tamaulipas",
+  "clave_inegi": "28015",
+  "region": "Noreste",
+  "alias": [],
+  "potencial_mercado": 31.3,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 5.5,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 15677
+  }
+ },
+ {
+  "nombre": "Santa Cruz Quilehtla",
+  "estado": "Tlaxcala",
+  "clave_inegi": "29059",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 31.2,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 5,
+   "empresas_construccion": 0,
+   "poblacion": 7750
+  }
+ },
+ {
+  "nombre": "Copainalá",
+  "estado": "Chiapas",
+  "clave_inegi": "07021",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 31.0,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 22192
+  }
+ },
+ {
+  "nombre": "Coacoatzintla",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30036",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 30.8,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 11018
+  }
+ },
+ {
+  "nombre": "Miacatlán",
+  "estado": "Morelos",
+  "clave_inegi": "17015",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 30.8,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 4.4,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 15802
+  }
+ },
+ {
+  "nombre": "Pueblo Nuevo, Guanajuato",
+  "estado": "Guanajuato",
+  "clave_inegi": "11024",
+  "region": "Centro-Norte",
+  "alias": [],
+  "potencial_mercado": 30.7,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 12403
+  }
+ },
+ {
+  "nombre": "Tamalín",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30150",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 30.7,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 11631
+  }
+ },
+ {
+  "nombre": "Tzintzuntzan",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16100",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 30.6,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 14911
+  }
+ },
+ {
+  "nombre": "Mecayapan",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30104",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 30.6,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 1,
+   "poblacion": 17134
+  }
+ },
+ {
+  "nombre": "Coxcatlán, Puebla",
+  "estado": "Puebla",
+  "clave_inegi": "21035",
+  "region": "Centro-Sur",
+  "alias": [
+   "Coxcatlán"
+  ],
+  "potencial_mercado": 30.4,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 20653
+  }
+ },
+ {
+  "nombre": "Churumuco",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16029",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 30.4,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 12342
+  }
+ },
+ {
+  "nombre": "Tamazulápam del Espíritu Santo",
+  "estado": "Oaxaca",
+  "clave_inegi": "20031",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 30.4,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 7185
+  }
+ },
+ {
+  "nombre": "San José Miahuatlán",
+  "estado": "Puebla",
+  "clave_inegi": "21129",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 30.3,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 2,
+   "empresas_construccion": 0,
+   "poblacion": 14018
+  }
+ },
+ {
+  "nombre": "Coahuayana",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16014",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 30.2,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 7.4,
+   "mayoreo_construccion": 0,
+   "empresas_construccion": 0,
+   "poblacion": 17022
+  }
+ },
+ {
+  "nombre": "San Juan Mixtepec",
+  "estado": "Oaxaca",
+  "clave_inegi": "20208",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 30.2,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 3,
+   "empresas_construccion": 0,
+   "poblacion": 6941
+  }
+ },
+ {
+  "nombre": "Queréndaro",
+  "estado": "Michoacán de Ocampo",
+  "clave_inegi": "16072",
+  "region": "Occidente",
+  "alias": [],
+  "potencial_mercado": 29.9,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 13961
+  }
+ },
+ {
+  "nombre": "Maltrata",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30099",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 29.6,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 18327
+  }
+ },
+ {
+  "nombre": "Tepetzintla, Veracruz de Ignacio de la Llave",
+  "estado": "Veracruz de Ignacio de la Llave",
+  "clave_inegi": "30167",
+  "region": "Sureste",
+  "alias": [
+   "Tepetzintla"
+  ],
+  "potencial_mercado": 29.6,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 14619
+  }
+ },
+ {
+  "nombre": "Santiago Yosondúa",
+  "estado": "Oaxaca",
+  "clave_inegi": "20500",
+  "region": "Sureste",
+  "alias": [],
+  "potencial_mercado": 29.0,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 7991
+  }
+ },
+ {
+  "nombre": "Atoyac, Jalisco",
+  "estado": "Jalisco",
+  "clave_inegi": "14014",
+  "region": "Occidente",
+  "alias": [
+   "Atoyac"
+  ],
+  "potencial_mercado": 28.9,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 1,
+   "empresas_construccion": 0,
+   "poblacion": 8689
+  }
+ },
+ {
   "nombre": "Ixtlán",
   "estado": "Michoacán de Ocampo",
   "clave_inegi": "16042",
@@ -9235,6 +15138,111 @@
    "mayoreo_construccion": 1,
    "empresas_construccion": 0,
    "poblacion": 14302
+  }
+ },
+ {
+  "nombre": "Eldorado",
+  "estado": "Sinaloa",
+  "clave_inegi": "25019",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 28.6,
+  "indicadores": {
+   "unidades_ferreteras": 14,
+   "tamano_medio": 3.7,
+   "mayoreo_construccion": 15,
+   "empresas_construccion": 3,
+   "poblacion": 0
+  }
+ },
+ {
+  "nombre": "Cumpas",
+  "estado": "Sonora",
+  "clave_inegi": "26023",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 28.6,
+  "indicadores": {
+   "unidades_ferreteras": 13,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 0,
+   "empresas_construccion": 0,
+   "poblacion": 5829
+  }
+ },
+ {
+  "nombre": "Chapantongo",
+  "estado": "Hidalgo",
+  "clave_inegi": "13017",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 28.3,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.0,
+   "mayoreo_construccion": 0,
+   "empresas_construccion": 0,
+   "poblacion": 12967
+  }
+ },
+ {
+  "nombre": "Francisco Z. Mena",
+  "estado": "Puebla",
+  "clave_inegi": "21064",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 28.3,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 3.5,
+   "mayoreo_construccion": 0,
+   "empresas_construccion": 0,
+   "poblacion": 17824
+  }
+ },
+ {
+  "nombre": "Iliatenco",
+  "estado": "Guerrero",
+  "clave_inegi": "12081",
+  "region": "Centro-Sur",
+  "alias": [],
+  "potencial_mercado": 28.1,
+  "indicadores": {
+   "unidades_ferreteras": 10,
+   "tamano_medio": 4.0,
+   "mayoreo_construccion": 0,
+   "empresas_construccion": 0,
+   "poblacion": 11679
+  }
+ },
+ {
+  "nombre": "Dzitbalché",
+  "estado": "Campeche",
+  "clave_inegi": "04013",
+  "region": "Peninsula",
+  "alias": [],
+  "potencial_mercado": 26.0,
+  "indicadores": {
+   "unidades_ferreteras": 12,
+   "tamano_medio": 3.4,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 2,
+   "poblacion": 0
+  }
+ },
+ {
+  "nombre": "Juan José Ríos",
+  "estado": "Sinaloa",
+  "clave_inegi": "25020",
+  "region": "Noroeste",
+  "alias": [],
+  "potencial_mercado": 25.7,
+  "indicadores": {
+   "unidades_ferreteras": 11,
+   "tamano_medio": 3.9,
+   "mayoreo_construccion": 9,
+   "empresas_construccion": 2,
+   "poblacion": 0
   }
  },
  {
@@ -9283,7 +15291,7 @@
   }
  },
  {
-  "nombre": "San Nicolás                                                                 ",
+  "nombre": "San Nicolás",
   "estado": "Guerrero",
   "clave_inegi": "12085",
   "region": "Centro-Sur",
