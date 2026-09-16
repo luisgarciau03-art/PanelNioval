@@ -203,3 +203,96 @@ reproducible: la misma entrada da el mismo orden en cualquier máquina, que es l
   ramo, se vuelve aquí y se reajustan pesos. El ADR se enmienda; no se sustituye en silencio.
 - Que DENUE deje de publicar la descarga masiva por URL directa y solo quede la API con token.
 - Que NIOVAL cambie de ramo o de cobertura geográfica.
+
+---
+
+## 9. Revisión 2026-09-15 — el corte baja a **≥ 10 ferreterías → 1,004 municipios**
+
+> **Esto es un ANEXO, no una reescritura.** Todo lo de arriba sigue vigente y describe lo que
+> se decidió el 2026-08-28 con la información de entonces. Lo único que esta sección cambia
+> es el **parámetro de corte** de §5.2. **El modelo de puntuación no se toca:** siguen siendo
+> los mismos cinco indicadores, los mismos pesos, la misma escala logarítmica, el mismo
+> `factor_nioval` y el mismo criterio de desempate de §7.
+
+**Tarea:** Plan 1 · T1.3 · **Rama:** `feat/relevancia-nacional-produccion`
+
+### 9.1 Qué cambió en la realidad, no en el dato
+
+El dato es el mismo (DENUE 05_2026; la medición de T1.2 reprodujo las cuatro cifras de agosto
+exactamente). Lo que cambió es el **requisito**: el dueño pidió cobertura **nacional** —
+«todas las ciudades de la región»— y eso convierte en insuficiente un corte que se eligió
+para llenar un rango de 400-600 chips en una UI que el Plan 4 está reemplazando.
+
+§5.2 justificaba el ≥20 por caer «dentro del rango 400-600 de la opción A de la decisión D3».
+**Ese rango quedó obsoleto**: se dimensionó antes del requisito nuevo y para una pantalla que
+ya no será la misma.
+
+### 9.2 La brecha, medida
+
+Auditoría completa en `docs/investigacion/2026-09-15-cobertura-catalogo-ciudades.md`.
+
+| | ≥20 (lo de agosto) | **≥10 (esta revisión)** |
+|---|---:|---:|
+| Municipios en el catálogo | 606 | **1,004** |
+| Masa ferretera nacional **fuera** | 13.7 % | **6.4 %** |
+| Sureste, la región peor cubierta | 65.6 % de su masa | **80.4 %** |
+| Desequilibrio regional (peor ÷ mejor, por masa) | 1.48× | **1.24×** |
+
+El Sureste tiene 736 municipios —casi un tercio del universo nacional— y era la región menos
+cubierta del país. Con ≥20 quedaba fuera **más de un tercio de su mercado ferretero**.
+
+### 9.3 Por qué ≥10 y no ≥5
+
+El costo marginal por punto de cobertura **se duplica** en el segundo tramo: los primeros
+7.3 puntos cuestan 406 ciudades (55.6 por punto); los siguientes 4.0 cuestan 445 (111.3 por
+punto).
+
+**Distinción que hay que mantener:** el dato dice *cuesta el doble*; **no** dice *deja de
+valer*. Que no valga es un **juicio de negocio** apoyado en el argumento operativo del consejo
+—un municipio de 5-9 ferreterías, tras los filtros del importador (≥5 reseñas, ≥3.5 estrellas,
+con teléfono), rinde del orden de 0-2 prospectos por una corrida que cuesta lo mismo que una
+de Monterrey— y **queda marcado como revisable** cuando el Plan 2 entregue el modelo de costo
+por prospecto, que es el que lo puede zanjar con números.
+
+La decisión se tomó en `council` de cuatro voces. El Arquitecto **cambió su posición inicial
+de ≥5 a ≥10** al converger dos voces independientes en el mismo argumento económico: el costo
+por corrida es fijo (~80 llamadas facturables) sin importar el tamaño de la ciudad.
+
+### 9.4 Lo que se verificó antes de dar el cambio por bueno
+
+| Comprobación | Resultado |
+|---|---|
+| **CE1** — municipios del universo con ≥10 que quedan fuera | **0** de 995 |
+| **CE3** — `min(potencial_mercado) > 5` | **14.1** (Ejutla, 1 ferretería): 2.8× sobre el piso |
+| Ninguna ciudad del catálogo viejo desaparece | **0 perdidas** — las 606 siguen, +398 nuevas |
+| Nombres ambiguos sin estado entre las nuevas | **0** de 398, contra 82 homónimos del DENUE |
+| Entidades cubiertas | **32/32** |
+| El catálogo en disco coincide con las fuentes | `--verificar` → exit 0 |
+| Suite completa | **486 passed, 1 skipped** |
+
+El corte por umbral deja **995**; las **9** restantes hasta 1,004 entran por herencia del
+array legacy vía `resolver_array_viejo()`, cuya lógica **no se toca**: una ciudad que el
+operador ya podía elegir no desaparece porque no llegue al corte.
+
+### 9.5 El umbral del test es normativo, y se declara
+
+El test que gobierna esto —*«ninguna macro-región cubre menos del 75 % de la masa ferretera de
+su región»*— usa un **75 % elegido después de ver los datos**, sabiendo que deja fuera al ≥20
+y dentro al ≥10. Eso es **ajuste retrospectivo** y se dice en vez de disimularse.
+
+El número **no se defiende como hallazgo estadístico** sino como **compromiso de servicio**:
+si la promesa al dueño es «cobertura nacional», dejar fuera más de una cuarta parte del
+mercado de una región rompe esa promesa. Cualquiera puede discutir el número; lo que no puede
+es creer que salió del dato.
+
+### 9.6 Qué invalidaría **esta** revisión (además de lo de §8)
+
+- Que el Plan 2 mida el costo por prospecto y demuestre que los municipios de 10-19
+  ferreterías tampoco se pagan: entonces el corte sube, no baja.
+- Que el rediseño del Plan 4 **no** entregue búsqueda y filtro por estado. 1,004 chips sin
+  filtro son **peores** que 606: la condición 2 del consejo es que este catálogo llega a
+  producción junto con la UI que lo hace usable, no antes.
+- Que el gate del owner sobre el orden nacional (T1.4) rechace las plazas nuevas.
+
+**Revertir cuesta una línea:** `--min-ferreterias` en `tools/generar_catalogo_ciudades.py`
+vuelve a 20 y se regenera. Es un parámetro, no una reestructuración.

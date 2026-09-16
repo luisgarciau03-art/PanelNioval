@@ -4,8 +4,13 @@ name: Tests
 # Hasta ahora esa regla solo se cumplia si alguien se acordaba de correr pytest a
 # mano: habia intencion, no mecanismo. Esto es el mecanismo.
 #
-# `main` tiene auto-deploy a Railway y a Vultr, asi que un merge en rojo llega a
-# produccion sin escala intermedia.
+# OJO, corregido el 2026-09-15: `main` NO tiene auto-deploy. Railway se elimino
+# el 2026-08-19 y el VPS de Vultr se despliega A MANO por ssh (ver el RUNBOOK,
+# "Operacion en el VPS"). Este comentario decia lo contrario y costo un
+# diagnostico entero en el Plan 1, T1.6.
+#
+# Que no haya auto-deploy NO rebaja este gate: main es lo que el operador
+# desplegara, y un rojo que entra aqui sale al VPS en el siguiente git pull.
 
 on:
   pull_request:
