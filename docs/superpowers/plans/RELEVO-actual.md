@@ -3,7 +3,7 @@
 > **Archivo único que se SOBRESCRIBE al cerrar CADA tarea.** Siempre contiene el mensaje
 > completo para arrancar una sesión nueva.
 >
-> **Estado: PLAN 1 CERRADO Y EN PRODUCCIÓN (8/8). Sesión 2 cerrada.** Siguiente: **Plan 4 · T4.0**.
+> **Estado: Plan 1 CERRADO Y EN PRODUCCIÓN (8/8) · Plan 4 EN CURSO (T4.0-T4.2).** ✅ **Dirección visual APROBADA por el owner.** Siguiente: **T4.3**.
 
 ---
 
@@ -15,7 +15,7 @@ PR abiertos.
 **`main`:** **`28eacfe`** — Plan 1 completo (PR #42) + su cierre documental (PR #45).
 **En el VPS corre `8bac782`**, y está bien: el PR #45 es sólo documentación, no hay nada que redesplegar.
 **RAMA DEL PLAN 1:** `feat/relevancia-nacional-produccion` — **mergeada dos veces y agotada.** No sigas en ella.
-**RAMA A CREAR:** `feat/rediseno-aterrizaje`, desde `main` actualizado.
+**RAMA DE TRABAJO:** **`feat/rediseno-aterrizaje`** — ya creada desde `main` `a97b494` y empujada. Último commit `59df79f`.
 
 ---
 
@@ -68,7 +68,7 @@ Verifica siempre después: `ssh root@155.138.200.66 'cd /srv/panel/app && git lo
 
 ## AVANCE
 
-- **Global: 1 / 4 planes (25 %)** · Tareas **8 / 34 (23.5 %)**
+- **Global: 1 / 4 planes (25 %)** · Tareas **11 / 34 (32.4 %)** · **Plan 4 en curso (3/12)**
 - **Plan 1: CERRADO, MERGEADO Y DESPLEGADO.** El operador ve **1,004 ciudades** donde había 606.
 
 ---
@@ -102,58 +102,124 @@ del RUNBOOK no funcionaba sobre HEAD desacoplado.
 
 ---
 
+## HECHO EN T4.0 (commit `2ed61e7`)
+
+| Qué | Evidencia |
+|---|---|
+| Rama desde `main` `a97b494`, respaldo **antes** de tocar nada, baseline **525** | `docs/auditoria/2026-09-15-estado-de-partida-plan4.md` |
+| **9 capturas** del «antes», de producción, 3 superficies × 320/768/1440 | `docs/diseno/antes-2026-09-15/` |
+| ⚠️ **Las del formulario traían nombre y teléfono de un cliente real.** Rehechas anonimizando **en el origen** (interceptando el endpoint): la PII nunca llegó a disco | §2.1 del informe |
+| **Línea base CE6:** dashboard 1440 **CLS 0.1924**, importador 320 **CLS 0.1073** — los dos sobre el umbral de 0.1. LCP máximo 548 ms | `docs/diseno/antes-2026-09-15/metricas-base.json` |
+| PR #43 y #44 reverificados: **los dos CONFLICTING** (riesgo R7, que el plan anticipaba) | §5 del informe |
+
+**Lo más útil que dejó T4.0:** el dashboard **ya falla CLS antes del rediseño**. CE6 dice «no
+empeorar», y sobre 0.1924 ese listón es demasiado bajo. **Apunta a bajar de 0.1**, y si no se
+consigue, dilo con el número delante en vez de esconderte tras un «no empeoró».
+
+---
+
+## HECHO EN T4.1 (commits `4212917` · `87fdbea` · `7ae544b`)
+
+**El criterio se fijó y se commiteó ANTES de mirar** (`4212917`), así que `git log` demuestra
+que la auditoría no es una racionalización de lo ya construido.
+
+**Veredicto:** el rediseño **cumple el encargo** y supera el criterio anti-plantilla — 5
+cualidades probadas de 10, sobre un mínimo de 4 — con **5 huecos bloqueantes**.
+
+| Lo mejor que encontró | |
+|---|---|
+| La dirección visual acierta el dominio | editorial/Swiss, con el argumento correcto: *«un rediseño que se vea mejor y capture más lento es un retroceso»* |
+| El formulario se midió donde importa | de **~90 a 11 pulsaciones** por captura |
+| **Validación cruzada del CLS** | el PR midió **0.1941** y T4.0 midió **0.1924** con otra herramienta, otro entorno y otros datos. **0.9 % de diferencia** |
+| El rediseño arregla el CLS de carga | 9/9 por debajo de 0.1 |
+
+**Los 5 bloqueantes:**
+
+- **B1** · Las capturas del «después» del tablero están **a cero**. T4.2 compararía un panel con
+  7,180 contactos contra uno vacío. **Es el único que bloquea el gate del owner.**
+- **B2** · La pantalla principal **no usa el sistema** que el PR declara, y el dato es binario:
+  espaciado con token **29/29** en `componentes.css` y **50/52** en `importador.css`, contra
+  **9/86** en `dashboard.css` y **0/31** en `formulario.css`.
+- **B3** · Tarjetas dentro de tarjetas. Bloquea **por regla**, no por coste al operador.
+- **B4** · **Las 9 mediciones de CLS son de CARGA, no de interacción.** Cuatro bloques del
+  importador empujan al pulsar «Buscar», una vez por corrida, y nadie lo midió.
+- **B5** · 🔍 **El buscador no normaliza acentos.** `toLowerCase()` y nada más, así que teclear
+  `leon` no encuentra `León`. **319 de las 1,004 ciudades (31.8 %)** llevan acento, y **39 del
+  top-100**. El fallo es **mudo**: la lista queda vacía y el operador no distingue «no está» de
+  «me la esconde».
+
+**El gate de `ux-researcher` corrigió el veredicto**, y eso es lo que más valor dio: encontró
+una contradicción dentro del propio documento, subió dos huecos de severidad y planteó B5 como
+hipótesis, que yo confirmé y medí en la rama.
+
+---
+
+## ✅ T4.2 — EL GATE DEL OWNER, CERRADO EN VERDE
+
+| Pregunta | Respuesta literal |
+|---|---|
+| (a) ¿Se aprueba la dirección visual? | **«Tal cual»** |
+| (b) ¿Alguna superficie empeoró? | **«Ninguna»** |
+| (c) ¿Los estados de carga transmiten? | **«Sí, transmiten bien»** |
+
+**CE1 y CE2 cerrados. Sin ajustes pedidos por el negocio**, así que T4.3 arranca con el alcance
+ya conocido y nada añadido.
+
+**Efecto lateral que importa:** el supuesto que el PR llevaba colgando —*«que Aprobados es lo
+que el owner mira primero»*, anotado como no confirmado por nadie— **queda confirmado**. Se le
+presentó explícitamente como el momento barato de cambiarlo y no lo cambió. **Deja de ser
+supuesto.**
+
+⚠️ **Lo que esta aprobación NO cierra** (no la cites de más):
+- **No aprueba el acabado.** Los 4 bloqueantes siguen bloqueando el **merge**.
+- **No valida la jornada del operador.** Se resolvió sobre capturas y mediciones, no sobre un
+  turno real de trabajo.
+- **No valida el importador a 1,004 ciudades.** Lo aprobado se construyó con 606.
+
+---
+
+## ⚠️ RETRACTACIÓN DE T4.1 QUE HAY QUE CONOCER
+
+**B1 quedó RETIRADO: era error mío, no del PR.** Acusé a las capturas del «después» de estar a
+cero comparándolas contra las mías de producción. El «antes» del propio PR **también** está a
+cero: misma herramienta, mismas condiciones, comparación equivalente.
+
+Y su `tools/capturar_superficies.py` **corta las dos vías de credencial y aborta si el panel
+consigue autenticarse igualmente**, para que ninguna captura del repo lleve datos de clientes
+(riesgo R8). **Su estándar es más estricto que el que yo apliqué en T4.0.**
+
+**Consecuencia incómoda y pendiente del owner:** las 9 capturas de `docs/diseno/antes-2026-09-15/`
+que commiteé en T4.0 llevan datos de producción (7,180 contactos, tasa real, ranking de
+ciudades). **No llevan PII** —lo verifiqué, y por eso rehice las del formulario— pero sí datos
+de negocio, y el proyecto se puso una regla más estricta. **No lo resuelvo por mi cuenta:**
+borrar no es opción aquí, y decidir si un agregado cae bajo R8 es del owner.
+
+---
+
 ## SIGUIENTE PASO EXACTO
 
-**Plan 4, Tarea T4.0 — Tarea Cero: rama, respaldo y evidencia del «antes».**
+**Plan 4, Tarea T4.3 — Cerrar la brecha: movimiento accesible y estados de carga.**
 
 ```
-ANCLA · Plan 4 Tarea T4.0 · importador nacional barato veraz profesional · avance 8/34 ·
- gate: 9 capturas del «antes» + métricas base ANTES de tocar nada ·
+ANCLA · Plan 4 Tarea T4.3 · importador nacional barato veraz profesional · avance 11/34 ·
+ gates: python-reviewer + code-reviewer + typescript-reviewer (toca static/js/*) ·
  baseline: python -m pytest tests/  -> 525 passed, 1 skipped
 ```
 
-**Qué hacer (literal del plan):**
+Lee el bloque de T4.3 en el plan. **El alcance ya está fijado y el negocio no añadió nada:**
+son los **4 bloqueantes de T4.1**, en este orden de daño al operador:
 
-1. Rama **`feat/rediseno-aterrizaje`** desde `main` actualizado (ya con el Plan 1).
-2. Baseline `python -m pytest tests/`. **Anotar el número exacto** (debe dar 525).
-3. **Capturas del «antes»** de las 3 superficies a **320, 768 y 1440 px**, **desde el panel en
-   producción**, a `docs/diseno/antes-2026-09-15/`.
-   💡 Producción ya sirve el Plan 1, así que el «antes» del Plan 4 **incluye las 1,004 ciudades**.
-   Necesitas el token para entrar: **léelo del archivo, no lo pegues** (ver abajo).
-4. Medir **LCP y CLS** del «antes» (línea base de CE6).
-5. Reverificar `gh pr view 43` y `gh pr view 44`: estado, mergeable, CI.
-6. Respaldo a `docs/auditoria/respaldos/2026-09-15-plan4/`.
+| # | Hueco | Por qué ese orden |
+|---|---|---|
+| **1º · B5** | 🔍 El buscador **no normaliza acentos**: teclear `leon` no encuentra `León`. **319 de 1,004** ciudades (31.8 %), 39 del top-100 | **Es el único que cuesta algo HOY y en cada uso.** El arreglo ya existe en Python (`normalizar()` del generador); falta su gemela en JS. Normalizar las dos puntas: al construir `buscable` y una vez por pulsación |
+| **2º · B4** | El CLS está medido **al cargar**, no **al interactuar**. Cuatro bloques con `hidden` del importador empujan al pulsar «Buscar» | **Sin ese número CE6 no se firma.** El patrón de arreglo ya está en el PR: a la caja de ciudades se le puso `min-height` |
+| **3º · B2** | `dashboard.css` y `formulario.css` **no usan el sistema**: espaciado 9/86 y 0/31 contra 29/29 y 50/52. Y redeclaran `'Segoe UI'` contra el ADR | El más grande y el que menos se ve. `importador.css` es el modelo a seguir |
+| **4º · B3** | Tarjetas dentro de tarjetas: `.men-card` dentro de `.table-box` | Minutos: quitar sombra o borde del interior |
 
-**Criterio de cierre.** Las 9 capturas y las métricas **existen antes** de tocar nada. Sin
-ellas, CE6 no se puede evaluar y el plan se queda sin instrumento de medición.
+**Y las 8 mejoras** (M1-M3, M4′, M5, M6, M8, M9, M10) están en la auditoría con su detalle.
 
-**Ojo con el PR #44:** pasó a `CONFLICTING` contra `main` tras el merge del #42 (`CLAUDE.md`,
-`app.py`, `2026-08-27-indice-tanda.md`), **además** de sus 5 conflictos contra el #43. Su rebase
-es T4.6 y **el trabajo creció**.
-
-### 🚨 Y ojo MAYOR con el PR #43: reintroduce las afirmaciones falsas
-
-El #43 **reescribe las mismas líneas de `CLAUDE.md`** que T1.7 acaba de corregir, y su versión
-vuelve a decir:
-
-- *«`GOOGLE_CREDENTIALS_JSON`, `TELEGRAM_TOKEN`… van por variables de entorno en **Railway**»*
-- *«nunca trabajar directo en `main` (**Railway auto-deploya**)»*
-
-**Las dos son falsas** desde el 2026-08-19. Si el #43 se mergea resolviendo el conflicto «a
-favor de la rama», **borra la corrección y el invariante falso vuelve a `main`** — y con él, el
-fallo que costó todo el diagnóstico de T1.6.
-
-**Ya ocurrió:** el PR #45 aterrizó esos docs en `main` (`28eacfe`) y **el #43 pasó de
-`MERGEABLE` a `CONFLICTING`**. Fue una decisión consciente, con su coste declarado: se cambió
-un merge limpio por un conflicto de **un solo archivo** a cambio de que la corrección no se
-pierda. **Por eso los docs de T1.6/T1.7 se aterrizaron a `main` a propósito**: el conflicto en
-`CLAUDE.md` es una **defensa**, no un estorbo. Obliga a decidir a mano en vez de revertir en
-silencio. **Al resolverlo, conserva SIEMPRE la versión de T1.7** en las líneas de Railway,
-despliegue, secretos y baseline; toma del #43 lo suyo (arquitectura de `templates/`+`static/`,
-Chart.js auto-hospedado, sistema de diseño, `.gitattributes`, `test_pii_repositorio.py`).
-
-El baseline del #43 (**900 passed, 2 skipped**) sale de la rama del Plan 1, no de `main`; tras
-el merge del #42 hay que remedirlo, no copiarlo.
+⚠️ **T4.3 toca `static/js/*`**, así que el gate de `typescript-reviewer` **es obligatorio**
+además de los dos de siempre.
 
 ---
 
@@ -161,7 +227,7 @@ el merge del #42 hay que remedirlo, no copiarlo.
 
 | Asunto | Qué falta | De quién |
 |---|---|---|
-| **CE5 del Plan 1** | Las **3 capturas** de `/importador` en producción (contador nuevo, filtro por región, ciudad sin historial puntuando > 0). Todo lo automatizable está verde | **Owner** |
+| **CE5 del Plan 1** | ⚠️ **Dos de los tres puntos ya están cubiertos sin querer:** `docs/diseno/antes-2026-09-15/importador-1440.png` (de T4.0) muestra «CIUDADES (1004) — ORDENADAS POR PRIORIDAD» y el desplegable en «Todas (1004)». Falta el tercero: una ciudad sin historial puntuando > 0 y no al final | **Owner**, o una captura más |
 | 🔒 **PII en `sin_clasificar`** | El endpoint publica **8 teléfonos y 1 correo** de clientes contra lo que promete su docstring. Tras token; **no lo introdujo el Plan 1** (el endpoint viejo ya lo hacía). O se sanea la salida conservando el aviso, o se corrige la promesa | **Owner decide**; ver RUNBOOK § «Ciudades sin clasificar» |
 | **El smoke no cubre el importador** | Dio `Todo OK ✅` contra un panel sin desplegar. Añadirle `/api/importador/ciudades` | Tarea pendiente, sin asignar |
 | **El smoke revienta en Windows** | `UnicodeEncodeError` al imprimir el `✅`; **sale con código ≠ 0 aunque los 5 chequeos pasen**. Se sortea con `PYTHONIOENCODING=utf-8` | Tarea pendiente, sin asignar |
@@ -230,6 +296,15 @@ el merge del #42 hay que remedirlo, no copiarlo.
 - **🆕 Un guard por subcadena se engaña con un comentario.** Limpia comentarios antes de buscar.
 - **🆕 Prueba las guardas por mutación.** Planta el defecto y comprueba que falla; si no, su
   verde no vale nada.
+- **🆕 `add_init_script` EJECUTA el string, no lo llama.** Pasarle `() => {...}` define una
+  función y la tira: el `PerformanceObserver` nunca se registra y **LCP y CLS salen 0.0 sin un
+  solo error**. Envuelve en IIFE, y trata un `LCP = 0` como fallo de medición, no como valor.
+- **🆕 Las capturas de producción llevan PII.** El formulario muestra nombre y teléfono de un
+  cliente real, el teléfono dos veces. Anonimiza **en el origen** interceptando el endpoint;
+  difuminar después ya es tarde. Y **abre las capturas antes de commitearlas**.
+- **🆕 El `.gitignore` volvió a morder:** `metricas-base.json` quedaba fuera del repo por la
+  regla global `*.json`, en silencio. Ya tiene excepción. **Cualquier `.json` nuevo que deba
+  versionarse la necesita** — compruébalo con `git check-ignore -v`.
 - **El baseline es por rama:** 388 / 482 / 491 / 525.
 - **`pytest -q` oculta el resultado.** Correr `python -m pytest tests/` a secas.
 - **`.gitignore` ignora `*.json` global** con excepción por ruta exacta para

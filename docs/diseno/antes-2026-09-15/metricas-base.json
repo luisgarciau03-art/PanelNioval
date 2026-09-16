@@ -1,0 +1,52 @@
+{
+  "medido": "2026-09-16",
+  "url": "https://panelnioval.duckdns.org",
+  "commit_desplegado": "8bac782",
+  "corridas_por_punto": 3,
+  "estadistico": "mediana",
+  "nota": "Linea base de CE6 (Plan 4). Medido contra produccion real, no local.",
+  "resultados": {
+    "dashboard-1440": {
+      "lcp": 148,
+      "cls": 0.1924,
+      "fcp": 148,
+      "ttfb": 95.7,
+      "load": 146.3
+    },
+    "formulario-1440": {
+      "lcp": 548,
+      "cls": 0,
+      "fcp": 548,
+      "ttfb": 82,
+      "load": 100.9
+    },
+    "importador-1440": {
+      "lcp": 428,
+      "cls": 0.0289,
+      "fcp": 136,
+      "ttfb": 80.3,
+      "load": 123.2
+    },
+    "dashboard-320": {
+      "lcp": 132,
+      "cls": 0.0952,
+      "fcp": 132,
+      "ttfb": 92.9,
+      "load": 142.3
+    },
+    "formulario-320": {
+      "lcp": 536,
+      "cls": 0,
+      "fcp": 336,
+      "ttfb": 82.2,
+      "load": 103.3
+    },
+    "importador-320": {
+      "lcp": 460,
+      "cls": 0.1073,
+      "fcp": 128,
+      "ttfb": 81,
+      "load": 123.3
+    }
+  }
+}
