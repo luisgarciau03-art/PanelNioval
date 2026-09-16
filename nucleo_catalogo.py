@@ -72,10 +72,10 @@ def normalizar_telefono(tel: str) -> str:
     """Deja solo digitos, antepone la lada de pais y el '+'. '' si no hay digitos.
 
     WhatsApp exige el numero internacional completo: envio_catalogo.py construye
-    la URL como `send?phone={telefono sin '+'}`, asi que un '+6623534185' llega
-    como phone=6623534185 y WhatsApp no puede resolverlo.
+    la URL como `send?phone={telefono sin '+'}`, asi que un '+5551234567' llega
+    como phone=5551234567 y WhatsApp no puede resolverlo.
 
-    'LISTA DE CONTACTOS' guarda el numero nacional de 10 digitos ('662 353 4185'),
+    'LISTA DE CONTACTOS' guarda el numero nacional de 10 digitos ('555 123 4567'),
     asi que sin este paso todo lo que salga de la hoja pierde la lada. Antes no se
     notaba porque el frontend leia una columna inexistente y mandaba vacio: la cola
     lo marcaba NUMERO_INVALIDO y el operador tecleaba el numero completo a mano.
@@ -105,7 +105,7 @@ def formatear_telefono_contactos(tel: str) -> str:
     """Formatea al convenio de 'LISTA DE CONTACTOS': 10 digitos en grupos 3-3-4.
 
     Medido sobre la hoja: 6787 de 7054 telefonos tienen 10 digitos y el formato
-    dominante es 'NNN NNN NNNN'. Escribir '+526623534185' ahi seria legible por
+    dominante es 'NNN NNN NNNN'. Escribir '+525551234567' ahi seria legible por
     maquina pero ajeno al resto de la columna, y el operador compara a ojo.
 
     Los prefijos de pais se retiran porque la hoja guarda el numero nacional:

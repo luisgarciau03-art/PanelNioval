@@ -46,6 +46,20 @@ POTENCIAL_MINIMO_ACEPTABLE = 5
 
 @pytest.fixture(scope="module")
 def html():
+    """El JS del importador, venga de donde venga.
+
+    Hasta el Plan 4 vivia embebido en `app.py` como `IMPORTADOR_HTML`; el PR #43
+    lo saco a `static/js/importador.js`. Estos tests comprueban el PREDICADO del
+    filtro, que es el mismo en las dos estructuras, asi que se busca primero en
+    el archivo extraido y se cae al modulo si todavia no existe.
+
+    Sin esto, el test se rompe al mergear el rediseno **por una mudanza**, no
+    porque el filtro haya dejado de funcionar -- que es justo el falso rojo que
+    hace que alguien acabe borrando un test bueno.
+    """
+    extraido = RAIZ / "static" / "js" / "importador.js"
+    if extraido.exists():
+        return extraido.read_text(encoding="utf-8")
     return app_modulo.IMPORTADOR_HTML
 
 

@@ -4,6 +4,10 @@
 # INEGI, no una credencial. Sin esta excepcion el *.json de arriba lo deja
 # fuera del repo en silencio y el panel arranca sin catalogo en produccion.
 !datos/ciudades_mx.json
+# El ADN de marca del Plan 4 tambien se versiona: son colores, tipografia y
+# ratios de contraste, no una credencial. Misma trampa que el catalogo: sin
+# esta excepcion el *.json de arriba lo deja fuera del repo en silencio.
+!docs/diseno/brand-profile.json
 __pycache__/
 *.pyc
 .env

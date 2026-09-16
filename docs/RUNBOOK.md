@@ -84,7 +84,7 @@ quieres envíos automáticos.
 - **Cierra cualquier Chrome que use ese perfil antes de correr el worker** (el perfil no admite 2 instancias a la vez).
 - Si ves `spinner`/timeout al abrir chats, casi siempre es que **WhatsApp Web no terminó de sincronizar** o **la sesión expiró** (repite el paso 3).
 - El arranque del worker tarda ~1 min en cargar dependencias (imprime `[worker] cargando dependencias...`); es normal, **no lo interrumpas**.
-- **Formato de teléfono México:** `52` + 10 dígitos (ej. `526623534185`).
+- **Formato de teléfono México:** `52` + 10 dígitos (ej. `525551234567`).
 - **`Video1.mp4`** debe existir en `C:\Users\PC 1\Files mensajes` para enviar el video; si falta, el resto de archivos igual se envían.
 
 ## Gate de seguridad de envío (contraseña)

@@ -1,0 +1,243 @@
+/* ============================================================================
+   NIOVAL - Tokens del sistema de diseno
+   Plan 4 - T4.4. Direccion: editorial/Swiss disciplinado (ver
+   docs/adr/2026-08-31-direccion-visual-panel.md).
+
+   Este es el UNICO archivo donde puede aparecer un color literal. El resto del
+   CSS usa var(--...). Lo comprueba tests/test_plan4_tokens.py, que ademas
+   verifica los ratios de contraste declarados aqui: si alguien "ajusta" un
+   color y rompe AA, la suite se pone en rojo en vez de enterarnos en produccion.
+
+   Los ratios estan MEDIDOS con la formula WCAG 2.2, no estimados.
+   ============================================================================ */
+
+:root {
+
+  /* --- Neutros -------------------------------------------------------------
+     Escala slate. Ya existia a medias en el CSS original (#0f172a .. #64748b);
+     aqui se completa. OJO: --gris-400 da 2.56:1 sobre blanco, asi que NUNCA
+     lleva texto. El suelo de texto accesible es --gris-500 (4.76:1). */
+  --gris-900: #0f172a;   /* 17.85:1 sobre blanco */
+  --gris-800: #1e293b;   /* 14.63:1 */
+  --gris-700: #334155;   /* 10.35:1 */
+  --gris-600: #475569;   /*  7.58:1 */
+  --gris-500: #64748b;   /*  4.76:1 <- suelo AA para texto */
+  --gris-400: #94a3b8;   /*  2.56:1 -- NO textual */
+  --gris-300: #cbd5e1;
+  --gris-200: #e2e8f0;
+  --gris-100: #f1f5f9;
+  --gris-50:  #f8fafc;
+  --blanco:   #ffffff;
+
+  /* --- Marca ---------------------------------------------------------------
+     El azul de NIOVAL pasa AA con holgura y se queda tal cual. */
+  --azul:          #0047CC;   /* 7.57:1 sobre blanco; blanco encima 7.57:1 */
+  --azul-oscuro:   #003399;   /* 10.86:1 */
+  --azul-tenue:    #e6f0ff;
+  --azul-tenue-2:  #f0f4ff;
+  --azul-borde:    #c5d8ff;
+  --azul-cian:     #0284c7;   /* solo en degradados de cabecera, decorativo */
+
+  /* --- Color semantico -----------------------------------------------------
+     Cada estado tiene DOS valores y la diferencia importa:
+
+       --x        pasa AA como texto sobre blanco Y con texto blanco encima.
+                  Es el que usan botones, texto de estado y bordes de control.
+       --x-vivo   el color de marca original. FALLA AA. Solo decorativo:
+                  puntos, barras, rellenos SIN texto encima.
+
+     El verde #00CC47 da 2.16:1 y el ratio es simetrico, asi que fallaba en los
+     dos sentidos -- y asi estaba construido el boton "Aprobado" del formulario.
+     Los sustitutos bajan solo la luminosidad en HLS: conservan tono y
+     saturacion, o sea el caracter de la marca. */
+  --exito:        #008930;   /* 4.54:1 en ambos sentidos */
+  --exito-vivo:   #00CC47;   /* 2.16:1 -- NUNCA con texto */
+  --exito-tinte:  #f0fff4;
+  --exito-fuerte: #155724;   /* 8.39:1 sobre --exito-tinte */
+
+  --aviso:        #b56015;   /* 4.52:1 */
+  --aviso-vivo:   #e67e22;   /* 2.85:1 -- NUNCA con texto */
+  --aviso-tinte:  #fff3cd;
+  --aviso-fuerte: #856404;   /* 4.96:1 sobre --aviso-tinte */
+
+  --error:        #e22e1c;   /* 4.52:1 */
+  --error-vivo:   #e74c3c;   /* 3.82:1 -- NUNCA con texto pequeno */
+  --error-tinte:  #f8d7da;
+  --error-fuerte: #721c24;   /* 8.25:1 sobre --error-tinte */
+
+  --marca-unica:  #8e44ad;   /* 5.87:1 -- morado, ya pasaba */
+
+  /* Resultados de llamada. Son los cinco estados que el operador registra, y
+     el color aqui SIGNIFICA, no decora. Cada par (texto sobre su banda) ya
+     pasaba AA en el CSS original y se conserva tal cual; lo unico que cambia
+     es que ahora tiene nombre. */
+  --aprobado-fuerte:  #155724;  --aprobado-banda:  #d4edda;  /* 6.99:1 */
+  --buzon-fuerte:     #856404;  --buzon-banda:     #fff3cd;  /* 4.96:1 */
+  --negado-fuerte:    #721c24;  --negado-banda:    #f8d7da;  /* 8.25:1 */
+  --incompat-fuerte:  #7b3300;  --incompat-banda:  #fde8d8;  /* 7.65:1 */
+  --marca-unica-fuerte: #4a1a6e; --marca-unica-banda: #e8d5f5; /* 9.17:1 */
+
+  /* Consola de log del importador. Se conserva su caracter -verde sobre fondo
+     oscuro- porque es lo mas honesto de esa pantalla. 11.10:1, de sobra. */
+  --consola-fondo: var(--gris-900);
+  --consola-texto: #a8d8a8;
+
+  /* OJO con el fondo. --texto-suave da 4.76:1 sobre blanco pero solo 4.14:1
+     sobre --azul-tenue: sigue fallando. Sobre tintes se usa --gris-600. */
+
+  /* --- Roles ---------------------------------------------------------------
+     Lo que el resto del CSS deberia usar. Un componente pide "texto suave",
+     no "gris 500". */
+  --texto-fuerte:  var(--gris-900);
+  --texto:         var(--gris-700);
+  --texto-suave:   var(--gris-500);   /* el mas claro que aun pasa AA */
+  --texto-inverso: var(--blanco);
+  --texto-enlace:  var(--azul);
+
+  --superficie:    var(--blanco);
+  --superficie-2:  var(--gris-50);
+  --fondo:         var(--gris-100);
+
+  --borde:         var(--gris-200);   /* separadores decorativos */
+  --borde-fuerte:  var(--gris-300);
+  /* Borde de un control (input, select): WCAG 1.4.11 pide 3:1 contra el fondo
+     adyacente porque delimita el campo. El #ccd anterior daba 1.4:1. */
+  --borde-control: #8896aa;           /* 3.00:1 sobre blanco */
+
+  /* Anillo de foco de DOS tonos. Un solo color no sirve: --azul da 7.57:1
+     sobre blanco pero 1.43:1 sobre el azul oscuro de la barra lateral y
+     2.36:1 sobre la consola, o sea invisible justo donde mas falta hace.
+     Con dos anillos concentricos basta con que uno pase 3:1 en cada fondo, y
+     este par pasa en los ocho fondos del sistema (blanco, gris-100, azul,
+     azul-oscuro, azul-cian, consola, exito y error). */
+  --foco-oscuro:   var(--gris-900);
+  --foco-claro:    var(--blanco);
+  --foco:          var(--foco-oscuro);   /* alias del anillo exterior */
+
+  /* --- Tipografia ----------------------------------------------------------
+     Decision del ADR: pila de sistema, sin fuente web. Es un panel interno que
+     se usa a jornada completa; los bytes se gastan mejor no gastandolos en la
+     pantalla donde manda la velocidad de captura.
+     Lo que SI es decision tipografica: cifras tabulares, pila mono declarada y
+     una escala con saltos de verdad. */
+  --fuente: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+            Arial, sans-serif;
+  --fuente-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas,
+                 "Liberation Mono", Menlo, monospace;
+
+  /* Escala con saltos reales. Tres tamanos casi iguales no son jerarquia. */
+  --texto-xs:   0.75rem;    /* 12px - etiquetas, metadatos */
+  --texto-sm:   0.875rem;   /* 14px - texto secundario */
+  --texto-base: 1rem;       /* 16px - cuerpo */
+  --texto-lg:   1.25rem;    /* 20px - subtitulos */
+  --texto-xl:   1.75rem;    /* 28px - titulos de seccion */
+  --texto-2xl:  2.5rem;     /* 40px - cifras destacadas */
+  --texto-3xl:  3.5rem;     /* 56px - el numero que manda */
+
+  --peso-normal: 400;
+  --peso-medio:  600;
+  --peso-fuerte: 700;
+
+  --linea-apretada: 1.2;
+  --linea-normal:   1.5;
+  --linea-suelta:   1.7;
+
+  --track-etiqueta: 0.06em;  /* las etiquetas en mayusculas necesitan aire */
+
+  /* --- Espaciado -----------------------------------------------------------
+     Base de 4px. Ritmo intencional: no el mismo padding en todo. */
+  --esp-1: 4px;
+  --esp-2: 8px;
+  --esp-3: 12px;
+  --esp-4: 16px;
+  --esp-5: 24px;
+  --esp-6: 32px;
+  --esp-7: 48px;
+  --esp-8: 64px;
+
+  /* --- Radios --------------------------------------------------------------
+     Escala, no un radio uniforme en todo: el radio uniforme es una de las
+     senales de plantilla que las reglas del entorno prohiben. */
+  --radio-sm: 4px;
+  --radio-md: 8px;
+  --radio-lg: 14px;
+  --radio-completo: 999px;
+
+  /* --- Elevacion -----------------------------------------------------------
+     Tres niveles y contenidos. La direccion elegida NO es "profundidad real":
+     las sombras en capas son justo donde nacen los repaints, y CE4 pide
+     CLS < 0.1 como gate duro. */
+  --sombra-1: 0 1px 2px rgba(15, 23, 42, .06);
+  --sombra-2: 0 2px 8px rgba(15, 23, 42, .08);
+  --sombra-3: 0 8px 24px rgba(15, 23, 42, .12);
+
+  /* --- Movimiento ----------------------------------------------------------
+     Los tokens viven aqui; la T4.6 los aplica. Solo propiedades del
+     compositor: transform, opacity, filter. Nunca width/height/top/left. */
+  --dur-rapida: 120ms;
+  --dur-normal: 200ms;
+  --dur-lenta:  320ms;
+  --curva-salida:   cubic-bezier(.16, 1, .3, 1);
+  --curva-estandar: cubic-bezier(.4, 0, .2, 1);
+
+  /* Estas DOS las escribe el JavaScript en el elemento, no se leen de aqui:
+     el valor de arriba es el estado de reposo. Se declaran igualmente porque
+     un `var(--nombre)` sin definicion no falla en ninguna parte —el navegador
+     se queda sin valor y el elemento hereda o queda transparente, en silencio—
+     y el guarda de tokens fantasma de tests/test_plan4_tokens.py las quiere
+     declaradas. */
+  --avance: 0;             /* barra de progreso: 0 a 1, via scaleX */
+  --retardo-fila: 0ms;     /* entrada escalonada de filas de tabla */
+
+  /* --- Paleta de datos (T4.7) -------------------------------------------
+     Los 31 colores literales que quedaban del CE3 vivian todos en
+     `dashboard.js`, y eran estas dos paletas. Se declaran aqui y el JS las
+     lee con `getComputedStyle`: una grafica necesita una cadena de color, no
+     puede consumir `var()`.
+
+     Serie de la grafica de resultados. NO es una paleta posicional: cada
+     entrada corresponde a un resultado de llamada concreto, porque el color
+     SIGNIFICA algo (regla de color semantico del ADR). Antes el color salia
+     del ORDEN en que la hoja devolvia las claves, asi que bastaba con que
+     Google las reordenara para pintar "APROBADO" de rojo. */
+  --dato-aprobado:      var(--exito-vivo);
+  --dato-negado:        var(--error-vivo);
+  --dato-no-compatible: var(--aviso-vivo);
+  --dato-marca-unica:   var(--marca-unica);
+  --dato-buzon:         #d4a017;   /* 3.05:1 sobre blanco - relleno, sin texto */
+  --dato-tel-incorrecto: var(--gris-500);
+  --dato-otro:          var(--gris-400);
+  --dato-serie:         var(--azul);
+  --dato-serie-tinte:   rgba(0, 71, 204, .10);
+  --dato-destacado:     var(--exito-vivo);
+  --dato-rejilla:       var(--gris-200);   /* lineas de eje */
+
+  /* Color de fila del operador, en Seguimiento. Es una marca que el propio
+     operador elige y guarda en localStorage; el trio es punto + fondo de fila
+     + franja izquierda. Los fondos son tintes muy claros a proposito: encima
+     va texto que tiene que seguir pasando AA. */
+  --fila-ambar:   #f59e0b;  --fila-ambar-fondo:   #fffbeb;
+  --fila-rojo:    #ef4444;  --fila-rojo-fondo:    #fef2f2;
+  --fila-verde:   #22c55e;  --fila-verde-fondo:   #f0fdf4;
+  --fila-azul:    #3b82f6;  --fila-azul-fondo:    #eff6ff;
+  --fila-naranja: #f97316;  --fila-naranja-fondo: #fff7ed;
+  --fila-morado:  #a855f7;  --fila-morado-fondo:  #faf5ff;
+  --fila-ninguno: var(--gris-300);
+}
+
+/* Accesibilidad, no preferencia. Con la opcion del sistema activada no se
+   mueve nada que no sea esencial. Los tokens se ponen a cero para que valga
+   incluso donde alguien use la duracion sin acordarse de esta regla. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-rapida: 1ms;
+    --dur-normal: 1ms;
+    --dur-lenta:  1ms;
+  }
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

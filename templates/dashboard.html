@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Panel NIOVAL</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/componentes.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+
+<a class="saltar-al-contenido" href="#content">Saltar al contenido</a>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="logo">
+    <img src="https://res.cloudinary.com/dipt3jq6r/image/upload/f_auto,q_auto,w_96,h_96,c_fit/v1764307686/NIOVAL-05_xhfrrh.jpg" alt="NIOVAL" width="48" height="48" onerror="this.style.display='none'">
+    <h2>NIOVAL</h2>
+    <p>Panel de Gestión</p>
+  </div>
+
+  <nav aria-label="Secciones del panel">
+    <div class="nav-group">
+      <div class="nav-label">Ventas</div>
+      <button type="button" class="nav-item" data-seccion="frecuentes">
+        <span class="icon" aria-hidden="true">⭐</span> Clientes Frecuentes
+      </button>
+      <button type="button" class="nav-item" data-seccion="ventas-dash">
+        <span class="icon" aria-hidden="true">📈</span> Dashboard Ventas
+      </button>
+      <button type="button" class="nav-item" data-seccion="ventas">
+        <span class="icon" aria-hidden="true">💰</span> Ventas
+      </button>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Clientes Prospectos</div>
+      <button type="button" class="nav-item active" data-seccion="dashboard" aria-current="page">
+        <span class="icon" aria-hidden="true">📊</span> Dashboard
+      </button>
+      <button type="button" class="nav-item" data-seccion="contactos">
+        <span class="icon" aria-hidden="true">📋</span> Lista de Contactos
+      </button>
+      <button type="button" class="nav-item" data-seccion="pendientes">
+        <span class="icon" aria-hidden="true">📞</span> Por Llamar
+      </button>
+      <button type="button" class="nav-item" data-seccion="ciudades">
+        <span class="icon" aria-hidden="true">🗺️</span> Ciudades por Interés
+      </button>
+      <button type="button" class="nav-item" data-seccion="respuestas">
+        <span class="icon" aria-hidden="true">📝</span> Respuestas
+      </button>
+      <button type="button" class="nav-item" data-seccion="mensajes">
+        <span class="icon" aria-hidden="true">💬</span> Mensajes
+      </button>
+      <button type="button" class="nav-item" data-seccion="catalogo">
+        <span class="icon" aria-hidden="true">📖</span> Envíos Catálogo
+        <span class="nav-item__insignia" id="cat-badge" aria-hidden="true" hidden></span>
+      </button>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Seguimiento</div>
+      <button type="button" class="nav-item" data-seccion="seguimiento">
+        <span class="icon" aria-hidden="true">🔄</span> Seguimiento
+      </button>
+      <button type="button" class="nav-item" data-seccion="bruce">
+        <span class="icon" aria-hidden="true">🤖</span> Prospectos Bruce
+      </button>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Herramientas</div>
+      <a class="nav-item nav-item--herramienta" href="/formulario"
+         target="_blank" rel="noopener">
+        <span class="icon" aria-hidden="true">📞</span> Iniciar Llamadas
+        <span class="solo-lectores">(se abre en una pestaña nueva)</span>
+      </a>
+      <a class="nav-item nav-item--herramienta" href="/importador"
+         target="_blank" rel="noopener">
+        <span class="icon" aria-hidden="true">📥</span> Importar Contactos
+        <span class="solo-lectores">(se abre en una pestaña nueva)</span>
+      </a>
+    </div>
+  </nav>
+  <div class="solo-lectores" role="status" id="anuncios-menu"></div>
+</aside>
+
+<!-- MAIN -->
+<main id="main">
+  <div id="topbar">
+    <h1 id="topbar-title">📊 Dashboard Prospectos</h1>
+    <div class="actions">
+      <span class="badge-cache" id="cache-badge">—<span class="solo-lectores" id="cache-badge-detalle"></span></span>
+      <button class="btn-refresh" onclick="refreshData()">↻ Actualizar</button>
+    </div>
+  </div>
+
+  <div id="content" tabindex="-1">
+
+    <!-- ═══ DASHBOARD ═══ -->
+    <div class="section active" id="sec-dashboard">
+      <div id="dash-cards">
+        <div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div>
+        <div class="cards cards--principal" aria-hidden="true">
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        </div>
+        <div class="cards cards--desglose" aria-hidden="true">
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+          <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        </div>
+      </div>
+      <div id="dash-charts-aviso"></div>
+      <div class="charts" id="dash-charts">
+        <div class="chart-box">
+          <h2>📈 Resultados de Llamadas</h2>
+          <div class="chart-lienzo"><canvas id="chartResultados" role="img" aria-label="Gráfica de resultados de llamadas"></canvas></div>
+        </div>
+        <div class="chart-box">
+          <h2>📅 Contactos por Semana</h2>
+          <div class="chart-lienzo"><canvas id="chartSemanas" role="img" aria-label="Gráfica de contactos por semana"></canvas></div>
+        </div>
+        <div class="chart-box full">
+          <h2>🏙️ Top Ciudades en Lista</h2>
+          <div class="chart-lienzo"><canvas id="chartCiudades" role="img" aria-label="Gráfica de las ciudades con más contactos en lista"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ FRECUENTES ═══ -->
+    <div class="section" id="sec-frecuentes">
+      <div class="cards" id="frec-cards">
+        <div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+      </div>
+      <div class="table-box">
+        <h2>⭐ Clientes Frecuentes — Orden de Ingreso</h2>
+        <div class="table-controls">
+          <input type="text" id="frecuentes-search" aria-label="Buscar en clientes frecuentes" placeholder="🔍 Buscar..." oninput="filterTable('frecuentes')">
+        </div>
+        <div class="tbl-wrap" id="frec-top-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
+        <div class="pagination" id="frec-pag"></div>
+      </div>
+    </div>
+
+    <!-- ═══ DASHBOARD VENTAS ═══ -->
+    <div class="section" id="sec-ventas-dash">
+      <div class="cards" id="vdash-cards">
+        <div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+      </div>
+      <div id="vdash-charts-aviso"></div>
+      <div class="charts" id="vdash-charts">
+        <div class="chart-box full">
+          <h2>💰 Facturación Mensual</h2>
+          <div class="chart-lienzo"><canvas id="chartVentasMonto" role="img" aria-label="Gráfica de facturación mensual"></canvas></div>
+        </div>
+        <div class="chart-box">
+          <h2>📦 Pedidos por Mes</h2>
+          <div class="chart-lienzo"><canvas id="chartVentasPedidos" role="img" aria-label="Gráfica de pedidos por mes"></canvas></div>
+        </div>
+        <div class="chart-box">
+          <h2>🎯 Ticket Promedio por Mes</h2>
+          <div class="chart-lienzo"><canvas id="chartVentasTicket" role="img" aria-label="Gráfica de ticket promedio por mes"></canvas></div>
+        </div>
+      </div>
+      <div class="table-box">
+        <h2>📅 Desglose por Mes</h2>
+        <div class="tbl-wrap" id="vdash-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ═══ VENTAS ═══ -->
+    <div class="section" id="sec-ventas">
+      <div class="table-box">
+        <h2>💰 Ventas — Orden de Ingreso</h2>
+        <div class="table-controls">
+          <input type="text" id="ventas-search" aria-label="Buscar en ventas" placeholder="🔍 Buscar..." oninput="filterTable('ventas')">
+          <span id="ventas-count" style="font-size:.8em;color:var(--texto-suave);align-self:center;margin-left:4px"></span>
+        </div>
+        <div class="tbl-wrap" id="ventas-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
+        <div class="pagination" id="ventas-pag"></div>
+      </div>
+    </div>
+
+    <!-- ═══ CONTACTOS ═══ -->
+    <div class="section" id="sec-contactos">
+      <div class="table-box">
+        <h2>📋 Lista de Contactos</h2>
+        <div class="table-controls">
+          <input type="text" id="contactos-search" aria-label="Buscar en la lista de contactos" placeholder="🔍 Buscar..." oninput="filterTable('contactos')">
+          <select id="contactos-ciudad" aria-label="Filtrar contactos por ciudad" onchange="filterTable('contactos')">
+            <option value="">Todas las ciudades</option>
+          </select>
+          <select id="contactos-cat" aria-label="Filtrar contactos por categoría" onchange="filterTable('contactos')">
+            <option value="">Todas las categorías</option>
+          </select>
+        </div>
+        <div class="tbl-wrap" id="contactos-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
+        <div class="pagination" id="contactos-pag"></div>
+      </div>
+    </div>
+
+    <!-- ═══ POR LLAMAR ═══ -->
+    <div class="section" id="sec-pendientes">
+      <div class="cards" id="pend-cards">
+        <div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+      </div>
+      <div class="table-box">
+        <h2>📞 Contactos Sin Respuesta — Por Llamar</h2>
+        <div class="table-controls">
+          <input type="text" id="pendientes-search" aria-label="Buscar en contactos por llamar" placeholder="🔍 Buscar..." oninput="filterTable('pendientes')">
+          <select id="pendientes-ciudad" aria-label="Filtrar contactos por llamar por ciudad" onchange="filterTable('pendientes')">
+            <option value="">Todas las ciudades</option>
+          </select>
+        </div>
+        <div class="tbl-wrap" id="pendientes-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
+        <div class="pagination" id="pendientes-pag"></div>
+      </div>
+    </div>
+
+    <!-- ═══ CIUDADES ═══ -->
+    <div class="section" id="sec-ciudades">
+      <div class="table-box">
+        <h2>🗺️ Ciudades Ordenadas por Interés</h2>
+        <div class="table-controls">
+          <input type="text" id="ciudades-search" aria-label="Buscar ciudad" placeholder="🔍 Buscar ciudad..." oninput="filterCiudades()">
+        </div>
+        <div class="tbl-wrap" id="ciudades-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ═══ RESPUESTAS ═══ -->
+    <div class="section" id="sec-respuestas">
+      <div class="table-box">
+        <h2>📝 Respuestas — Conclusión Final</h2>
+        <div class="table-controls">
+          <input type="text" id="resp-search" aria-label="Buscar en respuestas" placeholder="🔍 Buscar..." oninput="filterTable('respuestas')">
+          <select id="resp-conclusion" aria-label="Filtrar respuestas por conclusión" onchange="filterTable('respuestas')">
+            <option value="">Todas las conclusiones</option>
+          </select>
+        </div>
+        <div class="tbl-wrap" id="respuestas-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
+        <div class="pagination" id="respuestas-pag"></div>
+      </div>
+    </div>
+
+    <!-- ═══ MENSAJES ═══ -->
+    <div class="section" id="sec-mensajes">
+      <div class="table-box">
+        <h2>💬 Mensajes Iniciales</h2>
+        <div class="table-controls">
+          <input type="text" id="mensajes-search" aria-label="Buscar mensaje" placeholder="🔍 Buscar mensaje..." oninput="filterMensajes(this.value)">
+        </div>
+        <div class="tbl-wrap" id="mensajes-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
+        <div class="pagination" id="mensajes-pag"></div>
+      </div>
+    </div>
+
+    <!-- ═══ ENVÍOS DE CATÁLOGO (números a corregir) ═══ -->
+    <div class="section" id="sec-catalogo">
+      <div class="table-box">
+        <h2>📖 Envíos de Catálogo — números a corregir</h2>
+        <p style="color:var(--texto-suave);font-size:.85em;margin:4px 0 10px">Cuando el envío falla por número inválido/erróneo, aquí lo corriges: se actualiza el teléfono en <b>LISTA DE CONTACTOS</b> y se reintenta.</p>
+        <div class="table-controls">
+          <select id="cat-filtro" aria-label="Filtrar envíos de catálogo por estado" onchange="loadCatalogo()" style="padding:6px 10px;border:1px solid var(--borde-control);border-radius:8px;font-size:.85em">
+            <option value="problema">⚠️ Con problema (corregir número)</option>
+            <option value="">Todos</option>
+            <option value="PENDIENTE">Pendientes</option>
+            <option value="ENVIADO">Enviados</option>
+          </select>
+          <button class="btn-refresh" onclick="loadCatalogo()">↻ Actualizar</button>
+        </div>
+        <div class="tbl-wrap" id="catalogo-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Modal corrección de número (dashboard) -->
+    <div id="modal-corregir-cat" role="dialog" aria-modal="true" aria-label="Corregir número" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center;padding:16px">
+      <div style="background:var(--superficie);border-radius:16px;max-width:440px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+        <h2 style="margin-bottom:6px">✏️ Corregir número</h2>
+        <p style="font-size:.88em;color:var(--texto-suave);margin-bottom:12px">Tienda: <b id="cat-corr-tienda"></b></p>
+        <input id="cat-corr-input" aria-label="Número de teléfono corregido" type="tel" inputmode="numeric" placeholder="52 + 10 dígitos (ej. 525555555555)" <!-- barrido-ok: ejemplo sintetico de formato, todo cincos, no es de nadie -->
+               style="width:100%;padding:11px;border:1px solid var(--borde-control);border-radius:8px;font-size:1em" oninput="catValidarCorregir()">
+        <p id="cat-corr-error" style="color:var(--error);font-size:.82em;min-height:16px;margin:4px 0"></p>
+        <button id="cat-corr-btn" class="btn-refresh" style="width:100%;background:var(--exito);border-color:var(--exito-vivo);color:var(--texto-inverso);padding:10px" disabled onclick="catGuardarCorreccion()">Guardar y reintentar</button>
+        <button class="btn-refresh" style="width:100%;margin-top:8px" onclick="catCerrarModal()" data-cerrar>Cancelar</button>
+      </div>
+    </div>
+
+    <!-- ═══ SEGUIMIENTO ═══ -->
+    <div class="section" id="sec-seguimiento">
+      <div class="cards" id="seg-cards">
+        <div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+        <div class="esqueleto-tarjeta" aria-hidden="true"><div class="esqueleto esqueleto--texto esqueleto--corto"></div><div class="esqueleto esqueleto--num"></div></div>
+      </div>
+      <div class="seg-tabs" id="seg-tabs"></div>
+      <div class="table-box">
+        <h2 id="seg-tab-title">🔄 Seguimiento</h2>
+        <div class="table-controls">
+          <input type="text" id="seg-search" aria-label="Buscar en seguimiento" placeholder="🔍 Buscar en este panel..." oninput="filterSegTab()">
+        </div>
+        <div class="tbl-wrap" id="seguimiento-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
+        <div class="pagination" id="seguimiento-pag"></div>
+      </div>
+    </div>
+
+    <!-- ═══ PROSPECTOS BRUCE ═══ -->
+    <div class="section" id="sec-bruce">
+      <div class="table-box">
+        <h2>🤖 Prospectos Bruce — Agregar Nuevo</h2>
+        <div class="bruce-form" id="bruce-form">
+          <div>
+            <label>Nombre *</label>
+            <input id="bf-nombre" aria-label="Nombre del prospecto" placeholder="Nombre de la tienda o contacto">
+          </div>
+          <div>
+            <label>Número de Teléfono</label>
+            <input id="bf-tel" aria-label="Teléfono del prospecto" placeholder="10 dígitos" type="tel">
+          </div>
+          <div>
+            <label>Tipo de Interés</label>
+            <input id="bf-tipo" aria-label="Tipo de interés" placeholder="Ej: Abarrotes, Ferretería..." list="bruce-tipos-list">
+            <datalist id="bruce-tipos-list">
+              <option value="Abarrotes">
+              <option value="Ferretería">
+              <option value="Farmacia">
+              <option value="Papelería">
+              <option value="Ropa">
+              <option value="Electrónica">
+              <option value="Otro">
+            </datalist>
+          </div>
+          <div>
+            <label>Fecha</label>
+            <input id="bf-fecha" aria-label="Fecha de contacto" disabled style="background:var(--gris-200);color:var(--texto-suave)">
+          </div>
+          <div class="full">
+            <label>NOTA</label>
+            <textarea id="bf-nota" aria-label="Nota del prospecto" placeholder="Observaciones, contexto, seguimiento..."></textarea>
+          </div>
+          <div class="full" style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn btn-blue" onclick="agregarBruce()" style="max-width:200px">➕ Agregar Prospecto</button>
+          </div>
+        </div>
+      </div>
+      <div class="table-box">
+        <h2>📋 Lista de Prospectos</h2>
+        <div class="table-controls">
+          <input type="text" id="bruce-search" aria-label="Buscar en prospectos de Bruce" placeholder="🔍 Buscar..." oninput="filterBruce(this.value)">
+        </div>
+        <div class="tbl-wrap" id="bruce-table"><div class="solo-lectores" role="status" data-aviso-carga="Cargando datos..."></div><div class="esqueleto-tabla" aria-hidden="true"><div class="esqueleto-tabla__cabecera esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div><div class="esqueleto-tabla__fila esqueleto"></div></div></div>
+        <div class="pagination" id="bruce-pag"></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main><!-- /main -->
+
+<!-- ═══ MODAL EDICIÓN ═══ -->
+<div id="edit-seg-modal" role="dialog" aria-modal="true" aria-label="Editar registro" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.65);backdrop-filter:blur(5px);z-index:9999;overflow-y:auto;padding:20px">
+  <div style="background:var(--superficie);border-radius:22px;max-width:740px;margin:24px auto;position:relative;box-shadow:0 30px 90px rgba(0,0,0,.4);overflow:hidden">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,var(--azul-oscuro) 0%,var(--azul) 100%);padding:22px 28px 18px;position:relative">
+      <button onclick="closeEditSeg()" data-cerrar style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.18);border:none;border-radius:50%;width:34px;height:34px;color:var(--texto-inverso);font-size:1.15em;cursor:pointer;line-height:34px;text-align:center;transition:background-color var(--dur-rapida) var(--curva-estandar)" onmouseover="this.style.background='rgba(255,255,255,.32)'" onmouseout="this.style.background='rgba(255,255,255,.18)'">✕</button>
+      <div id="edit-modal-title" style="color:var(--texto-inverso);font-size:1.05em;font-weight:800;letter-spacing:.3px">✏️ Editar Registro</div>
+      <div id="edit-modal-subtitle" style="color:rgba(255,255,255,.65);font-size:.78em;margin-top:5px;max-width:560px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+    </div>
+    <!-- Color selector (solo Seguimiento) -->
+    <div id="edit-color-section" style="padding:14px 28px;border-bottom:1px solid var(--borde);display:flex;align-items:center;gap:14px">
+      <span style="font-size:.68em;font-weight:700;color:var(--gris-500);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Estado visual</span>
+      <div id="edit-color-picker"></div>
+      <span id="edit-color-label" style="font-size:.78em;color:var(--gris-600);font-style:italic"></span>
+    </div>
+    <!-- Fields -->
+    <div style="padding:22px 28px 10px">
+      <div id="edit-seg-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:15px 18px"></div>
+    </div>
+    <!-- Footer -->
+    <div style="padding:16px 28px 20px;display:flex;gap:10px;justify-content:flex-end;background:var(--gris-50);border-top:1px solid var(--borde);margin-top:10px">
+      <button onclick="closeEditSeg()" style="padding:10px 26px;border-radius:10px;border:1.5px solid var(--borde-control);background:var(--superficie);cursor:pointer;font-weight:600;color:var(--gris-600);font-size:.9em;transition:background-color var(--dur-rapida) var(--curva-estandar),color var(--dur-rapida) var(--curva-estandar)" onmouseover="this.style.background='var(--gris-100)'" onmouseout="this.style.background='var(--superficie)'">Cancelar</button>
+      <button id="edit-seg-save" onclick="saveEdit()" style="padding:10px 26px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--azul-oscuro),var(--azul));color:var(--texto-inverso);cursor:pointer;font-weight:700;font-size:.9em;box-shadow:0 4px 14px rgba(0,71,204,.35);transition:box-shadow var(--dur-rapida) var(--curva-estandar),transform var(--dur-rapida) var(--curva-estandar)">💾 Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js auto-hospedado (T4.10). Estaba en <head> y venia de jsdelivr:
+     bloqueaba el render hasta que el CDN respondiera -medido: 15 s- y no llevaba
+     `integrity`, asi que ni siquiera se podia comprobar que llegaba lo esperado.
+     Servido desde `static/` deja de ser un tercero: mismo origen, sin bloquear el
+     analisis del documento, y verificable por hash en el repo.
+     Version 4.4.0, sha256 0e2326c6868072bec1592760c6729043caeea2960a2b46cee6a2192aac6abff0.
+     Va ANTES de dashboard.js y sin `defer` a proposito: dashboard.js no lo
+     difiere, y un script diferido correria DESPUES, dejando `Chart` sin definir
+     justo cuando el tablero lo consulta. -->
+<script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dialogo.js') }}"></script>
+<script src="{{ url_for('static', filename='js/estados.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+
+<!-- MODAL UPLOAD COMPROBANTE -->
+<div id="modal-upload" role="dialog" aria-modal="true" aria-label="Subir comprobante de pago" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--superficie);border-radius:18px;padding:32px;width:420px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="color:var(--blue);font-size:1.1em;font-weight:700">📎 Subir Comprobante de Pago</h2>
+      <button onclick="cerrarUpload()" data-cerrar aria-label="Cerrar" style="background:none;border:none;font-size:1.4em;cursor:pointer;color:var(--texto-suave);min-width:24px;min-height:24px">✕</button>
+    </div>
+    <div style="background:var(--blue3);border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:.85em;color:var(--blue)">
+      Factura: <strong id="upload-factura-display"></strong>
+    </div>
+    <input type="hidden" id="upload-factura">
+    <label style="display:block;border:2px dashed var(--borde-control);border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:border-color var(--dur-rapida) var(--curva-estandar)"
+           onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--borde-control)'">
+      <div style="font-size:2em;margin-bottom:8px">🖼️</div>
+      <div style="font-size:.9em;color:var(--texto-suave);margin-bottom:6px">Arrastra o haz clic para seleccionar</div>
+      <div style="font-size:.75em;color:var(--texto-suave)">JPG, PNG, JPEG, WEBP</div>
+      <input type="file" id="upload-file" accept="image/*" style="display:none" onchange="previewImagen(this)">
+    </label>
+    <div id="upload-preview" style="text-align:center"></div>
+    <div id="upload-status" style="text-align:center;margin-top:10px;font-size:.85em;min-height:20px"></div>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button onclick="cerrarUpload()" style="flex:1;padding:11px;border:1px solid var(--borde);border-radius:10px;background:var(--superficie);cursor:pointer;font-weight:600;color:var(--texto-suave)">Cancelar</button>
+      <button id="btn-subir" onclick="subirComprobante()" style="flex:2;padding:11px;border:none;border-radius:10px;background:var(--blue);color:var(--texto-inverso);cursor:pointer;font-weight:700;font-size:.95em">⬆️ Subir Comprobante</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VER IMAGEN -->
+<div id="modal-imagen" role="dialog" aria-modal="true" aria-label="Comprobante ampliado" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:14px" onclick="cerrarImagen()">
+  <img id="img-full" src="" alt="Comprobante ampliado" style="max-width:90vw;max-height:80vh;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.5)" onclick="event.stopPropagation()">
+  <div style="display:flex;gap:14px">
+    <a id="img-link" href="#" target="_blank" onclick="event.stopPropagation()" style="background:var(--superficie);color:var(--blue);padding:8px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.9em">Abrir en Drive →</a>
+    <button onclick="cerrarImagen()" data-cerrar style="background:rgba(255,255,255,.15);border:none;color:var(--texto-inverso);padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.9em">✕ Cerrar</button>
+  </div>
+</div>
+
+</body>
+</html>

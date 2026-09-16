@@ -1,0 +1,105 @@
+{
+  "marca": "NIOVAL",
+  "producto": "Panel de gestion interno (ventas, prospectos, encuesta de llamadas, importador)",
+  "generado": "2026-08-31",
+  "plan": "Plan 4 - T4.1",
+  "fuente": "Extraido del CSS embebido en app.py y del logo en Cloudinary. Los ratios de contraste estan MEDIDOS con la formula WCAG 2.2 (relative luminance), no estimados.",
+  "audiencia": "Operadores internos de NIOVAL. Uso intensivo por horas, no visitantes casuales.",
+
+  "paleta": {
+    "azul_primario": {
+      "token": "--blue",
+      "hex": "#0047CC",
+      "usos": "cabeceras, botones primarios, enlaces, barra lateral",
+      "contraste_sobre_blanco": 7.57,
+      "aa_texto": true,
+      "aa_texto_grande": true,
+      "literales_sin_token_en_app_py": 17
+    },
+    "azul_profundo": {
+      "token": "--blue2",
+      "hex": "#003399",
+      "usos": "degradado de fondo, estados hover",
+      "contraste_sobre_blanco": 10.86,
+      "aa_texto": true,
+      "aa_texto_grande": true
+    },
+    "verde": {
+      "token": "--green",
+      "hex": "#00CC47",
+      "usos": "aprobado, exito, chips de prioridad",
+      "contraste_sobre_blanco": 2.16,
+      "aa_texto": false,
+      "aa_texto_grande": false,
+      "veredicto": "FALLA en ambos niveles y en ambos sentidos (el ratio es simetrico: texto blanco sobre relleno verde falla igual). Hoy se usa como fondo de boton con texto blanco.",
+      "sustituto_para_texto": "#008930",
+      "contraste_del_sustituto": 4.54,
+      "nota": "El sustituto conserva tono y saturacion en HLS: solo baja luminosidad. El #00CC47 original se conserva para rellenos y elementos NO textuales."
+    },
+    "naranja": {
+      "token": "--orange",
+      "hex": "#e67e22",
+      "usos": "no compatible, avisos, buzon",
+      "contraste_sobre_blanco": 2.85,
+      "aa_texto": false,
+      "aa_texto_grande": false,
+      "sustituto_para_texto": "#b56015",
+      "contraste_del_sustituto": 4.52
+    },
+    "rojo": {
+      "token": "--red",
+      "hex": "#e74c3c",
+      "usos": "negado, error",
+      "contraste_sobre_blanco": 3.82,
+      "aa_texto": false,
+      "aa_texto_grande": true,
+      "sustituto_para_texto": "#e22e1c",
+      "contraste_del_sustituto": 4.52
+    },
+    "morado": {
+      "token": "--purple",
+      "hex": "#8e44ad",
+      "usos": "marca unica / competencia",
+      "contraste_sobre_blanco": 5.87,
+      "aa_texto": true,
+      "aa_texto_grande": true,
+      "nota": "Declarado solo en el dashboard; el formulario lo usa como literal."
+    },
+    "grises_en_uso": [
+      { "hex": "#888888", "apariciones": 17, "contraste": 3.54, "aa_texto": false, "sustituto": "#767676" },
+      { "hex": "#aaaaaa", "apariciones": 9,  "contraste": 2.32, "aa_texto": false, "sustituto": "#767676" },
+      { "hex": "#777777", "apariciones": 4,  "contraste": 4.48, "aa_texto": false, "sustituto": "#767676" },
+      { "hex": "#7f8c8d", "apariciones": 8,  "contraste": 3.48, "aa_texto": false, "sustituto": "#5f6b6c" },
+      { "hex": "#64748b", "apariciones": 3,  "contraste": 4.76, "aa_texto": true,  "sustituto": null }
+    ]
+  },
+
+  "tipografia": {
+    "actual": "'Segoe UI', sans-serif",
+    "declarada_en": 3,
+    "veredicto": "Pila por defecto de Windows. Esta por omision, no por decision (T4.2 debe decidirlo explicitamente).",
+    "monospace": "monospace (sin pila concreta), usado en la consola de log del importador"
+  },
+
+  "logo": {
+    "origen": "Cloudinary (host externo)",
+    "apariciones_en_app_py": 3,
+    "problemas": [
+      "sin atributos width/height en las tres: provoca salto de layout (CLS)",
+      "2 de 3 sin atributo alt",
+      "las tres con onerror que lo oculta: si Cloudinary cae, la marca desaparece sin sustituto"
+    ]
+  },
+
+  "tono": {
+    "voz": "Directa y operativa, en espanol de Mexico. Etiquetas cortas en mayusculas ('TOTAL CONTACTOS', 'CATEGORIAS A BUSCAR').",
+    "emoji": "Uso intensivo de emoji como iconografia en navegacion, botones y titulos.",
+    "riesgo": "El emoji hace de icono sin equivalente textual, y los lectores de pantalla lo leen literal ('grafico de barras Dashboard Prospectos'). T4.10 debe decidir si se sustituyen por SVG con etiqueta."
+  },
+
+  "cualidades_de_diseno_actuales": {
+    "referencia": "Las 10 cualidades exigidas por las reglas globales del entorno (design-quality).",
+    "cumplidas_hoy": 0,
+    "detalle": "Tarjeta blanca centrada sobre degradado azul, radio uniforme, una sola sombra, tarjetas de KPI todas del mismo peso, sin jerarquia de escala, sin profundidad intencional, sin movimiento que aclare. Es el patron de plantilla que las reglas prohiben de forma explicita."
+  }
+}

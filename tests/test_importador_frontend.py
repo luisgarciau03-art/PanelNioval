@@ -3,8 +3,9 @@
 Defectos B7, B8, B9, mas la mitad de cliente de B10 y los B12/B13 que encontro
 el recorrido de rutas de clic.
 
-El JS vive embebido en `IMPORTADOR_HTML` dentro de app.py y el proyecto no tiene
-infraestructura de pruebas de navegador, asi que lo que se puede afirmar desde
+El JS vive en `static/js/importador.js` (antes del Plan 4 estaba embebido en
+`IMPORTADOR_HTML`, dentro de app.py) y el proyecto no tiene infraestructura de
+pruebas de navegador, asi que lo que se puede afirmar desde
 aqui son dos cosas distintas y las dos utiles:
 
   - el comportamiento de SERVIDOR (cancelar, restaurar estado), con el cliente
@@ -17,6 +18,7 @@ La verificacion en navegador de verdad queda anotada como gate en T3.8.
 import pytest
 
 import app
+from conftest import leer_js, leer_superficie
 
 
 @pytest.fixture
@@ -27,7 +29,7 @@ def client():
 
 @pytest.fixture
 def html():
-    return app.IMPORTADOR_HTML
+    return leer_superficie("importador")
 
 
 # ───────────────── B7 · recargar no puede perder el trabajo ─────────────────
@@ -245,7 +247,8 @@ class TestJsValido:
     """
 
     def _extraer_js(self, html):
-        return html[html.rindex("<script>") + len("<script>"):html.rindex("</script>")]
+        # Desde el Plan 4 el JS vive en su propio archivo, ya sin etiquetas.
+        return leer_js("importador")
 
     def test_las_llaves_estan_balanceadas(self, html):
         import re
