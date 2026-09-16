@@ -33,8 +33,15 @@ no le cuesta nada a nadie.
 
 **Resuelto:** `render_template` de `main` **más** los cinco imports del limitador del #44.
 `render_template_string` se descarta porque la extracción lo dejó **sin un solo uso**
-—comprobado: 0 llamadas—. Los otros cinco **sí se usan**, contados uno por uno: `Limiter` 6
-veces, `ProxyFix` 4, `limits_parse` 2, `MovingWindowRateLimiter` 2.
+—comprobado: 0 llamadas—. Los otros cinco **sí se usan**, con su sitio exacto: `Limiter` en el
+constructor (`app.py:113`), `get_remote_address` como `key_func` (`:114`) y en la guarda de
+fuerza bruta (`:159`), `ProxyFix` en el WSGI (`:260`), `limits_parse` (`:262`) y
+`MovingWindowRateLimiter` (`:263`).
+
+⚠️ **Corrección del gate de `python-reviewer`:** una versión anterior de este documento decía
+«`Limiter` 6 veces», que era un conteo de **subcadena** e incluía comentarios. No cambia la
+conclusión —el import hace falta— pero un conteo impreciso en un documento de seguridad es
+justo lo que no debe quedarse.
 
 ### C2 · `app.py:29` — módulos estándar · **unión pura**
 
@@ -168,3 +175,42 @@ volverá a leer. Subir un umbral en silencio es como se pierden los límites.
 | Baseline del #44 antes del merge | 626 passed, 1 skipped — el origen del «≥626» que citaban los planes |
 
 **CE7 cumplido.**
+
+---
+
+## 6. Lo que los gates dejaron anotado, y no se arregla aquí
+
+### 6.1 MEDIUM · La próxima palanca no puede ser subir el número otra vez
+
+El gate de `python-reviewer` confirmó que la subida del tope a 3,800 es honesta —margen de sólo
+**103 líneas** sobre las 3,697 actuales, así que sigue siendo una alarma— pero añadió un matiz
+que merece quedarse escrito:
+
+> Las 515 líneas del endurecimiento son **concerns bastante distintos** —limitador de
+> peticiones, cierre ante señal, healthcheck, zona horaria— y entraron **todas a `app.py`** en
+> lugar de a módulos propios.
+
+Subir el umbral es lo correcto **para este merge**: el test ya estaba escrito así y una
+resolución de conflictos no es el sitio para rediseñar. Pero **si `app.py` vuelve a crecer, la
+palanca correcta es extraer esos bloques, no subir el tope de nuevo.** Queda para el plan que
+toque cohesión.
+
+### 6.2 LOW, preexistentes — no los introdujo esta resolución
+
+Confirmados con `git blame` como anteriores a esta rama: `parse_monto` duplicada
+(`app.py:968` y `:1032`, las dos de mayo), e imports y variables sin uso que marca `pyflakes`
+(`MediaIoBaseUpload`, `io`, y tres locales). Candidatos a una tarea de limpieza aparte.
+
+### 6.3 🪤 Trampa nueva · `__pycache__` viejo produce fallos falsos, y de los que asustan
+
+El gate lo vivió y lo dejó escrito en vez de corregirlo en silencio: con `__pycache__` heredado
+de comandos previos, la suite dio **decenas de fallos falsos**, incluido uno que *parecía una
+regresión de seguridad real* — `inspect.getsource` devolviendo un cuerpo de función distinto al
+que hay en disco.
+
+```bash
+find . -name __pycache__ -exec rm -rf {} +
+```
+
+Tras limpiarlo: **1,193 passed, 2 skipped**, exacto. **Antes de creerse un rojo raro tras
+cambiar de rama, vaciar la caché de bytecode.**
