@@ -4,7 +4,9 @@
 **Proyecto:** PanelNioval — `C:\Users\PC 1\PanelNioval`
 **Superficies:** rutas Flask de `app.py`, `Dockerfile`, `despliegue/docker-compose.yml`
 **Rama de trabajo:** `fix/endurecimiento-panel` (desde `main` actualizado — **NUNCA `main`**)
-**Baseline verificado en disco el 2026-08-28:** `python -m pytest tests/` → **357 passed, 1 skipped**, exit 0
+**Baseline verificado en disco el 2026-09-04 en la rama de trabajo:** `python -m pytest tests/` →
+**388 passed, 1 skipped**, exit 0. (El «357 passed» que este encabezado daba el 2026-08-28 era
+el de `perf/gasto-places-importador`, rama del Plan 2, no el de la base de este plan.)
 **Origen:** mejoras **M5**, **M14**, **M2**, **M3** y **M9** del índice de la tanda
 2026-08-27 (§4.2–§4.4). Todas identificadas y ninguna asignada a un plan.
 
@@ -133,7 +135,7 @@ que hoy no existe — afecta Plan 5, Tarea T5.1.` Ver **D5** en DECISIONES PENDI
 | CE7 | La semana ISO es la correcta | Test en un cambio de semana |
 | CE8 | El healthcheck detecta un panel colgado | Se levanta el contenedor con la ruta de salud rota; `docker ps` lo marca `unhealthy` |
 | CE9 | `SIGTERM` no parte una escritura | Test: la señal a media corrida deja el estado en `interrumpido` y ninguna fila a medias |
-| CE10 | Baseline sin regresiones | `python -m pytest tests/` → ≥ 357 passed |
+| CE10 | Baseline sin regresiones | `python -m pytest tests/` → **≥ 388 passed** (baseline de `main`, medido en T5.0 el 2026-09-04). ⚠️ **Corregido:** el «≥ 357» original era el baseline de `perf/gasto-places-importador` (rama del Plan 2), no un número universal — un gate absoluto es inalcanzable desde otra rama base. Si esta rama se rebasa sobre un `main` con el PR #43 dentro, el gate sube al baseline de ese `main` |
 
 ---
 
@@ -332,7 +334,7 @@ cooperativa que se traga la señal deja el hilo corriendo y **parece** que funci
 **Depende de:** T5.1–T5.5.
 
 **Qué hacer.**
-1. `python -m pytest tests/` → ≥ 357 passed, sin regresiones.
+1. `python -m pytest tests/` → **≥ 388 passed** (baseline de esta rama, T5.0), sin regresiones.
 2. Los cinco `grep` de T5.0, repetidos: el de rate limiting pasa de 0 a > 0; el de
    `_escapar_formula` cubre todas las escrituras; `HEALTHCHECK` aparece; las
    `datetime.now()` desnudas desaparecen.
@@ -426,7 +428,7 @@ canónicas. Se reporta tal cual y **no cuenta** para el mínimo de diversidad.
 | T5.3 | ✅ TDD, 3 tests con reloj congelado | python-reviewer | ✅ | — (constancia en T5.3) | ✅ sin regresiones |
 | T5.4 | ✅ TDD, 3 tests + contenedor `unhealthy` real | — | ✅ | ✅ **ruta sin auth** | ✅ sin regresiones |
 | T5.5 | ✅ TDD, 3 tests + `silent-failure-hunter` | python-reviewer | ✅ | — | ✅ sin regresiones |
-| T5.6 | ✅ suite + 5 grep + contenedor construido | ✅ `security-auditor` | ✅ | ✅ | ✅ ≥ 357 passed |
+| T5.6 | ✅ suite + 5 grep + contenedor construido | ✅ `security-auditor` | ✅ | ✅ | ✅ ≥ 388 passed |
 | T5.7 | ✅ suite completa antes del merge | — | ✅ | — | ✅ verde para mergear |
 
 ---
@@ -453,16 +455,16 @@ va al respaldo fechado.
 
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
-| T5.0 | Tarea Cero: rama, respaldo, baseline y los 5 grep | PENDIENTE | | |
-| T5.1 | Rate limiting en todas las rutas (M5) | PENDIENTE | | |
-| T5.2 | Escapado de fórmulas en todas las escrituras (M14) | PENDIENTE | | |
-| T5.3 | Zona horaria explícita, dos capas (M2) | PENDIENTE | | |
-| T5.4 | Healthcheck del contenedor (M9) | PENDIENTE | | |
-| T5.5 | Cierre ordenado del hilo del importador (M3) | PENDIENTE | | |
-| T5.6 | Verificación integral | PENDIENTE | | |
-| T5.7 | Cierre: docs, PR, handoff | PENDIENTE | | |
+| T5.0 | Tarea Cero: rama, respaldo, baseline y los 5 grep | ✅ **HECHA** | Rama `fix/endurecimiento-panel` desde `main` @ `82995c3` (decisión E5 del owner). Respaldo: 5 XLSX + `huellas.json`, 65 hojas, ninguno vacío. Baseline **388 passed, 1 skipped**. Los 5 grep con salida pegada en [`docs/auditoria/2026-09-04-t50-estado-de-partida.md`](../../auditoria/2026-09-04-t50-estado-de-partida.md) | 2026-09-04 |
+| T5.1 | Rate limiting en todas las rutas (M5) **+ cotas de fila/columna** | ✅ **HECHA** | `942cc67` + `bafb4a0`. Flask-Limiter 4.1.1 en memoria (D5·A); límites global, importador, heartbeat y sondeo. Cotas `_fila_valida`/`_columna_valida` en las 3 rutas con índices crudos (cierra los 2 CRITICAL preexistentes de T5.2). 48 tests; suite **562 passed, 1 skipped**. Reviews: security-reviewer **2 CRITICAL introducidos por la tarea** (DoS pre-auth y falta de ProxyFix) resueltos; CE1 era un guarda que no podía fallar, corregido | 2026-09-04 |
+| T5.2 | Escapado de fórmulas en todas las escrituras (M14) | ✅ **HECHA** | `b78130b` + `b9b3216`. Inventario de 17 escrituras en [`docs/auditoria/2026-09-04-t52-inventario-escrituras.md`](../../auditoria/2026-09-04-t52-inventario-escrituras.md); escapan las 6 con USER_ENTERED efectivo (antes 1). 77 tests; suite **514 passed, 1 skipped**. Reviews: security-reviewer 1 HIGH + 1 MEDIUM resueltos, python-reviewer 1 HIGH resuelto, silent-failure-hunter 3 resueltos. ⚠️ 2 CRITICAL **preexistentes** sin cerrar (§5.1 del inventario) | 2026-09-04 |
+| T5.3 | Zona horaria explícita, dos capas (M2) | ✅ **HECHA** | `fe907b0` + `bdfa5cb`. Helper `nc.ahora_mexico()` (ZoneInfo) + `ENV TZ` + `tzdata`. 24 tests nuevos; suite **412 passed, 1 skipped**. Reviews: code-reviewer APPROVE, python-reviewer Warning, silent-failure-hunter 2 HIGH — todos resueltos. Histórico medido y NO corregido: 2 de 2,662 filas del panel (0.1 %) | 2026-09-04 |
+| T5.4 | Healthcheck del contenedor (M9) | ✅ **HECHA** *(CE8 abierto: gate del owner)* | `b256336` + `517362c`. Ruta `/salud` sin auth, sin tocar Google y sin filtrar nada; `HEALTHCHECK` en `Dockerfile` y compose, con `ProxyHandler` vacío. 40 tests; suite **620 passed, 1 skipped**. Reviews sin CRITICAL/HIGH. ⚠️ **CE8 no se cierra aquí**: Docker no está instalado. Verificado en su lugar que la sonda exacta da exit 0 contra el panel vivo y exit 1 con la ruta rota | 2026-09-04 |
+| T5.5 | Cierre ordenado del hilo del importador (M3) | ✅ **HECHA** | `7677bae` + `8ffb7a1`. Manejador de SIGTERM que **encadena** al de gunicorn (su `init_signals` corre antes de importar la app); 3 puntos de parada dentro de la categoría y `--graceful-timeout 120`, sin los cuales era un no-op. 18 tests; suite **580 passed, 1 skipped**. Reviews: python-reviewer **Block con 1 CRITICAL** (el manejador neutralizaba SIGTERM fuera de gunicorn) y silent-failure-hunter **1 ALTA** (la parada no llegaba antes del SIGKILL) — resueltos | 2026-09-04 |
+| T5.6 | Verificación integral | ✅ **HECHA** | Los 5 grep repetidos, `tools/verificar_endurecimiento.py` (12/12 guardas detectan su defecto, y el arnés comprobado en las dos direcciones), suite **620 passed, 1 skipped**, barrido limpio sobre 3,463 líneas. Evidencia en [`docs/auditoria/2026-09-04-t56-verificacion-integral.md`](../../auditoria/2026-09-04-t56-verificacion-integral.md). **9 de 10 CE cumplidos**; CE8 es gate del owner | 2026-09-04 |
+| T5.7 | Cierre: docs, PR, handoff | ✅ **HECHA** | `873afd6`. `CLAUDE.md` (baseline 620 y bloque de arquitectura), `docs/RUNBOOK.md` (429, healthcheck, reinicio a media corrida, el apóstrofo, y el aviso del bypass) e índice al día. **PR #44** contra `main` | 2026-09-04 |
 
-**Avance del plan: 0 / 8 tareas (0 %)**
+**Avance del plan: 8 / 8 tareas (100 %) ✅**
 
 **Gates del owner asociados (reportar, no intentar):** rotar `TELEGRAM_TOKEN` (M7) y apagar
 el despliegue de Railway (M6). Ninguno lo cierra este plan, y ambos siguen siendo el riesgo

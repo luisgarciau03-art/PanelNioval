@@ -102,7 +102,7 @@ def marcar_en_proceso(ws, envio_row: int, col: dict, ahora: Optional[datetime] =
     para que una corrida solapada no la vuelva a tomar (seleccionar_pendientes
     solo toma PENDIENTE)."""
     import gspread.utils as gsu
-    ts = (ahora or datetime.now()).strftime(nc.FMT_TIMESTAMP)
+    ts = (ahora or nc.ahora_mexico()).strftime(nc.FMT_TIMESTAMP)
     ws.batch_update([
         {"range": gsu.rowcol_to_a1(envio_row, col["estado"]), "values": [[nc.EN_PROCESO]]},
         {"range": gsu.rowcol_to_a1(envio_row, col["timestamp_estado"]), "values": [[ts]]},
@@ -116,7 +116,7 @@ def aplicar_resultado(ws, envio_row: int, resultado: ResultadoEnvio, col: Option
     import gspread.utils as gsu
     if col is None:
         col = _col_de(ws)
-    ts = (ahora or datetime.now()).strftime(nc.FMT_TIMESTAMP)
+    ts = (ahora or nc.ahora_mexico()).strftime(nc.FMT_TIMESTAMP)
     ws.batch_update([
         {"range": gsu.rowcol_to_a1(envio_row, col["estado"]), "values": [[resultado.estado]]},
         {"range": gsu.rowcol_to_a1(envio_row, col["timestamp_estado"]), "values": [[ts]]},

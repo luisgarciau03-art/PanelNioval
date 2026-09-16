@@ -4,6 +4,14 @@
 # linea del resumen: se ven los puntos y exit 0, pero nunca el numero de tests.
 pytest>=8.0.0
 
+# openpyxl: lo usa tools/medir_desfase_horario.py para leer los respaldos XLSX
+# (Plan 5 T5.3). Va aqui y no en requirements.txt porque es una herramienta de
+# auditoria, no runtime del panel. Estaba instalado por casualidad en la maquina
+# de desarrollo: ni gspread ni google-auth lo arrastran, asi que sin declararlo
+# el owner se encontraria un ModuleNotFoundError al seguir el punto 4 del plan.
+# No lo cubre ningun test, porque ningun test importa el script.
+openpyxl>=3.1.0
+
 # Dependencias RUNTIME de envio_catalogo.py (no en requirements.txt del panel Flask).
 # El script solo corre en la PC del owner; los tests las stubbean en conftest.py.
 # Se listan aquí para instalación reproducible cuando se ejecute el script real.
@@ -11,3 +19,13 @@ selenium>=4.20.0
 webdriver-manager>=4.0.0
 pyperclip>=1.8.0
 oauth2client>=4.1.3
+
+# tzdata: NO es opcional para el worker local, y por poco se queda sin declarar.
+# nucleo_catalogo.py evalua ZoneInfo("America/Mexico_City") A NIVEL DE MODULO
+# (linea 67) y worker_catalogo_run.py lo importa, asi que sin este paquete es un
+# ZoneInfoNotFoundError AL IMPORTAR: la Tarea Programada del owner muere sin
+# enviar un solo catalogo. Windows no trae base de zonas del sistema, nunca.
+#
+# Estaba solo en requirements.txt, que es el del PANEL. El aviso de ahi decia
+# "en Windows tambien hace falta" — y estaba en el archivo equivocado.
+tzdata>=2024.1

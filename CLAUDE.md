@@ -8,7 +8,7 @@ Panel web interno de NIOVAL (distribuidora mayorista de ferretería/plomería) p
 - **`static/js/vendor/`** (Plan 4 · T4.10): Chart.js 4.4.0 auto-hospedado. Venía de jsdelivr, en `<head>` y sin `defer`, así que el tablero no pintaba nada hasta que el CDN contestara (**15.1 s** medidos) — y sin `integrity`, o sea sin poder comprobar qué llegaba. Servido desde `static/` deja de ser un tercero y queda verificable por hash; `tests/test_plan4_accesibilidad.py` comprueba el sha256 y trae su control negativo. Va **antes** de `dashboard.js` y **sin `defer`**: diferido correría después y `Chart` estaría sin definir cuando el tablero lo consulta.
 - **Sistema de diseño** (Plan 4 · T4.11): `docs/diseno/sistema.md` — tokens, componentes, los cuatro estados, movimiento, accesibilidad y las ocho herramientas de verificación. **Léelo antes de tocar CSS o marcado**: cada regla de ahí salió de un fallo medido, y varias no las ve ningún `grep` (la opacidad que rompe el contraste, el par que pasa sobre blanco y no sobre un tinte, el esqueleto que borra los datos que acaban de llegar).
 - **`templates/` y `static/`** (Plan 4 · T4.3): las tres superficies. Son **HTML estático puro** —cero Jinja salvo los `url_for` de los enlaces, cero contexto de Python— porque todos los datos llegan por `fetch` a `/api/*`. Al tocarlas, ojo con dos cosas: Jinja **parsea la plantilla al renderizar**, así que un `{{` suelto revienta al servir la página y no al importar (lo fija `tests/test_plan4_extraccion.py`); y `.dockerignore` no debe excluir nunca `templates/` ni `static/`, o el VPS se despliega sin interfaz.
-- **`envio_catalogo.py`** (antes `22.PY`): script Selenium **standalone** que corre en la PC del owner (no en Railway). Lee pedidos del día, busca teléfonos, abre WhatsApp Web con perfil Chrome local y envía mensajes + 4 archivos, marca `ENVIADO_WA` y reporta por Telegram. Auditoría completa: `docs/auditoria/2026-08-13-auditoria-22py.md`.
+- **`envio_catalogo.py`** (antes `22.PY`): script Selenium **standalone** que corre en la PC del owner (no en el VPS). Lee pedidos del día, busca teléfonos, abre WhatsApp Web con perfil Chrome local y envía mensajes + 4 archivos, marca `ENVIADO_WA` y reporta por Telegram. Auditoría completa: `docs/auditoria/2026-08-13-auditoria-22py.md`.
 - **`nucleo_catalogo.py`** (Plan 3): lógica pura de la cola de catálogo (conclusiones elegibles, estados, validación de números). Sin selenium/gspread. **`worker_catalogo.py`**: worker transport-agnostic que procesa la worksheet `ENVIOS_CATALOGO` (transporte = worker local, decisión owner). El panel encola/consulta/corrige vía `/api/catalogo/*`. Diseño: `docs/superpowers/plans/2026-08-13-plan3-diseno-cola.md`.
 - **`worker_catalogo_run.py`** (Plan 5): runner del worker local (Selenium + heartbeat + lock) que el owner corre en su PC (`instalar-worker.ps1` = Tarea Programada). Operación: `docs/RUNBOOK.md`; decisión de transporte: `docs/adr/2026-08-13-transporte-catalogo.md`. Smoke test: `tools/smoke_panel.py`.
 - **Catálogo de ciudades (Plan 1):** el importador ya no trae la lista escrita a mano. `datos/ciudades_mx.json` (**1,004 municipios**, clave INEGI, estado, macro-región, alias, potencial e indicadores) se genera con `tools/generar_catalogo_ciudades.py` desde **DENUE 05_2026 + Censo 2020**, por URL directa y **sin token**. Lo sirve `/api/importador/ciudades` ya ordenado por `prioridad = potencial_mercado × factor_nioval`. ⚠️ El `.gitignore` cubre `*.json` por credenciales y hay una **excepción por ruta exacta**: sin ella el catálogo quedaba fuera del repo en silencio y el panel arrancaría sin él en el VPS. Modelo: `docs/adr/2026-08-28-modelo-relevancia-ciudades.md`; operación: `docs/RUNBOOK.md`.
@@ -16,8 +16,39 @@ Panel web interno de NIOVAL (distribuidora mayorista de ferretería/plomería) p
 - **Importador — los cuatro contadores:** `encontrados` (aprobados por los filtros de Places, deduplicados por `place_id` a nivel corrida), `nuevos_en_sheet` (**filas realmente escritas** — el número grande de la UI), `duplicados` (ya estaban en `LISTA DE CONTACTOS`) y `descartados` (reseñas, calificación o sin teléfono). Se cumple `nuevos_en_sheet + duplicados == encontrados`; `descartados` es disjunto. Un fallo de escritura **no** se cuenta como duplicado: la corrida termina en `error` con la causa.
 - **Estado del importador:** vive en memoria de UN solo proceso (`--workers 1 --threads 4`). Además se persiste un registro mínimo y sin datos personales en `IMPORT_ESTADO_FILE` (temp del sistema) con el único fin de poder decir "se interrumpió" tras un reinicio; **nunca veta** una corrida nueva. Ver `docs/adr/2026-08-27-estado-compartido-importador.md`.
 - **Autenticación fail-closed:** la app no arranca sin `PANEL_DASHBOARD_TOKEN` ni `SECRET_KEY` (`app.py:34-44`) — revienta con `RuntimeError` en vez de publicar el panel abierto. Ya arrancada, todas las rutas exigen el token (header `X-Dashboard-Token`, `?token=`, o cookie de sesión), y `/api/catalogo/heartbeat` exige por separado `WORKER_TOKEN` o devuelve 401. Único bypass, explícito y ruidoso: `PANEL_AUTH_DESACTIVADA=1` (usado por `tests/conftest.py` y para desarrollo local). El default nunca abre.
-- **`Procfile` / `nixpacks.toml`**: `gunicorn app:app --workers 1 --threads 4 --worker-class gthread --timeout 120`. **Un solo worker a proposito**: `_import_job` y `_cache` son globales de modulo y con 2 procesos son 2 memorias distintas (razon completa en `docs/adr/2026-08-27-estado-compartido-importador.md`). Artefactos de Railway; se retiran cuando ese despliegue se apague (ver `docs/superpowers/plans/2026-08-17-despliegue-vultr.md`, Task 10).
-- **`Dockerfile`**: imagen del panel para el VPS Vultr (`python:3.11-slim` + gunicorn, `--bind 0.0.0.0:8000`). **`despliegue/`**: plantillas versionadas de `docker-compose.yml` y del fragmento de Caddy que se copian al servidor `155.138.200.66`; la copia viva está en `/srv/panel/` (ver `docs/RUNBOOK.md` § Operación en el VPS y `docs/superpowers/specs/2026-08-17-panelnioval-vultr-design.md`).
+- **Endurecimiento (Plan 5)**: cinco cosas que el panel no tenía y ahora sí.
+  **Rate limiting** con `Flask-Limiter` en memoria del proceso (`--workers 1` lo hace exacto):
+  global 600/h y 60/min, importador **6/h** porque es la única ruta que gasta dinero,
+  heartbeat y `/salud` holgados porque un 429 ahí tumba al worker o al healthcheck. Se
+  engancha con `init_app()` **después** del gate de token: al revés, 60 peticiones anónimas
+  agotaban el cubo y dejaban fuera a quien sí tenía token. **`ProxyFix(x_for=1)`** porque
+  tras Caddy `remote_addr` es la IP del proxy y todos compartían un solo cubo.
+  **Escapado de fórmulas** en las 6 escrituras con `USER_ENTERED` efectivo — no en las
+  `RAW`, donde el apóstrofo se guardaría *dentro* del dato. ⚠️ `update_cell` **fija**
+  `USER_ENTERED` y no admite el parámetro: leyendo `app.py` parece el caso seguro y es el
+  contrario. **Zona horaria** en dos capas: `nucleo_catalogo.ahora_mexico()` con `ZoneInfo`
+  más `ENV TZ` y `tzdata` (sin él, `ZoneInfo` revienta al importar y el panel no arranca).
+  **`/salud`**, la única ruta sin auth: `{'ok': True}` pelado, sin tocar Google y sin
+  reflejar estado interno. **Parada cooperativa ante `SIGTERM`**, que *encadena* al
+  manejador de gunicorn — pisarlo dejaría al worker sin apagado ordenado. Detalle y
+  verificación: `docs/auditoria/2026-09-04-t56-verificacion-integral.md`.
+- **Arranque — solo `Dockerfile` desde el 2026-09-05.** Antes eran tres sitios (`Procfile`,
+  `nixpacks.toml`, `Dockerfile`) y podían divergir; Railway se apagó y sus dos archivos se
+  retiraron con la Task 10 del plan de Vultr. Siguen en el historial de git y en
+  `docs/auditoria/respaldos/2026-09-05/`. Hay un test que falla si reaparecen, porque
+  volverían sin `--graceful-timeout` ni `--workers 1`.
+  Comando: `gunicorn app:app --bind 0.0.0.0:8000 --workers 1 --threads 4 --worker-class
+  gthread --timeout 120 --graceful-timeout 120`. **Un solo worker a propósito**:
+  `_import_job`, `_cache` y el contador del limitador son globales de módulo, y con 2
+  procesos son 2 memorias distintas (razón completa en
+  `docs/adr/2026-08-27-estado-compartido-importador.md`). **`--graceful-timeout 120`** no es
+  cosmético: con los 30 s por defecto, la parada ordenada del importador no llega a
+  ejecutarse antes del SIGKILL.
+- **`Dockerfile` / `despliegue/`**: imagen del panel para el VPS Vultr (`python:3.11-slim` +
+  gunicorn, `--bind 0.0.0.0:8000`, con `HEALTHCHECK`). **`despliegue/`**: plantillas
+  versionadas de `docker-compose.yml` y del fragmento de Caddy que se copian al servidor
+  `155.138.200.66`; la copia viva está en `/srv/panel/` (ver `docs/RUNBOOK.md` § Operación
+  en el VPS y `docs/superpowers/specs/2026-08-17-panelnioval-vultr-design.md`).
 - **`requirements.txt`**: deps del panel Flask. **`requirements-dev.txt`**: pytest + deps runtime de `envio_catalogo.py` (selenium, etc.), no instaladas en el contenedor del panel.
 
 ## Hojas de Google (IDs — fuente de verdad en `app.py:28-45` `SHEET_IDS`/`SHEET_GIDS`)
@@ -79,8 +110,16 @@ Las decisiones abiertas al owner están en el índice §8; los nueve gates del o
 
 ## Pendientes conocidos (gates del owner)
 
-- Rotar `TELEGRAM_TOKEN` y cargar secretos en Railway (Plan 5 T5.3).
-- Elegir transporte de WhatsApp para Railway: A=WhatsApp Business API (recomendado) / B=worker local / C=Selenium headless (Plan 5 T5.1).
+- Rotar `TELEGRAM_TOKEN` — **el riesgo abierto más grande** ahora que Railway está apagado: sigue vivo en el historial de git (~14 copias) y válido en el proveedor hasta que se rote allí.
+- Elegir transporte de WhatsApp para el VPS: A=WhatsApp Business API (recomendado) / B=worker local (lo que corre hoy) / C=Selenium headless. ⚠️ Si se elige **C**, `envio_catalogo.py` pasa a un contenedor UTC y sus 5 relojes desnudos reintroducen el bug de fecha que cerró el Plan 5 — hay tripwire en `tests/test_endurecimiento_zona_horaria.py`.
 - **Validar el top-20 de ciudades del Plan 1** y decidir si el ranking premia el mercado o lo que queda por cosechar (`docs/investigacion/2026-08-29-verificacion-plan1.md` §2.3 y §7).
 - Corridas reales de WhatsApp (Plan 3 T3.6 / Plan 5 T5.5) y confirmación de la columna T de `LISTA DE CONTACTOS` (Plan 4 T4.1).
-- ~~Autenticación del panel (M1)~~ — **RESUELTO** en `feat/despliegue-vultr`: el gate es fail-closed (`app.py:34-82`). ~~Pendiente: la exposición vive en Railway~~ — **CERRADO.** El servicio de Railway se eliminó el 2026-08-19 y devuelve **404** en la raíz y en `/api/prospectos/stats` (reverificado el 2026-09-16). El panel del VPS responde **401 sin token**: el gate fail-closed funciona en producción.
+- ~~Autenticación del panel (M1)~~ — **RESUELTO**: el gate es fail-closed (`app.py:34-82`).
+  ⚠️ **La exposición de Railway tuvo un historial contradictorio y queda CERRADA con la
+  última medición.** El RUNBOOK la dio por eliminada el **2026-08-19** con un 404; el PR #44
+  midió el **2026-09-05** un **502 con `x-railway-fallback: true`** —que no es lo mismo: un
+  404 es «el dominio no tiene ruta» y un 502 con `fallback` es «sí la tiene y no hay nada
+  detrás»—, lo que sugería que el servicio había vuelto a existir. **Reverificado el
+  2026-09-16 (Plan 1, T1.7): 404 en la raíz y en `/api/prospectos/stats`.** Ninguna ruta
+  responde 200. **Sigue pendiente del owner** confirmar en la consola si el proyecto está
+  borrado o sólo detenido: un servicio detenido puede resucitar.

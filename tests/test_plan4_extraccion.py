@@ -45,9 +45,18 @@ class TestElHtmlSalioDeAppPy:
     def test_app_py_bajo_de_las_3400_lineas(self):
         """Antes de la T4.3 eran 6,368. CE1 pedia <800, que era inalcanzable
         extrayendo solo HTML; el numero real alcanzado es ~3,133 (decision D6).
-        El tope de aqui solo impide que el HTML vuelva a entrar."""
+        El tope de aqui solo impide que el HTML vuelva a entrar.
+
+        TOPE SUBIDO DE 3,400 A 3,800 al mergear el PR #44 (Plan 4, T4.6), y se
+        deja dicho por que para que nadie lo lea como que la extraccion se
+        deshizo: la extraccion dejo el archivo en **3,182** lineas, y el
+        endurecimiento anade **515** que son PYTHON -limitador de peticiones,
+        cierre ordenado ante SIGTERM, healthcheck y zona horaria explicita-, no
+        HTML volviendo al monolito. 3,182 + 515 = 3,697. El margen hasta 3,800
+        es corto a proposito: si alguien devuelve una plantilla al archivo, se
+        nota."""
         lineas = len((RAIZ / "app.py").read_text(encoding="utf-8").splitlines())
-        assert lineas < 3400, f"app.py tiene {lineas} lineas"
+        assert lineas < 3800, f"app.py tiene {lineas} lineas"
 
 
 class TestLosArchivosExisten:
