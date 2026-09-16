@@ -236,7 +236,15 @@ function renderChips(lista) {
 // estan en el top-100. Y el fallo era MUDO: lista vacia, sin forma de saber si
 // la ciudad no esta o el buscador la esconde.
 //
-// NFD separa la letra de su tilde; el rango U+0300-U+036F borra la marca. Es la
+// NFD separa la letra de su tilde; el rango U+0300-U+036F borra la marca.
+//
+// OJO, y es a proposito: eso colapsa TAMBIEN la n con virgulilla, porque NFD la
+// descompone en n + U+0303. `Canada` encuentra la version con virgulilla, y
+// `Muniz` la suya. Es un filtro ADITIVO -nunca esconde un resultado que ya
+// aparecia, solo amplia lo que encuentra- y el nombre que se pinta conserva su
+// virgulilla intacta: `buscable` es un indice interno, no lo que se muestra.
+// Y es lo mismo que hace `normalizar()` del generador de catalogo en Python, asi
+// que las dos puntas del sistema tratan los nombres igual. Es la
 // gemela de `normalizar()` del generador de catalogo, que ya hacia esto en
 // Python. Se llama UNA vez por chip al construir y UNA por pulsacion sobre lo
 // tecleado: nunca dentro del bucle del filtro, que es lo que la T4.9 abarato de

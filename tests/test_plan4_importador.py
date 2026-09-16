@@ -672,3 +672,76 @@ class TestElBuscadorIgnoraLosAcentos:
         assert "c.buscable.includes(q)" in filtro, (
             "el filtro dejo de usar el texto precalculado"
         )
+
+
+class TestSinAcentosSeEjecutaDeVerdad:
+    """Los tests de arriba son ESTRUCTURALES: afirman que el texto del JS
+    contiene `NFD` y el rango correcto. Eso demuestra que el codigo dice lo que
+    debe, **no que funcione**: una regex mal escrita que casualmente contuviera
+    las subcadenas `0300` y `036f` los pasaria todos.
+
+    Aqui se ejecuta la funcion REAL, extraida del archivo, contra nombres reales
+    del catalogo. Es la diferencia entre comprobar que el barrido esta escrito y
+    comprobar que encuentra algo.
+
+    Hallazgo del gate de typescript-reviewer en T4.4.
+    """
+
+    CASOS = [
+        ("leon", "León"),
+        ("merida", "Mérida"),
+        ("queretaro", "Querétaro"),
+        ("nezahualcoyotl", "Nezahualcóyotl"),
+        ("san luis potosi", "San Luis Potosí"),
+        ("LEON", "León"),
+        ("guemez", "Güémez"),
+        ("canada", "Cañada"),
+    ]
+
+    def _ejecutar(self, tmp_path):
+        """Extrae `sinAcentos` del archivo real y la corre en node."""
+        import json
+        import shutil
+        import subprocess
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("node no esta instalado en esta maquina")
+        fuente = (RAIZ / "static" / "js" / "importador.js").read_text(encoding="utf-8")
+        m = re.search(r"function sinAcentos\(s\) \{[\s\S]*?\n\}", fuente)
+        assert m, "no se encontro sinAcentos() en el archivo"
+        guion = tmp_path / "probar.mjs"
+        guion.write_text(
+            m.group(0)
+            + "\nconst casos = JSON.parse(process.argv[2]);\n"
+            + "console.log(JSON.stringify(casos.map(c => sinAcentos(c))));\n",
+            encoding="utf-8",
+        )
+        entradas = [c for _, c in self.CASOS] + [None, 12345, "  Mérida  "]
+        r = subprocess.run(
+            [node, str(guion), json.dumps(entradas)],
+            capture_output=True, text=True, timeout=60, encoding="utf-8",
+        )
+        assert r.returncode == 0, "node fallo:\n%s" % r.stderr
+        return json.loads(r.stdout)
+
+    def test_cada_nombre_acentuado_se_encuentra_tecleandolo_sin_tildes(self, tmp_path):
+        salida = self._ejecutar(tmp_path)
+        fallos = [
+            "%r no encuentra %r (dio %r)" % (tecleado, nombre, salida[i])
+            for i, (tecleado, nombre) in enumerate(self.CASOS)
+            if tecleado.lower() not in salida[i]
+        ]
+        assert fallos == [], fallos
+
+    def test_no_se_rompe_con_null_ni_con_numeros(self, tmp_path):
+        """`String(s == null ? '' : s)` tiene que dar cadena vacia para null y
+        undefined, no el literal 'null'."""
+        salida = self._ejecutar(tmp_path)
+        assert salida[len(self.CASOS)] == "", "null no da cadena vacia"
+        assert salida[len(self.CASOS) + 1] == "12345"
+
+    def test_los_espacios_alrededor_sobreviven_para_que_trim_los_quite(self, tmp_path):
+        """`filtrarCiudades` hace `.trim()` DESPUES de normalizar. Si la funcion
+        recortara por su cuenta, ese trim sobraria y nadie se enteraria."""
+        salida = self._ejecutar(tmp_path)
+        assert salida[-1] == "  merida  "
