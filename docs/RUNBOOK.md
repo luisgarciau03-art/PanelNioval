@@ -500,7 +500,13 @@ servidor con Bruce.
 |---|---|
 | Ver logs | `ssh root@155.138.200.66 'docker logs -f panel'` |
 | Reiniciar | `ssh root@155.138.200.66 'docker restart panel'` |
-| Desplegar cambios | `ssh root@155.138.200.66 'cd /srv/panel/app && git pull && cd /srv/panel && docker compose up -d --build'` |
+| Desplegar cambios | `ssh root@155.138.200.66 'cd /srv/panel/app && git fetch origin && git checkout main && git merge --ff-only origin/main && cd /srv/panel && docker compose up -d --build'` |
+
+⚠️ **El comando llevaba `git pull` y no servía:** el repo del servidor estaba en **HEAD
+desacoplado** (`FETCH_HEAD`), donde `git pull` no avanza nada. Corregido el 2026-09-15 tras
+toparse con ello en el Plan 1, T1.6. Comprueba siempre el commit servido después de desplegar:
+`ssh root@155.138.200.66 'cd /srv/panel/app && git log -1 --oneline'`.
+
 | Smoke test | `python tools/smoke_panel.py https://panelnioval.duckdns.org --token <token>` |
 | Consumo | `ssh root@155.138.200.66 'docker stats --no-stream'` |
 

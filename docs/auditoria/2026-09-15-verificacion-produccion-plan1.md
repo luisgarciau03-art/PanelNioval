@@ -7,10 +7,16 @@
 
 ## 1. La respuesta, en una línea
 
-> **No.** El VPS sigue sirviendo código **anterior al PR #42**, y la causa no es un despliegue
-> lento: **no existe ningún auto-deploy**. El invariante que repiten los cuatro planes de la
-> tanda —«el VPS auto-deploya `main`»— **es falso desde el 2026-08-19**, cuando se eliminó
-> Railway. **CE5 queda BLOQUEADA**, y desbloquearla es un `ssh` manual del owner.
+> **Al principio no, y por una razón que nadie sabía: no existe ningún auto-deploy.** El
+> invariante que repiten los cuatro planes —«el VPS auto-deploya `main`»— **es falso desde el
+> 2026-08-19**, cuando se eliminó Railway. Tras desplegar a mano con autorización del owner,
+> **el trabajo ESTÁ en producción y verificado**: 1,004 ciudades, las 8 regiones con sus
+> conteos exactos y CE3 verde.
+>
+> Y la verificación destapó algo más: **el endpoint publica 8 teléfonos y 1 correo de clientes**
+> en `sin_clasificar`, contradiciendo su propio docstring. **No lo introdujo este despliegue**
+> —el endpoint viejo ya lo hacía— y está detrás del token, pero la promesa del código es falsa.
+> Ver §10.
 
 ---
 
@@ -29,7 +35,7 @@ queda en el historial del shell y en la transcripción de la sesión.
 
 ---
 
-## 3. Lo que NO está en producción, medido
+## 3. Lo que NO estaba en producción — medición ANTES de desplegar
 
 Sondeo autenticado contra `https://panelnioval.duckdns.org`:
 
@@ -49,9 +55,9 @@ Y el HTML que sirve `/importador` lo confirma sin lugar a duda:
 | `id="region-filter"` (filtro por macro-región, PR #42 T1.7) | **AUSENTE** | |
 | `/api/importador/ciudades` | **AUSENTE** | |
 
-El operador sigue viendo el array viejo: **293 entradas escritas a mano, con 50 nombres
+El operador seguía viendo el array viejo: **293 entradas escritas a mano, con 50 nombres
 duplicados y 9 con la abreviatura del estado pegada**. Ni las 606 de agosto, ni las 1,004 de
-T1.3.
+T1.3. **Esto es lo que el despliegue de §9 corrigió.**
 
 ---
 
@@ -81,7 +87,7 @@ sostenía.
 
 ---
 
-## 5. El smoke dio verde igualmente, y eso es un defecto del smoke
+## 5. El smoke daba verde igualmente, y eso es un defecto del smoke
 
 `tools/smoke_panel.py` imprimió **`Todo OK ✅`** contra un panel que **no tiene nada del PR #42**.
 No es un fallo del script: comprueba `/`, `/formulario`, `/api/formulario/siguiente`,
@@ -122,7 +128,7 @@ los planes: son documentos fechados, y lo que corresponde es que el relevo lo di
 
 ---
 
-## 8. Qué desbloquea CE5 — acción del owner
+## 8. Qué desbloqueaba CE5, y por qué el comando del RUNBOOK no bastaba
 
 ```bash
 ssh root@155.138.200.66 'cd /srv/panel/app && git pull && cd /srv/panel && docker compose up -d --build'
@@ -132,6 +138,10 @@ ssh root@155.138.200.66 'cd /srv/panel/app && git pull && cd /srv/panel && docke
 escribir filas de prueba hay que pausar su scheduler. Este despliegue **no** escribe filas, pero
 reconstruye contenedores en un servidor compartido: es una acción con consecuencias, no un
 `git pull` inocuo.
+
+⚠️ **Y el comando del RUNBOOK, tal cual, NO habría funcionado:** el repo del servidor estaba en
+**HEAD desacoplado**, donde `git pull` no avanza nada. Hizo falta `checkout main` +
+`merge --ff-only`. El RUNBOOK debería decirlo; queda como pendiente.
 
 **Después del despliegue, y sólo entonces**, CE5 se cierra con:
 
@@ -143,7 +153,86 @@ reconstruye contenedores en un servidor compartido: es una acción con consecuen
 
 ---
 
-## 9. Lo que este hallazgo significa para el resto de la tanda
+## 9. El despliegue, ejecutado y verificado (2026-09-16)
+
+El owner autorizó ejecutarlo. **Lo que apareció al abrir el servidor cambió el alcance:**
+
+| Hecho | Detalle |
+|---|---|
+| Último despliegue real | **2026-08-24** — tres semanas antes, no «el del PR #42» |
+| Commit desplegado | `51520f3` (rollback documentado) |
+| Lo que salía a producción | **24 commits**, 66 archivos, 35,102 inserciones — PRs #34 a #42 |
+| Estado del repo del servidor | **HEAD desacoplado** en `FETCH_HEAD`: el `git pull` del RUNBOOK **no habría funcionado** |
+| `Dockerfile` | cambia (`--workers 2` → `--workers 1 --threads 4 --worker-class gthread`, ADR `2026-08-27`), así que `--build` era necesario de verdad |
+| Variables nuevas | `CATALOGO_CIUDADES_FILE`, `PLACES_CACHE_FILE`, `IMPORT_ESTADO_FILE` — **las tres con valor por defecto**; ninguna obligatoria nueva |
+| Alcance del compose | un solo servicio, `panel`. El `web:` que aparecía es una **red externa**, no un servicio: **Bruce no se tocó** |
+
+**Ejecución:** `git fetch` + `checkout main` + `merge --ff-only` (`51520f3` → `8bac782`), y
+`docker compose up -d --build`. Arranque limpio: gunicorn con `gthread`, **RestartCount=0**.
+
+### Verificación post-despliegue
+
+| Comprobación | Resultado |
+|---|---|
+| Smoke | ✅ **`Todo OK ✅`** |
+| `/api/importador/ciudades` | ✅ **HTTP 200**, 290,869 bytes (antes: **404**) |
+| Ciudades servidas | ✅ **1,004**, idéntico a `main` · `catalogo_cargado: true` |
+| Las 8 regiones | ✅ **227 / 213 / 145 / 115 / 112 / 95 / 57 / 40**, suma 1,004 |
+| Ciudades nuevas de T1.3 | ✅ **398 de 398** vivas. La mejor, Jalpa de Méndez, en el **#428** |
+| CE3 en vivo | ✅ mínimo **14.1** (Ejutla), **ninguna en 0** |
+| `clave_inegi` en la respuesta | ✅ **0 apariciones** — la decisión de T1.4 se respeta en producción |
+| `factor_nioval` real | 73 valores distintos, de **0.65 a 1.102**: la hoja tiene historial y el orden se separa del catálogo **por diseño** |
+
+**CE5: la parte automatizable, VERDE.** Faltan las **3 capturas**, que son del owner.
+
+---
+
+## 10. ⚠️ HALLAZGO DE PRIVACIDAD — el endpoint contradice su propio docstring
+
+`api_importador_ciudades` promete, literalmente:
+
+> *«Devuelve SOLO agregados por ciudad. **Ningun telefono ni nombre de contacto sale de aqui**,
+> aunque el origen sea la hoja de clientes.»*
+
+**Es falso.** De las 32 entradas de `sin_clasificar`, **9 son datos personales**:
+
+| Qué | Cuántos | Ejemplos enmascarados |
+|---|---:|---|
+| Teléfonos | **8** | `614…19`, `614…90`, `526…44`, `771…45`, `558…73` |
+| Correos | **1** | `Cop…@…` |
+| Valores legítimos (estados, «Sin ciudad») | 23 | `Chiapas`, `Nayarit`, `San Luis`, `Sin ciudad` |
+
+**Causa:** son celdas de la columna CIUDAD donde alguien tecleó un teléfono o un correo. El
+camino de `sin_clasificar` los pasa **verbatim**, sin sanear, y `pintarSinClasificar()` los
+muestra en la UI.
+
+### 10.1 Lo que este hallazgo NO es
+
+- **No lo introdujo este despliegue.** El endpoint **viejo** `/api/prospectos/ciudades` —que
+  llevaba semanas vivo— publica exactamente los mismos 8 patrones y la misma arroba.
+  Comprobado.
+- **No es una fuga pública.** Sin token, el endpoint responde **401**. Es el owner viendo sus
+  propios datos.
+- **No es un fallo de la decisión de mostrarlos.** Que `sin_clasificar` sea visible es
+  deliberado y correcto: esconderlo haría desaparecer contactos reales del ranking sin que
+  nadie se entere.
+
+### 10.2 Lo que sí es
+
+**Una promesa falsa en el código**, y eso es lo peligroso: alguien decidirá mañana que este
+endpoint es seguro para un contexto nuevo —un panel compartido, un log, una captura en un
+documento— apoyándose en un docstring que no se cumple.
+
+**Severidad: MEDIA.** No obliga a revertir el despliegue. Pero el docstring **miente hoy**, y
+lo que corresponde es o sanear la salida (enmascarar lo que parezca teléfono o correo,
+conservando el aviso al operador) o corregir la promesa. **Es decisión del owner**, y queda
+como pendiente en el relevo.
+
+---
+
+---
+
+## 11. Lo que estos hallazgos significan para el resto de la tanda
 
 - **El riesgo de mergear a `main` era menor de lo que creíamos** — no publica nada. Pero el
   precio es el simétrico: **el trabajo no llega al operador solo**, y los Planes 4, 3 y 2 tienen
