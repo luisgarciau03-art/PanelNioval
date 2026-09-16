@@ -1,25 +1,25 @@
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--blue:var(--azul);--blue2:var(--azul-oscuro);--blue3:var(--azul-tenue);--green:var(--exito);--orange:var(--aviso);--purple:var(--marca-unica);--red:var(--error);--gray:var(--gris-500)}
-body{font-family:'Segoe UI',sans-serif;background:var(--azul-tenue-2);display:flex;min-height:100vh;color:var(--texto-fuerte)}
+body{font-family:var(--fuente);background:var(--azul-tenue-2);display:flex;min-height:100vh;color:var(--texto-fuerte)}
 
 /* SIDEBAR */
 #sidebar{width:230px;min-height:100vh;background:linear-gradient(180deg,var(--blue2) 0%,var(--blue) 100%);color:var(--texto-inverso);display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:100}
 #sidebar .logo{padding:22px 18px 14px;border-bottom:1px solid rgba(255,255,255,.15);text-align:center}
 #sidebar .logo img{height:48px;background:var(--superficie);border-radius:10px;padding:5px}
-#sidebar .logo h2{font-size:1.15em;margin-top:8px;font-weight:800;letter-spacing:.5px}
+#sidebar .logo h2{font-size:1.15em;margin-top:var(--esp-2);font-weight:800;letter-spacing:.5px}
 #sidebar .logo p{font-size:.72em;opacity:.75;margin-top:2px}
-.nav-group{padding:14px 12px 4px}
+.nav-group{padding:14px var(--esp-3) var(--esp-1)}
 /* Sin `opacity`. Blanco al 60 % sobre el azul de la barra da 3.68:1 y no llega
    al 4.5:1 de WCAG 1.4.3 — medido en navegador por tools/verificar_accesibilidad.py,
    no estimado. El tono suave se consigue con un color que SI pasa (--azul-tenue
    sobre --azul da 6.9:1), no bajando el alfa. */
-.nav-label{font-size:.65em;text-transform:uppercase;letter-spacing:1.5px;color:var(--azul-tenue);padding:0 8px;margin-bottom:6px}
+.nav-label{font-size:.65em;text-transform:uppercase;letter-spacing:1.5px;color:var(--azul-tenue);padding:0 var(--esp-2);margin-bottom:6px}
 /* Los 12 elementos de navegacion pasaron de `div` con `onclick` a `<button>`
    (T4.7): un div no entra en el orden de tabulacion, no responde a Enter ni a
    Espacio y no se anuncia como control, asi que TODA la navegacion del panel
    quedaba fuera del alcance de quien no usa raton. El precio de usar el
    elemento correcto es reponer lo que el navegador le pone de fabrica. */
-.nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:0;border-radius:10px;background:transparent;color:inherit;font-family:inherit;text-align:left;text-decoration:none;cursor:pointer;font-size:.88em;font-weight:500;line-height:var(--linea-apretada);transition:background-color var(--dur-rapida) var(--curva-estandar);margin-bottom:2px}
+.nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px var(--esp-3);border:0;border-radius:10px;background:transparent;color:inherit;font-family:inherit;text-align:left;text-decoration:none;cursor:pointer;font-size:.88em;font-weight:500;line-height:var(--linea-apretada);transition:background-color var(--dur-rapida) var(--curva-estandar);margin-bottom:2px}
 /* La barra lateral es azul oscuro: el anillo de foco de dos tonos de base.css
    se ve sobre ella, pero se le da holgura para que no lo coma el borde. */
 .nav-item:focus-visible{outline-offset:2px}
@@ -37,17 +37,17 @@ body{font-family:'Segoe UI',sans-serif;background:var(--azul-tenue-2);display:fl
 
 /* MAIN */
 #main{margin-left:230px;flex:1;min-width:0;display:flex;flex-direction:column;min-height:100vh}
-#topbar{background:var(--superficie);padding:14px 28px;border-bottom:1px solid var(--borde);display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:64px;position:sticky;top:0;z-index:50}
+#topbar{background:var(--superficie);padding:14px 28px;border-bottom:1px solid var(--borde);display:flex;align-items:center;justify-content:space-between;gap:var(--esp-4);min-height:64px;position:sticky;top:0;z-index:50}
 #topbar h1{font-size:1.25em;color:var(--blue);font-weight:700;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #topbar .actions{display:flex;gap:10px;align-items:center}
-.btn-refresh{background:var(--blue3);border:1px solid var(--blue);color:var(--blue);padding:6px 16px;border-radius:8px;cursor:pointer;font-size:.82em;font-weight:600;white-space:nowrap;transition:background-color var(--dur-rapida) var(--curva-estandar),color var(--dur-rapida) var(--curva-estandar)}
+.btn-refresh{background:var(--blue3);border:1px solid var(--blue);color:var(--blue);padding:6px var(--esp-4);border-radius:8px;cursor:pointer;font-size:.82em;font-weight:600;white-space:nowrap;transition:background-color var(--dur-rapida) var(--curva-estandar),color var(--dur-rapida) var(--curva-estandar)}
 .btn-refresh:hover{background:var(--blue);color:var(--texto-inverso)}
 /* Ya no reserva un ancho fijo: el texto pasa de "—" a "Datos de hace N min",
    que es de largo estable. Lo que sigue haciendo falta es `nowrap`, para que
    no envuelva y devuelva el salto de layout que la T4.5 quito. */
 .badge-cache{font-size:.72em;color:var(--gris-600);background:var(--gris-100);padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;cursor:help}
 #topbar .actions{flex-wrap:nowrap;flex-shrink:0}
-#content{padding:24px 28px;flex:1}
+#content{padding:var(--esp-5) 28px;flex:1}
 
 /* SECTION */
 .section{display:none}
@@ -73,7 +73,7 @@ body{font-family:'Segoe UI',sans-serif;background:var(--azul-tenue-2);display:fl
 .card.card--principal .value{font-size:var(--texto-3xl);line-height:var(--linea-apretada)}
 .card.card--principal{border-left-width:5px}
 .cards-titulo{font-size:var(--texto-xs);font-weight:var(--peso-medio);letter-spacing:var(--track-etiqueta);text-transform:uppercase;color:var(--texto-suave);margin:0 0 var(--esp-3)}
-.card{background:var(--superficie);border-radius:14px;padding:18px 16px;box-shadow:0 2px 10px rgba(0,71,204,.08);border-left:4px solid var(--blue);transition:transform var(--dur-rapida) var(--curva-estandar)}
+.card{background:var(--superficie);border-radius:14px;padding:18px var(--esp-4);box-shadow:0 2px 10px rgba(0,71,204,.08);border-left:4px solid var(--blue);transition:transform var(--dur-rapida) var(--curva-estandar)}
 .card:hover{transform:translateY(-3px)}
 .card .label{font-size:.7em;text-transform:uppercase;letter-spacing:.8px;color:var(--texto-suave);margin-bottom:6px}
 .card .value{font-size:1.9em;font-weight:800;color:var(--blue)}
@@ -88,7 +88,7 @@ body{font-family:'Segoe UI',sans-serif;background:var(--azul-tenue-2);display:fl
 /* `min-width:0` en `.chart-box`: un elemento de rejilla trae `min-width:auto`
    igual que uno flex, asi que el <canvas> le ponia suelo y a 320 px el tablero
    desbordaba 36 px aunque la rejilla ya fuera de una sola columna. */
-.charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:var(--esp-4);margin-bottom:22px}
 .chart-box{background:var(--superficie);border-radius:14px;padding:20px;box-shadow:0 2px 10px rgba(0,71,204,.08);min-width:0}
 .chart-box h2{font-size:.88em;color:var(--blue);margin-bottom:14px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .chart-box.full{grid-column:1/-1}
@@ -108,23 +108,23 @@ body{font-family:'Segoe UI',sans-serif;background:var(--azul-tenue-2);display:fl
 /* TABLES */
 .table-box{background:var(--superficie);border-radius:14px;padding:20px;box-shadow:0 2px 10px rgba(0,71,204,.08);margin-bottom:22px;overflow:hidden}
 .table-box h2{font-size:.88em;color:var(--blue);margin-bottom:14px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
-.table-controls{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
-.table-controls input,.table-controls select{padding:7px 12px;border:1px solid var(--borde-control);border-radius:8px;font-size:.83em;outline:none;transition:border-color var(--dur-rapida) var(--curva-estandar)}
+.table-controls{display:flex;gap:10px;margin-bottom:var(--esp-3);flex-wrap:wrap}
+.table-controls input,.table-controls select{padding:7px var(--esp-3);border:1px solid var(--borde-control);border-radius:8px;font-size:.83em;outline:none;transition:border-color var(--dur-rapida) var(--curva-estandar)}
 .table-controls input:focus,.table-controls select:focus{border-color:var(--blue)}
-.seg-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
-.seg-tab{padding:8px 18px;border-radius:20px;background:var(--gris-100);color:var(--gris-600);cursor:pointer;font-size:.83em;font-weight:600;border:2px solid transparent;transition:background-color var(--dur-rapida) var(--curva-estandar),color var(--dur-rapida) var(--curva-estandar),border-color var(--dur-rapida) var(--curva-estandar);white-space:nowrap}
+.seg-tabs{display:flex;flex-wrap:wrap;gap:var(--esp-2);margin-bottom:18px}
+.seg-tab{padding:var(--esp-2) 18px;border-radius:20px;background:var(--gris-100);color:var(--gris-600);cursor:pointer;font-size:.83em;font-weight:600;border:2px solid transparent;transition:background-color var(--dur-rapida) var(--curva-estandar),color var(--dur-rapida) var(--curva-estandar),border-color var(--dur-rapida) var(--curva-estandar);white-space:nowrap}
 .seg-tab:hover{background:var(--gris-200);color:var(--gris-800)}
 .seg-tab.active{background:var(--blue);color:var(--texto-inverso);border-color:var(--blue)}
 /* Sin `opacity`: --gris-600 al 75 % sobre --gris-100 da 3.81:1. El conteo es
    informacion (cuantos registros hay en la pestana), no adorno. */
 .seg-tab .tab-count{font-size:.75em;margin-left:3px}
 .edit-field-group{display:flex;flex-direction:column;gap:5px}
-.edit-field-group label{font-size:.68em;font-weight:700;color:var(--gris-500);text-transform:uppercase;letter-spacing:.6px;display:flex;align-items:center;gap:4px}
-.edit-field-group input,.edit-field-group select,.edit-field-group textarea{padding:9px 12px;border:1.5px solid var(--borde-control);border-radius:10px;font-size:.87em;outline:none;transition:border-color var(--dur-rapida) var(--curva-estandar),box-shadow var(--dur-rapida) var(--curva-estandar);width:100%;background:var(--gris-50);color:var(--gris-800)}
+.edit-field-group label{font-size:.68em;font-weight:700;color:var(--gris-500);text-transform:uppercase;letter-spacing:.6px;display:flex;align-items:center;gap:var(--esp-1)}
+.edit-field-group input,.edit-field-group select,.edit-field-group textarea{padding:9px var(--esp-3);border:1.5px solid var(--borde-control);border-radius:10px;font-size:.87em;outline:none;transition:border-color var(--dur-rapida) var(--curva-estandar),box-shadow var(--dur-rapida) var(--curva-estandar);width:100%;background:var(--gris-50);color:var(--gris-800)}
 .edit-field-group input:focus,.edit-field-group select:focus,.edit-field-group textarea:focus{border-color:var(--azul);box-shadow:0 0 0 3px rgba(0,71,204,.1);background:var(--superficie)}
 .edit-field-group textarea{resize:vertical;min-height:72px;line-height:1.5}
 .edit-field-group input[type=date]{color:var(--gris-900)}
-.btn-edit-row{padding:4px 11px;border:1.5px solid var(--azul);border-radius:7px;background:var(--azul-tenue-2);color:var(--azul);cursor:pointer;font-size:.77em;font-weight:700;white-space:nowrap;transition:background-color var(--dur-rapida) var(--curva-estandar),color var(--dur-rapida) var(--curva-estandar),box-shadow var(--dur-rapida) var(--curva-estandar)}
+.btn-edit-row{padding:var(--esp-1) 11px;border:1.5px solid var(--azul);border-radius:7px;background:var(--azul-tenue-2);color:var(--azul);cursor:pointer;font-size:.77em;font-weight:700;white-space:nowrap;transition:background-color var(--dur-rapida) var(--curva-estandar),color var(--dur-rapida) var(--curva-estandar),box-shadow var(--dur-rapida) var(--curva-estandar)}
 .btn-edit-row:hover{background:var(--azul);color:var(--texto-inverso);box-shadow:0 2px 8px rgba(0,71,204,.25)}
 .color-opt{position:relative;width:30px;height:30px;border-radius:50%;cursor:pointer;transition:transform var(--dur-rapida) var(--curva-estandar),border-color var(--dur-rapida) var(--curva-estandar);flex-shrink:0}
 .color-opt:hover{transform:scale(1.15)}
@@ -151,14 +151,14 @@ th{background:var(--blue);color:var(--texto-inverso);padding:0;text-align:left;f
    sobrevivia era el oscuro, que sobre el azul del encabezado da 2.36:1 y no
    llega al 3:1 que pide WCAG 1.4.11 para un indicador de foco. */
 .tabla__orden:focus-visible{outline:none;box-shadow:inset 0 0 0 3px var(--foco-claro),inset 0 0 0 5px var(--foco-oscuro)}
-.tabla__flecha{opacity:.55;font-size:.75em;margin-left:4px}
+.tabla__flecha{opacity:.55;font-size:.75em;margin-left:var(--esp-1)}
 th[aria-sort="ascending"] .tabla__flecha,
 th[aria-sort="descending"] .tabla__flecha{opacity:1}
 .tabla__acciones{width:60px}
-td{padding:8px 10px;border-bottom:1px solid var(--borde);white-space:nowrap;vertical-align:top}
+td{padding:var(--esp-2) 10px;border-bottom:1px solid var(--borde);white-space:nowrap;vertical-align:top}
 tr:nth-child(even) td{background:var(--azul-tenue-2)}
 tr:hover td{background:var(--blue3)}
-.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.75em;font-weight:600}
+.tag{display:inline-block;padding:2px var(--esp-2);border-radius:20px;font-size:.75em;font-weight:600}
 .tag.aprobado{background:var(--aprobado-banda);color:var(--aprobado-fuerte)}
 .tag.negado{background:var(--negado-banda);color:var(--negado-fuerte)}
 .tag.buzon{background:var(--buzon-banda);color:var(--buzon-fuerte)}
@@ -177,19 +177,19 @@ tr:hover td{background:var(--blue3)}
    de componentes.css, que si las distinguen. */
 
 /* PAGINATION */
-.pagination{display:flex;align-items:center;gap:6px;margin-top:12px;justify-content:flex-end;flex-wrap:wrap}
-.pagination button{padding:4px 10px;border:1px solid var(--borde-control);border-radius:6px;background:var(--superficie);cursor:pointer;font-size:.8em;color:var(--blue)}
+.pagination{display:flex;align-items:center;gap:6px;margin-top:var(--esp-3);justify-content:flex-end;flex-wrap:wrap}
+.pagination button{padding:var(--esp-1) 10px;border:1px solid var(--borde-control);border-radius:6px;background:var(--superficie);cursor:pointer;font-size:.8em;color:var(--blue)}
 .pagination button.active{background:var(--blue);color:var(--texto-inverso);border-color:var(--blue)}
 .pagination button:hover:not(.active){background:var(--blue3)}
 .pag-info{font-size:.78em;color:var(--texto-suave)}
 
-.section-header{font-size:1.05em;font-weight:700;color:var(--blue);margin-bottom:18px;padding-bottom:8px;border-bottom:2px solid var(--blue3)}
+.section-header{font-size:1.05em;font-weight:700;color:var(--blue);margin-bottom:18px;padding-bottom:var(--esp-2);border-bottom:2px solid var(--blue3)}
 .btn-upload-pago{background:var(--blue3);border:1px solid var(--blue);color:var(--blue);padding:3px 9px;border-radius:6px;cursor:pointer;font-size:.75em;font-weight:600;white-space:nowrap;transition:background-color var(--dur-rapida) var(--curva-estandar),color var(--dur-rapida) var(--curva-estandar)}
 .btn-upload-pago:hover{background:var(--blue);color:var(--texto-inverso)}
-.bruce-form{background:var(--azul-tenue-2);border-radius:12px;padding:18px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.bruce-form input,.bruce-form select,.bruce-form textarea{width:100%;padding:9px 12px;border:1.5px solid var(--borde-control);border-radius:8px;font-size:.86em;font-family:inherit;outline:none;transition:border-color var(--dur-rapida) var(--curva-estandar)}
+.bruce-form{background:var(--azul-tenue-2);border-radius:12px;padding:18px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr;gap:var(--esp-3)}
+.bruce-form input,.bruce-form select,.bruce-form textarea{width:100%;padding:9px var(--esp-3);border:1.5px solid var(--borde-control);border-radius:8px;font-size:.86em;font-family:inherit;outline:none;transition:border-color var(--dur-rapida) var(--curva-estandar)}
 .bruce-form input:focus,.bruce-form select:focus,.bruce-form textarea:focus{border-color:var(--blue)}
-.bruce-form label{font-size:.72em;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:block}
+.bruce-form label{font-size:.72em;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;margin-bottom:var(--esp-1);display:block}
 .bruce-form .full{grid-column:1/-1}
 .bruce-form textarea{resize:vertical;min-height:60px}
 /* De `<span onclick>` a `<button role=switch>` (T4.10): el precio de usar el
@@ -197,16 +197,16 @@ tr:hover td{background:var(--blue3)}
    minimo de 24x24 es SC 2.5.8. */
 .bruce-casilla{cursor:pointer;font-size:1.2em;text-align:center;user-select:none;background:none;border:0;padding:0;color:inherit;font-family:inherit;min-width:24px;min-height:24px;transition:transform var(--dur-rapida) var(--curva-estandar)}
 .bruce-casilla:hover{transform:scale(1.3)}
-.men-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;padding:4px 0}
+.men-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--esp-4);padding:var(--esp-1) 0}
 /* Sin sombra propia: va DENTRO de .table-box, que ya se eleva. Dos sombras
    apiladas son la tarjeta-dentro-de-tarjeta que las reglas prohiben, y que el
    propio importador declara que no quiere ("separacion por filete, no por
    tarjeta dentro de tarjeta"). La separacion la da el filete izquierdo. */
-.men-card{background:var(--superficie);border-radius:12px;border:1px solid var(--borde);border-left:4px solid var(--blue);padding:16px 18px;display:flex;flex-direction:column;gap:10px}
-.men-card-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.men-card{background:var(--superficie);border-radius:12px;border:1px solid var(--borde);border-left:4px solid var(--blue);padding:var(--esp-4) 18px;display:flex;flex-direction:column;gap:10px}
+.men-card-header{display:flex;align-items:center;justify-content:space-between;gap:var(--esp-2)}
 .men-card-tipo{font-size:.8em;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--blue)}
-.men-card-content{font-size:.82em;color:var(--gris-700);line-height:1.55;white-space:pre-wrap;max-height:130px;overflow-y:auto;border-top:1px solid var(--borde);padding-top:8px;word-break:break-word}
-.men-card-empty{font-size:.8em;color:var(--texto-suave);font-style:italic;border-top:1px solid var(--borde);padding-top:8px}
+.men-card-content{font-size:.82em;color:var(--gris-700);line-height:1.55;white-space:pre-wrap;max-height:130px;overflow-y:auto;border-top:1px solid var(--borde);padding-top:var(--esp-2);word-break:break-word}
+.men-card-empty{font-size:.8em;color:var(--texto-suave);font-style:italic;border-top:1px solid var(--borde);padding-top:var(--esp-2)}
 
 
 /* ==========================================================================

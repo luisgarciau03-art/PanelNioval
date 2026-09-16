@@ -409,3 +409,41 @@ class TestSinTarjetasDentroDeTarjetas:
         el contenedor, que es donde corresponde."""
         bloque = self._bloque(self._css("dashboard.css"), ".table-box")
         assert "box-shadow" in bloque
+
+
+class TestLasTresSuperficiesUsanLaPilaDelADR:
+    """Hallazgo B2 de la auditoria de T4.1.
+
+    El ADR decidio conservar una pila de sistema multiplataforma y NO descargar
+    ninguna fuente web, con este motivo: una fuente web anade bytes y un
+    `font-display: swap` que provoca reflow justo en la superficie donde la
+    velocidad de captura es el criterio de exito.
+
+    `importador.css` lo respetaba; `dashboard.css` y `formulario.css` seguian
+    redeclarando `'Segoe UI'` literal, que es la que estaba por omision antes del
+    rediseno. El propio PR sabia cual era la correcta y la aplicaba en una de las
+    tres superficies.
+    """
+
+    def test_ninguna_superficie_redeclara_una_familia_literal(self):
+        """`inherit` es legitimo y necesario -los controles de formulario NO
+        heredan la familia por defecto- y `--fuente-mono` es el otro token del
+        sistema. Lo que se persigue es la familia escrita a mano."""
+        malas = []
+        for nombre in ("dashboard.css", "formulario.css", "importador.css"):
+            for linea in _texto(CSS / nombre).splitlines():
+                for m in re.finditer(r"font-family:\s*([^;}]+)", linea):
+                    valor = m.group(1).strip()
+                    if valor.startswith("inherit") or "var(--fuente" in valor:
+                        continue
+                    malas.append("%s -> %s" % (nombre, valor[:40]))
+        assert malas == [], (
+            "hay superficies con la familia escrita a mano en vez del token: %s" % malas
+        )
+
+    def test_la_pila_del_token_no_descarga_ninguna_fuente(self):
+        """Control negativo de la decision del ADR: si alguien mete una fuente
+        web, el token dejaria de ser una pila de sistema y este test lo dice."""
+        tokens = _texto(CSS / "tokens.css")
+        assert "@font-face" not in tokens
+        assert "fonts.googleapis" not in tokens and ".woff" not in tokens
