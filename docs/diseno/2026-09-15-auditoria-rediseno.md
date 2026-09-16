@@ -88,7 +88,14 @@ arriba no se ha tocado: `git log` lo demuestra — commit `4212917`.)*
 # 1. EL VEREDICTO, EN UNA LÍNEA
 
 > **El rediseño cumple el encargo y supera el criterio anti-plantilla — 5 cualidades probadas
-> de las 10, sobre un mínimo de 4 — pero tiene 3 huecos bloqueantes, y ninguno es estético.**
+> de las 10, sobre un mínimo de 4 — pero tiene 5 huecos bloqueantes**, y sólo uno de ellos es
+> una cuestión de tratamiento visual.
+>
+> ⚠️ **Este veredicto se corrigió tras el gate de `ux-researcher`**, que subió dos huecos de
+> severidad y destapó un defecto funcional que esta auditoría había cerrado como «riesgo bajo»:
+> **el buscador de ciudades no normaliza acentos, y eso deja 319 de las 1,004 fuera de alcance**
+> para quien teclee sin tildes. El detalle está en **§9**; las secciones 1-8 se conservan tal
+> como se escribieron, para que la corrección se vea.
 > El más grave no está en el diseño sino en su evidencia: **las capturas del «después» del
 > tablero están todas a cero**, así que el gate del owner en T4.2 compararía un «antes» con
 > datos reales contra un «después» vacío. Los otros dos: la pantalla principal **no usa el
@@ -400,3 +407,134 @@ centrado sobre degradado, y la pila tipográfica es una decisión argumentada �
 para evitar el reflow de `font-display:swap`—, no una omisión.
 
 **El rediseño es opinionado y sabe por qué.** Ese no es su problema.
+
+---
+
+# 9. CORRECCIONES DEL GATE `ux-researcher`
+
+El gate hizo lo que se le pidió: **corregir la severidad, no validarla**. Sus cuatro objeciones
+se aceptan. Tres modifican el veredicto y una destapa un defecto que esta auditoría había
+cerrado mal.
+
+## 9.1 Una contradicción dentro de este mismo documento
+
+El veredicto original decía *«3 huecos bloqueantes, y ninguno es estético»* — y dos párrafos
+después describía **B3 como exactamente un problema de tratamiento visual**.
+
+**Objeción aceptada.** B3 sigue siendo bloqueante, pero **por gobernanza de reglas, no por
+coste para el operador**: es uno de los cuatro defectos que las reglas del entorno prohíben por
+su nombre, y cerrarlo cuesta quitar una sombra. Ese es el argumento correcto, y es más fuerte
+que el que yo había escrito.
+
+## 9.2 B4 (nuevo, bloqueante) · Las 9 mediciones de CLS son de CARGA, no de INTERACCIÓN
+
+**La objeción más valiosa del gate.** Los 9 puntos por debajo de 0.1 del §2.1 miden el
+desplazamiento **al cargar la página**. M7 describe un salto distinto: cuatro bloques con
+`hidden` —`.stats-row`, `#progress-box`, `#medidor-box`, `.resultado`— que **aparecen al pulsar
+«Buscar»** y empujan lo que tengan debajo.
+
+Ese desplazamiento **no está medido por ninguna de las nueve cifras**. Y ocurre en la superficie
+que el propio §0.6 señalaba como la de espera más larga, **una vez por corrida**.
+
+**Lo que lo convierte en inconsistencia y no en decisión:** el patrón de arreglo ya existe en
+este mismo PR. La caja de ciudades *«tenía techo pero no suelo»* y se le puso `min-height`. A
+estos cuatro bloques no se les aplicó lo mismo.
+
+**Consecuencia:** CE6 no puede firmarse en verde sobre las mediciones actuales. Falta medir el
+CLS de interacción, y es T4.7 quien debe hacerlo.
+
+## 9.3 B5 (nuevo, bloqueante) · El buscador de ciudades no normaliza acentos — **medido**
+
+El gate lo planteó como hipótesis sobre el código anterior al PR, marcándolo honestamente como
+**no confirmado** en la rama auditada. **Lo confirmé en la rama del PR #43**:
+
+```js
+// static/js/importador.js:223
+buscable: (el.dataset.ciudad || '').toLowerCase(),
+// :317
+const q = document.getElementById('ciudad-filter').value.toLowerCase().trim();
+// :326
+(!q || c.buscable.includes(q))
+```
+
+`toLowerCase()` **no quita acentos**: en JavaScript, buscar `leon` dentro de `león` devuelve
+falso.
+
+### Impacto, medido contra el catálogo real de producción
+
+| | |
+|---|---:|
+| Ciudades del catálogo | **1,004** |
+| **Con al menos un carácter acentuado** | **319 (31.8 %)** |
+| **En el top-100 por prioridad** | **39** |
+
+Casos reales, todos **NO encontrados** al teclear sin acento: `leon` → León · `merida` →
+Mérida · `queretaro` → Querétaro · `nezahualcoyotl` → Nezahualcóyotl · `juarez, chihuahua` →
+Juárez, Chihuahua · `san luis potosi` → San Luis Potosí · `torreon` → Torreón.
+
+**Por qué bloquea:** casi **un tercio del catálogo** es inalcanzable por el camino que un
+operador usa de verdad — teclear sin ir a buscar la tecla del acento. Y el fallo es **mudo**:
+la lista queda vacía, y el operador no puede distinguir *«esta ciudad no está en el catálogo»*
+de *«el buscador me la está escondiendo»*. Con 606 ciudades ya existía; con 1,004, y con la
+agrupación por región apoyándose en el buscador para lo que no cabe en pantalla, es peor.
+
+**Arreglo:** normalizar las dos puntas con `NFD` y quitar las marcas diacríticas, una sola vez
+al construir `buscable` y una vez por pulsación sobre la consulta. El proyecto ya tiene esa
+función en Python —`normalizar()` del generador—; falta su gemela en JavaScript.
+
+**Lección de método, que vale más que el defecto:** cerré M5 como «riesgo bajo» habiendo
+comprobado sólo que la caja no salta y que las menciones a «606» son comentarios. **Nunca
+ejecuté una búsqueda.** Verifiqué la parte que se ve en el CSS y di por buena la que había que
+ejercitar.
+
+## 9.4 M4 se parte: el esqueleto ausente del formulario sube a bloqueante
+
+**Objeción aceptada, y es un fallo de coherencia mío.** El §0.6 —escrito *antes* de mirar—
+declaraba que quería atrapar *«los cuatro estados cubiertos en el tablero y olvidados en las
+otras superficies»*. Lo encontré, y lo clasifiqué como mejora. Eso contradice mi propio
+criterio fijado de antemano.
+
+- **Sube a bloqueante:** el **formulario no tiene esqueleto de carga propio**. Es la superficie
+  de mayor frecuencia de uso y la única medida en pulsaciones; un salto de layout ahí cuesta en
+  cada una de las cientos de repeticiones diarias.
+- **Se queda como mejora:** `vacío` no capturado en el importador — es falta de **evidencia**,
+  no necesariamente de implementación, y la auditoría no distinguió una cosa de la otra.
+
+## 9.5 A la matriz le falta un eje, y el propio plan lo pedía
+
+El gate señala que la matriz responde bien *«¿existe el sistema declarado?»* y mal *«¿es más
+barata la jornada del operador?»*. Tiene razón, y la prueba está en este mismo documento: el
+dato más importante que encontré —**el formulario baja de ~90 a 11 pulsaciones**— aparece como
+mención suelta en §2, **no como una fila de la matriz**. El eje correcto estaba en mi cabeza y
+no en la estructura.
+
+| Eje ausente | Por qué importa aquí |
+|---|---|
+| **Coste por repetición, por superficie** | El 90→11 sólo existe para el formulario. No hay equivalente para tablero ni importador |
+| **Reanudación tras interrupción** | Un operador de llamadas vive interrumpido. Nadie comprobó qué pasa al recargar a media captura |
+| **Flujo por teclado como rendimiento** | «4 → 0 inalcanzables» prueba accesibilidad, no velocidad. Nadie contó los saltos de foco para cerrar una llamada |
+| **Fricción de confirmación acumulada** | *«Nada celebra sin verificar»* es sana; si implica un diálogo por envío, son cientos de clics al día |
+| **Degradación en sesión larga** | El registro del importador crece sin tope y nadie midió la corrida número 40 del día |
+
+**No se añaden ahora:** medirlos es trabajo de T4.7, no de una auditoría documental. Quedan
+escritos para que T4.7 no los redescubra.
+
+## 9.6 Cómo debe leerse este documento
+
+El gate lo formula mejor de lo que yo lo había dejado: **«cumple el encargo» no es lo mismo que
+«validado para la jornada del operador»**. Esta auditoría mide lo declarado contra lo
+implementado y contra la política anti-plantilla. **No mide la jornada.** El cierre del §7 ya lo
+decía, pero se pierde si sólo se lee el veredicto de una línea.
+
+## 9.7 Estado final de los huecos
+
+| Severidad | Huecos |
+|---|---|
+| **Bloqueantes (5)** | **B1** capturas del «después» a cero · **B2** la pantalla principal no usa el sistema · **B3** tarjetas dentro de tarjetas *(por regla)* · **B4** el CLS de interacción no está medido · **B5** el buscador no normaliza acentos: 319 ciudades inalcanzables |
+| **Mejoras (8)** | M1 escala de radios/sombras esquivada · M2 el hover salta con `reduced-motion` · M3 5 tokens sin uso · M4′ `vacío` sin capturar en importador · M5 el importador nunca visto a 1,004 · M6 la forma del esqueleto no casa en Mensajes · M8 el peor caso de CLS baila entre documentos · M9 sin tabla de duraciones y curvas |
+
+*(M7 queda absorbido en B4.)*
+
+**B1 sigue siendo el único que bloquea T4.2**, porque impide la comparación que el owner tiene
+que juzgar. B2 a B5 bloquean el **merge**, no el gate del owner: son deuda de implementación
+sobre una dirección visual que la auditoría respalda.
