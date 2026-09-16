@@ -12,8 +12,9 @@ Continúas el proyecto **PanelNioval**. **Sesión 3.** NO empieces de cero: el d
 PR abiertos.
 
 **PROYECTO:** `C:\Users\PC 1\PanelNioval`
-**`main`:** **`8bac782`** — Plan 1 completo. **Es lo que corre en el VPS.**
-**RAMA DEL PLAN 1:** `feat/relevancia-nacional-produccion` (= rama del PR #42, ya mergeada). Último commit `407eb32`.
+**`main`:** **`28eacfe`** — Plan 1 completo (PR #42) + su cierre documental (PR #45).
+**En el VPS corre `8bac782`**, y está bien: el PR #45 es sólo documentación, no hay nada que redesplegar.
+**RAMA DEL PLAN 1:** `feat/relevancia-nacional-produccion` — **mergeada dos veces y agotada.** No sigas en ella.
 **RAMA A CREAR:** `feat/rediseno-aterrizaje`, desde `main` actualizado.
 
 ---
@@ -94,7 +95,9 @@ del RUNBOOK no funcionaba sobre HEAD desacoplado.
 
 - **`main` = `8bac782`.** `pytest` sobre `main`: **525 passed, 1 skipped**.
 - **Producción = `8bac782`**, verificado en el servidor. `RestartCount=0`. Smoke `Todo OK ✅`.
-- **PR #42: MERGED.** **PR #43: `MERGEABLE/CLEAN`.** **PR #44: `CONFLICTING` contra `main`.**
+- **PR #42: MERGED** (`8bac782`). **PR #45: MERGED** (`28eacfe`, cierre documental).
+- ⚠️ **PR #43: `CONFLICTING`** — sólo en `CLAUDE.md`, **a propósito** (ver abajo).
+- ⚠️ **PR #44: `CONFLICTING`** en 4 archivos: `CLAUDE.md`, `app.py`, `docs/RUNBOOK.md` y `docs/superpowers/plans/2026-08-27-indice-tanda.md`.
 - Árbol limpio, todo empujado.
 
 ---
@@ -140,7 +143,10 @@ vuelve a decir:
 favor de la rama», **borra la corrección y el invariante falso vuelve a `main`** — y con él, el
 fallo que costó todo el diagnóstico de T1.6.
 
-**Por eso los docs de T1.6/T1.7 se aterrizaron a `main` a propósito**: el conflicto en
+**Ya ocurrió:** el PR #45 aterrizó esos docs en `main` (`28eacfe`) y **el #43 pasó de
+`MERGEABLE` a `CONFLICTING`**. Fue una decisión consciente, con su coste declarado: se cambió
+un merge limpio por un conflicto de **un solo archivo** a cambio de que la corrección no se
+pierda. **Por eso los docs de T1.6/T1.7 se aterrizaron a `main` a propósito**: el conflicto en
 `CLAUDE.md` es una **defensa**, no un estorbo. Obliga a decidir a mano en vez de revertir en
 silencio. **Al resolverlo, conserva SIEMPRE la versión de T1.7** en las líneas de Railway,
 despliegue, secretos y baseline; toma del #43 lo suyo (arquitectura de `templates/`+`static/`,
@@ -159,8 +165,8 @@ el merge del #42 hay que remedirlo, no copiarlo.
 | 🔒 **PII en `sin_clasificar`** | El endpoint publica **8 teléfonos y 1 correo** de clientes contra lo que promete su docstring. Tras token; **no lo introdujo el Plan 1** (el endpoint viejo ya lo hacía). O se sanea la salida conservando el aviso, o se corrige la promesa | **Owner decide**; ver RUNBOOK § «Ciudades sin clasificar» |
 | **El smoke no cubre el importador** | Dio `Todo OK ✅` contra un panel sin desplegar. Añadirle `/api/importador/ciudades` | Tarea pendiente, sin asignar |
 | **El smoke revienta en Windows** | `UnicodeEncodeError` al imprimir el `✅`; **sale con código ≠ 0 aunque los 5 chequeos pasen**. Se sortea con `PYTHONIOENCODING=utf-8` | Tarea pendiente, sin asignar |
-| **PR #43** (Plan 4) | Aprobación de la dirección visual + aterrizaje | Plan 4, T4.2 y T4.4 |
-| **PR #44** | `CONFLICTING` contra `main` **y** contra el #43 | Plan 4, T4.6 |
+| **PR #43** (Plan 4) | ⚠️ **`CONFLICTING` en `CLAUDE.md`** (era `MERGEABLE`). Provocado a propósito por el PR #45: sin él, el #43 borraba la corrección del auto-deploy en silencio. **Al resolver, conservar la versión de T1.7** | Plan 4, T4.2 y T4.4 |
+| **PR #44** | `CONFLICTING` contra `main` en **4 archivos** (`CLAUDE.md`, `app.py`, `RUNBOOK`, índice de agosto) **y** contra el #43 | Plan 4, T4.6 |
 | **Caché `_estado_catalogo`** | `app.py:895-897` no se invalida: un fallo transitorio al arrancar serviría `catalogo_cargado: false` hasta el reinicio. No es silencioso | Insumo del Plan 3 |
 | **Bug de conteo** | Diagnóstico H1/H2/H3 — sin hacer | Plan 3 |
 | **`claude-mem` caído** | Desde 2026-09-05 (issue #2188) | **El relevo es la única persistencia** |
