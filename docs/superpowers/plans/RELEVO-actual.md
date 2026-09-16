@@ -3,7 +3,7 @@
 > **Archivo único que se SOBRESCRIBE al cerrar CADA tarea.** Siempre contiene el mensaje
 > completo para arrancar una sesión nueva.
 >
-> **Estado: Plan 1 CERRADO Y EN PRODUCCIÓN (8/8) · Plan 4 EN CURSO (T4.0 hecha).** Siguiente: **Plan 4 · T4.1**.
+> **Estado: Plan 1 CERRADO Y EN PRODUCCIÓN (8/8) · Plan 4 EN CURSO (T4.0 y T4.1 hechas).** Siguiente: **T4.2 — gate del owner**.
 
 ---
 
@@ -68,7 +68,7 @@ Verifica siempre después: `ssh root@155.138.200.66 'cd /srv/panel/app && git lo
 
 ## AVANCE
 
-- **Global: 1 / 4 planes (25 %)** · Tareas **9 / 34 (26.5 %)** · **Plan 4 en curso (1/12)**
+- **Global: 1 / 4 planes (25 %)** · Tareas **10 / 34 (29.4 %)** · **Plan 4 en curso (2/12)**
 - **Plan 1: CERRADO, MERGEADO Y DESPLEGADO.** El operador ve **1,004 ciudades** donde había 606.
 
 ---
@@ -118,24 +118,60 @@ consigue, dilo con el número delante en vez de esconderte tras un «no empeoró
 
 ---
 
+## HECHO EN T4.1 (commits `4212917` · `87fdbea` · `7ae544b`)
+
+**El criterio se fijó y se commiteó ANTES de mirar** (`4212917`), así que `git log` demuestra
+que la auditoría no es una racionalización de lo ya construido.
+
+**Veredicto:** el rediseño **cumple el encargo** y supera el criterio anti-plantilla — 5
+cualidades probadas de 10, sobre un mínimo de 4 — con **5 huecos bloqueantes**.
+
+| Lo mejor que encontró | |
+|---|---|
+| La dirección visual acierta el dominio | editorial/Swiss, con el argumento correcto: *«un rediseño que se vea mejor y capture más lento es un retroceso»* |
+| El formulario se midió donde importa | de **~90 a 11 pulsaciones** por captura |
+| **Validación cruzada del CLS** | el PR midió **0.1941** y T4.0 midió **0.1924** con otra herramienta, otro entorno y otros datos. **0.9 % de diferencia** |
+| El rediseño arregla el CLS de carga | 9/9 por debajo de 0.1 |
+
+**Los 5 bloqueantes:**
+
+- **B1** · Las capturas del «después» del tablero están **a cero**. T4.2 compararía un panel con
+  7,180 contactos contra uno vacío. **Es el único que bloquea el gate del owner.**
+- **B2** · La pantalla principal **no usa el sistema** que el PR declara, y el dato es binario:
+  espaciado con token **29/29** en `componentes.css` y **50/52** en `importador.css`, contra
+  **9/86** en `dashboard.css` y **0/31** en `formulario.css`.
+- **B3** · Tarjetas dentro de tarjetas. Bloquea **por regla**, no por coste al operador.
+- **B4** · **Las 9 mediciones de CLS son de CARGA, no de interacción.** Cuatro bloques del
+  importador empujan al pulsar «Buscar», una vez por corrida, y nadie lo midió.
+- **B5** · 🔍 **El buscador no normaliza acentos.** `toLowerCase()` y nada más, así que teclear
+  `leon` no encuentra `León`. **319 de las 1,004 ciudades (31.8 %)** llevan acento, y **39 del
+  top-100**. El fallo es **mudo**: la lista queda vacía y el operador no distingue «no está» de
+  «me la esconde».
+
+**El gate de `ux-researcher` corrigió el veredicto**, y eso es lo que más valor dio: encontró
+una contradicción dentro del propio documento, subió dos huecos de severidad y planteó B5 como
+hipótesis, que yo confirmé y medí en la rama.
+
+---
+
 ## SIGUIENTE PASO EXACTO
 
-**Plan 4, Tarea T4.1 — Auditoría del rediseño construido: ¿cumple lo que pediste?**
+**Plan 4, Tarea T4.2 — Gate del owner: aprobar la dirección visual antes de invertir más.**
 
 ```
-ANCLA · Plan 4 Tarea T4.1 · importador nacional barato veraz profesional · avance 9/34 ·
+ANCLA · Plan 4 Tarea T4.2 · importador nacional barato veraz profesional · avance 10/34 ·
  baseline: python -m pytest tests/  -> 525 passed, 1 skipped
 ```
 
-Lee el bloque de T4.1 en `docs/superpowers/plans/2026-09-15-plan4-rediseno-profesional-aterrizaje.md`.
-El instrumento de medición ya existe: **usa las 9 capturas y las 6 métricas de T4.0**, no
-vuelvas a generarlas.
+⚠️ **NO presentes el gate sin cerrar B1 primero.** Las capturas del «después» del tablero están
+a cero: el owner compararía «con datos» contra «sin datos» y lo que juzgaría no sería el
+rediseño. **Recapturar las tres superficies con datos**, con el procedimiento de anonimización
+de T4.0 (interceptar `/api/formulario/siguiente`; el script está en el informe de T4.0 §2.1).
 
-**Si necesitas capturar producción otra vez, dos cosas obligatorias:**
-1. **El formulario muestra datos de un cliente real.** Anonimiza interceptando
-   `/api/formulario/siguiente` antes de que la página pinte — el script está en el informe. No
-   difumines píxeles: si la PII llegó a disco, ya es tarde.
-2. **Mira las capturas antes de commitearlas.** Las nueve se abrieron una por una.
+Después, lee el bloque de T4.2 en el plan y presenta al owner **la dirección**, no los huecos:
+*editorial/Swiss, denso y escaneable, sin fuente web, sin profundidad ni textura, con el color
+como significado*. La auditoría la respalda. B2–B5 son deuda de implementación y su sitio es
+T4.3, no el juicio del owner.
 
 ---
 
