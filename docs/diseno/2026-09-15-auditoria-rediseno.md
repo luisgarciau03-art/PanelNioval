@@ -88,14 +88,21 @@ arriba no se ha tocado: `git log` lo demuestra — commit `4212917`.)*
 # 1. EL VEREDICTO, EN UNA LÍNEA
 
 > **El rediseño cumple el encargo y supera el criterio anti-plantilla — 5 cualidades probadas
-> de las 10, sobre un mínimo de 4 — pero tiene 5 huecos bloqueantes**, y sólo uno de ellos es
-> una cuestión de tratamiento visual.
+> de las 10, sobre un mínimo de 4 — con 4 huecos bloqueantes**, ninguno de los cuales impide el
+> gate del owner.
 >
-> ⚠️ **Este veredicto se corrigió tras el gate de `ux-researcher`**, que subió dos huecos de
-> severidad y destapó un defecto funcional que esta auditoría había cerrado como «riesgo bajo»:
-> **el buscador de ciudades no normaliza acentos, y eso deja 319 de las 1,004 fuera de alcance**
-> para quien teclee sin tildes. El detalle está en **§9**; las secciones 1-8 se conservan tal
-> como se escribieron, para que la corrección se vea.
+> ⚠️ **Este documento se corrigió DOS veces, y las dos correcciones se dejan a la vista:**
+>
+> - **§9** — el gate de `ux-researcher` subió dos huecos de severidad y destapó un defecto
+>   funcional que yo había cerrado como «riesgo bajo»: **el buscador de ciudades no normaliza
+>   acentos, y eso deja 319 de las 1,004 fuera de alcance** para quien teclee sin tildes.
+> - **§10 — B1 QUEDA RETIRADO: el error era mío, no del PR.** Acusé a las capturas del
+>   «después» de estar a cero sin abrir el «antes» del propio PR, que **también** lo está. Su
+>   comparación sí es equivalente, y su herramienta **aborta si detecta credenciales** para que
+>   ninguna captura lleve datos de clientes. Su estándar es más estricto que el mío.
+>
+> **Quedan 4 bloqueantes, y ninguno bloquea T4.2.** Las secciones 1-8 se conservan tal como se
+> escribieron, para que las correcciones se vean.
 > El más grave no está en el diseño sino en su evidencia: **las capturas del «después» del
 > tablero están todas a cero**, así que el gate del owner en T4.2 compararía un «antes» con
 > datos reales contra un «después» vacío. Los otros dos: la pantalla principal **no usa el
@@ -538,3 +545,97 @@ decía, pero se pierde si sólo se lee el veredicto de una línea.
 **B1 sigue siendo el único que bloquea T4.2**, porque impide la comparación que el owner tiene
 que juzgar. B2 a B5 bloquean el **merge**, no el gate del owner: son deuda de implementación
 sobre una dirección visual que la auditoría respalda.
+
+---
+
+# 10. ⚠️ RETRACTACIÓN DE B1 — el error era mío
+
+**B1 queda RETIRADO.** No era un hueco del PR #43: era un error de mi auditoría, y de los que
+importan porque acusaba al PR de un defecto que no tiene.
+
+## 10.1 Qué afirmé y por qué estaba mal
+
+Afirmé que *«las capturas del "después" están a cero, así que el owner compararía un panel con
+7,180 contactos contra uno vacío»*. Comparé **su «después» contra MIS capturas de T4.0**, que
+son de producción y llevan datos reales.
+
+**El PR nunca propuso esa comparación.** Su «antes» —`docs/diseno/antes/dashboard-1440.png`—
+está **también a cero**, tomado con la misma herramienta y en las mismas condiciones. Lo
+verifiqué abriéndolo. **Su comparación antes/después es perfectamente equivalente**: ceros
+contra ceros, y la diferencia de jerarquía se lee igual de bien —8 tarjetas idénticas contra 3
+grandes + 5 pequeñas—, porque esa diferencia **no depende de los números**.
+
+## 10.2 Y no es un descuido suyo: es una decisión deliberada, mejor razonada que la mía
+
+`tools/capturar_superficies.py` corta **las dos vías** de credencial de Google y luego **aborta
+la ejecución si el panel consigue autenticarse igualmente**:
+
+```python
+def verificar_sin_credenciales() -> None:
+    """Aborta si el panel todavia puede leer las hojas.
+
+    Un barrido que no encuentra nada no demuestra que no hay nada: aqui se
+    comprueba en la direccion util, que el cliente de Google **falla**.
+    """
+```
+
+con el motivo escrito en la cabecera del archivo: *«garantiza que **ninguna captura lleva datos
+de clientes** (riesgo R8 del Plan 4)»*.
+
+Es decir: **el PR se puso una regla más estricta que la mía y la hizo cumplir con código**, no
+con buenas intenciones. Y comprueba en la dirección útil —que el cliente *falle*—, que es
+exactamente la disciplina que este proyecto exige en todo lo demás.
+
+## 10.3 La consecuencia incómoda: las capturas fuera de norma son las MÍAS
+
+Las 9 capturas que tomé en T4.0 viven en `docs/diseno/antes-2026-09-15/` y **están
+commiteadas** con datos de producción: 7,180 contactos, 6,148 llamadas, la tasa de conversión
+real y el ranking de ciudades de la hoja.
+
+- **No contienen PII** — lo verifiqué antes de commitear, y por eso rehice las tres del
+  formulario anonimizando en el origen.
+- **Pero sí son datos de negocio reales**, y el estándar que el propio proyecto se puso —R8—
+  es que las capturas del repo no lleven datos de clientes. El mío fue más laxo que el suyo.
+
+**No lo arreglo por mi cuenta:** borrar no es una opción en este proyecto (lo retirado va al
+respaldo fechado), y decidir si un agregado de negocio cae bajo R8 es del owner. **Queda como
+pendiente declarado**, no como algo que se resuelve en silencio.
+
+## 10.4 Lo que sí queda en pie, mucho más pequeño
+
+Hay un residuo legítimo, y es una **mejora**, no un bloqueante:
+
+> **M10 · Para el gate del owner conviene usar las capturas `--sinteticos`, no las de ceros.**
+> La cualidad nº 1 del rediseño es la **jerarquía por contraste de escala**, y un `0` de un
+> dígito no muestra lo mismo que un `7180` de cuatro: el salto de 56 px contra 30 px se aprecia
+> peor sobre ceros. La herramienta **ya resuelve esto** con la bandera `--sinteticos`, y la
+> T4.10 la usó para las capturas responsive por ese mismo motivo (*«una tabla vacía no desborda
+> y no enseñaría nada de la maquetación»*). Basta con reutilizar ese camino para el par
+> antes/después del gate.
+
+**Coste de la corrección: ninguno.** Ni código, ni credenciales, ni decisión nueva. Sólo correr
+la herramienta que ya existe con la bandera que ya existe, sobre las dos ramas.
+
+## 10.5 Cómo se me escapó, que es lo que hay que no repetir
+
+Vi las tres cifras en cero y **di por supuesto que el «antes» del PR tenía datos**. No lo abrí.
+Tenía el archivo a un `git show` de distancia y construí un hueco bloqueante sobre una
+suposición.
+
+Es **el mismo error que cometí con B5, sólo que del revés**: allí me creí un «riesgo bajo» sin
+ejecutar una búsqueda; aquí me creí un «bloqueante» sin abrir una imagen. Las dos veces di por
+verificado lo que sólo había inferido.
+
+## 10.6 Estado de los huecos, corregido
+
+| Severidad | Huecos |
+|---|---|
+| **Bloqueantes (4)** | **B2** la pantalla principal no usa el sistema · **B3** tarjetas dentro de tarjetas *(por regla)* · **B4** el CLS de interacción no está medido · **B5** el buscador no normaliza acentos: 319 de 1,004 ciudades inalcanzables |
+| **Mejoras (9)** | M1 · M2 · M3 · M4′ · M5 · M6 · M8 · M9 · **M10 (nueva)** usar `--sinteticos` para el par del gate |
+| **Retirado** | ~~B1~~ — error de la auditoría, no del PR |
+
+**Y ninguno de los cuatro bloqueantes restantes bloquea T4.2.** Los cuatro son deuda de
+implementación; el gate del owner es sobre la **dirección visual**, y esa puede juzgarse hoy
+con el par antes/después que el PR ya trae.
+
+**T4.2 está desbloqueada.**
