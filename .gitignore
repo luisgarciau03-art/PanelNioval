@@ -4,6 +4,11 @@
 # INEGI, no una credencial. Sin esta excepcion el *.json de arriba lo deja
 # fuera del repo en silencio y el panel arranca sin catalogo en produccion.
 !datos/ciudades_mx.json
+# Las metricas base del Plan 4 TAMBIEN se versionan: son el instrumento de
+# medicion de CE6 (LCP/CLS del «antes»). Sin esta excepcion el *.json de arriba
+# las deja fuera del repo en silencio y la comparacion del «despues» se queda
+# sin contra que medir. Mismo caso que el catalogo: dato publico, no credencial.
+!docs/diseno/**/metricas-base.json
 __pycache__/
 *.pyc
 .env
