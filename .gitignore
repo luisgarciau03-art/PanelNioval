@@ -8,6 +8,11 @@
 # ratios de contraste, no una credencial. Misma trampa que el catalogo: sin
 # esta excepcion el *.json de arriba lo deja fuera del repo en silencio.
 !docs/diseno/brand-profile.json
+# Las metricas base del Plan 4 TAMBIEN se versionan: son el instrumento de
+# medicion de CE6 (LCP/CLS del «antes»). Sin esta excepcion el *.json de arriba
+# las deja fuera del repo en silencio y la comparacion del «despues» se queda
+# sin contra que medir. Mismo caso que el catalogo: dato publico, no credencial.
+!docs/diseno/**/metricas-base.json
 __pycache__/
 *.pyc
 .env
