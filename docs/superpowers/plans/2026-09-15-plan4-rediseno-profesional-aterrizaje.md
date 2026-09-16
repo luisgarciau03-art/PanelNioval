@@ -455,7 +455,7 @@ referencia de qué se restaura.
 | T4.2 | Gate del owner: aprobar la dirección visual | PENDIENTE | | |
 | T4.3 | Cerrar la brecha: movimiento accesible y estados de carga | PENDIENTE | | |
 | T4.4 | Aterrizar el PR #43 | PENDIENTE | | |
-| T4.5 | Verificar que la extracción no rompió nada funcional | PENDIENTE | | |
+| T4.5 | Verificar que la extracción no rompió nada funcional | **HECHO** | `docs/investigacion/2026-09-15-verificacion-extraccion.md` · **consola limpia** en las 3 superficies (0 errores, 0 avisos) · **los dos escapes bloqueados**: `O'Brien` se pinta como texto y el `<img onerror>` NO ejecuta — **con control positivo** que demuestra que el detector sí ve un XSS real (`innerHTML` sin escapar → `True`) · flujos: navegación 6/6 secciones, clic en chip, filtro que oculta y restaura, **orden de tabla con ratón Y con teclado** (`none`→`ascending`→`descending`, y Enter funciona), 4 diálogos los 4 con botón de cerrar · el único error de consola es un **hueco del fixture** (`_cuerpo` no cubre `/api/ventas/*`), está capturado y degrada sin tumbar la página · ⚠️ anotado: **la sección de Ventas nunca se ha ejercitado con datos** en todo el Plan 4 | 2026-09-16 |
 | T4.6 | Rebasar el PR #44 y resolver los 5 conflictos | PENDIENTE | | |
 | T4.7 | Desplegar y verificar: a11y, responsive y rendimiento | PENDIENTE | | |
 | T4.8 | Cierre: sistema documentado, PROGRESO y relevo | PENDIENTE | | |
