@@ -450,7 +450,7 @@ referencia de qué se restaura.
 
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
-| T4.0 | Tarea Cero: rama, respaldo y evidencia del «antes» | PENDIENTE | | |
+| T4.0 | Tarea Cero: rama, respaldo y evidencia del «antes» | **HECHO** | commit `2ed61e7` · `docs/auditoria/2026-09-15-estado-de-partida-plan4.md` · rama `feat/rediseno-aterrizaje` desde `main` `a97b494` · baseline **525 passed, 1 skipped** (el «≥626» es del PR #44, sin mergear) · respaldo antes de tocar nada · **9 capturas** de producción en `docs/diseno/antes-2026-09-15/` · ⚠️ **las del formulario traían nombre y teléfono de un cliente real**: rehechas anonimizando en el ORIGEN (interceptando el endpoint), la PII nunca llegó a disco · **línea base CE6**: dashboard 1440 **CLS 0.1924** e importador 320 **CLS 0.1073**, los dos sobre el umbral; LCP máximo 548 ms, con margen · ⚠️ **la primera medición dio todo 0.0 por un observador mal registrado** (`add_init_script` ejecuta el string: una flecha suelta no se llama) — corregido y con guarda contra el cero · `.gitignore` dejaba `metricas-base.json` fuera del repo en silencio: excepción explícita · PR #43 y #44 **CONFLICTING** (riesgo R7 materializado), su CI verde es del 4-6 sep y no vale para hoy | 2026-09-16 |
 | T4.1 | Auditoría del rediseño construido (matriz de cobertura) | PENDIENTE | | |
 | T4.2 | Gate del owner: aprobar la dirección visual | PENDIENTE | | |
 | T4.3 | Cerrar la brecha: movimiento accesible y estados de carga | PENDIENTE | | |

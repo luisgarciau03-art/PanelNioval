@@ -5,12 +5,12 @@
 
 **SESIÓN ACTUAL: 2** · **ÚLTIMO RELEVO: 2026-09-16, tras T1.7 ([`RELEVO-actual.md`](RELEVO-actual.md), apuntando a Plan 4 · T4.0)**
 
-**PROGRESO GLOBAL: 1 / 4 planes completados (25 %) · 8 / 34 tareas (23.5 %)**
+**PROGRESO GLOBAL: 1 / 4 planes completados (25 %) · 9 / 34 tareas (26.5 %)** · **Plan 4 en curso (1/12)**
 
 > ✅ **Plan 1 CERRADO y EN PRODUCCIÓN** (2026-09-16). PR #42 mergeado (`main` `8bac782`) y desplegado a mano en el VPS. El operador ve **1,004 ciudades** donde había 606.
 >
 > ⚠️ **HALLAZGO QUE AFECTA A LOS OTROS TRES PLANES:** el invariante «el VPS auto-deploya `main`» **es FALSO** desde el 2026-08-19. No hay auto-deploy: el despliegue es un `ssh` manual. **«Mergeado» y «desplegado» son dos estados distintos**, y los Planes 2, 3 y 4 llevan el invariante falso escrito. Cada uno necesita su paso de despliegue explícito. Detalle: `docs/auditoria/2026-09-15-verificacion-produccion-plan1.md`.
-**Plan 1: CERRADO (8/8). Siguiente: Plan 4 · T4.0 · Baseline vigente sobre `main`: 525 passed, 1 skipped** (el 626 sigue siendo de `fix/endurecimiento-panel`/PR #44 y vuelve a aplicar cuando aterrice en el Plan 4, T4.6 — ⚠️ ese PR pasó a **CONFLICTING** contra `main` tras el merge del #42)
+**Plan 1: CERRADO (8/8). En curso: Plan 4 (T4.0 hecha) · Siguiente: T4.1 · Baseline vigente sobre `main`: 525 passed, 1 skipped** (el 626 sigue siendo de `fix/endurecimiento-panel`/PR #44 y vuelve a aplicar cuando aterrice en el Plan 4, T4.6 — ⚠️ ese PR pasó a **CONFLICTING** contra `main` tras el merge del #42)
 
 **Biblioteca de herramientas leída en la sesión de diseño:**
 `C:\Users\PC 1\.claude\BIBLIOTECA-HERRAMIENTAS.md` — **653 herramientas (229 agentes + 424
