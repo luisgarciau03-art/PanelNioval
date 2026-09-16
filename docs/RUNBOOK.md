@@ -103,10 +103,24 @@ El worker **no envía nada** sin autorización explícita (para evitar disparos 
 
 ## Smoke test post-deploy
 
+⚠️ **Lo que el smoke NO cubre:** comprueba `/`, `/formulario`, `/api/formulario/siguiente`,
+`/api/catalogo/envios` y `/api/catalogo/worker-estado`. **No toca `/api/importador/ciudades`**,
+así que puede dar `Todo OK ✅` con un despliegue que no incluya el catálogo de ciudades. Si lo
+que quieres verificar es el importador, compruébalo aparte.
+
 ```bash
 python tools/smoke_panel.py https://panelnioval.duckdns.org --token <valor>
 ```
-Debe imprimir `Todo OK ✅`. Railway auto-deploya `main`: correr el smoke tras cada merge.
+Debe imprimir `Todo OK ✅`.
+
+⚠️ **NO hay auto-deploy. Mergear a `main` NO publica nada.** Railway se eliminó el 2026-08-19
+(ver más abajo) y el VPS de Vultr **no tiene webhook ni workflow de despliegue**: el único
+camino es el `ssh` manual de la tabla «Operación en el VPS». Esta línea decía lo contrario
+hasta el 2026-09-15 y costó un diagnóstico entero en el Plan 1, T1.6 — el merge del PR #42
+estuvo 12 minutos en `main` sin llegar al operador, y el smoke daba `Todo OK` porque **no
+comprueba ninguna ruta nueva**.
+
+Secuencia correcta tras cada merge: **desplegar a mano, y después el smoke.**
 
 ## Verificar la hoja de contactos (antes de capturar correos)
 
@@ -469,6 +483,29 @@ cuántos contactos hay detrás. Nada se descarta en silencio.
 Para reducir ese grupo se añade el valor real como `alias` del municipio correcto en
 `ALIAS_EXTRA` de `tools/generar_catalogo_ciudades.py` y se regenera.
 
+**Medido en producción el 2026-09-16**, con el catálogo ya en 1,004 municipios: quedan
+**32 valores sin clasificar**.
+
+> ### ⚠️ Esos 32 valores incluyen DATOS PERSONALES
+>
+> **8 son teléfonos y 1 es un correo** de clientes: celdas donde alguien tecleó el contacto en
+> la columna CIUDAD. El endpoint los devuelve **verbatim** en `sin_clasificar[].ciudad` y la UI
+> los muestra en el aviso amarillo.
+>
+> **El docstring de `api_importador_ciudades` dice lo contrario** —*«Ningun telefono ni nombre
+> de contacto sale de aqui»*— y **es falso**. Esa promesa es el riesgo real: alguien decidirá
+> que este endpoint es seguro para un contexto nuevo (un panel compartido, un log, una captura
+> en un documento) apoyándose en ella.
+>
+> Lo que acota el daño hoy: el endpoint responde **401 sin token**, así que es el owner viendo
+> sus propios datos; y **no lo introdujo el Plan 1** — el endpoint viejo
+> `/api/prospectos/ciudades` publica exactamente los mismos valores desde antes.
+>
+> **Decisión pendiente del owner:** o se sanea la salida (enmascarar lo que parezca teléfono o
+> correo **conservando el aviso**, que existe a propósito para que esos contactos no
+> desaparezcan del ranking en silencio), o se corrige la promesa del docstring. Lo que no puede
+> quedarse es la promesa falsa. Detalle: `docs/auditoria/2026-09-15-verificacion-produccion-plan1.md` §10.
+
 
 ## Gates del owner pendientes (seguridad)
 
@@ -486,7 +523,13 @@ servidor con Bruce.
 |---|---|
 | Ver logs | `ssh root@155.138.200.66 'docker logs -f panel'` |
 | Reiniciar | `ssh root@155.138.200.66 'docker restart panel'` |
-| Desplegar cambios | `ssh root@155.138.200.66 'cd /srv/panel/app && git pull && cd /srv/panel && docker compose up -d --build'` |
+| Desplegar cambios | `ssh root@155.138.200.66 'cd /srv/panel/app && git fetch origin && git checkout main && git merge --ff-only origin/main && cd /srv/panel && docker compose up -d --build'` |
+
+⚠️ **El comando llevaba `git pull` y no servía:** el repo del servidor estaba en **HEAD
+desacoplado** (`FETCH_HEAD`), donde `git pull` no avanza nada. Corregido el 2026-09-15 tras
+toparse con ello en el Plan 1, T1.6. Comprueba siempre el commit servido después de desplegar:
+`ssh root@155.138.200.66 'cd /srv/panel/app && git log -1 --oneline'`.
+
 | Smoke test | `python tools/smoke_panel.py https://panelnioval.duckdns.org --token <token>` |
 | Consumo | `ssh root@155.138.200.66 'docker stats --no-stream'` |
 
