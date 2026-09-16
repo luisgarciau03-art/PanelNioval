@@ -5,7 +5,7 @@
 
 **SESIÓN ACTUAL: 2** · **ÚLTIMO RELEVO: 2026-09-16, tras T1.7 ([`RELEVO-actual.md`](RELEVO-actual.md), apuntando a Plan 4 · T4.0)**
 
-**PROGRESO GLOBAL: 1 / 4 planes completados (25 %) · 14 / 34 tareas (41.2 %)** · **Plan 4 en curso (6/12)**
+**PROGRESO GLOBAL: 1 / 4 planes completados (25 %) · 15 / 34 tareas (44.1 %)** · **Plan 4 en curso (7/12)**
 
 > ✅ **Plan 1 CERRADO y EN PRODUCCIÓN** (2026-09-16). PR #42 mergeado (`main` `8bac782`) y desplegado a mano en el VPS. El operador ve **1,004 ciudades** donde había 606.
 >
