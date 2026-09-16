@@ -103,10 +103,24 @@ El worker **no envía nada** sin autorización explícita (para evitar disparos 
 
 ## Smoke test post-deploy
 
+⚠️ **Lo que el smoke NO cubre:** comprueba `/`, `/formulario`, `/api/formulario/siguiente`,
+`/api/catalogo/envios` y `/api/catalogo/worker-estado`. **No toca `/api/importador/ciudades`**,
+así que puede dar `Todo OK ✅` con un despliegue que no incluya el catálogo de ciudades. Si lo
+que quieres verificar es el importador, compruébalo aparte.
+
 ```bash
 python tools/smoke_panel.py https://panelnioval.duckdns.org --token <valor>
 ```
-Debe imprimir `Todo OK ✅`. Railway auto-deploya `main`: correr el smoke tras cada merge.
+Debe imprimir `Todo OK ✅`.
+
+⚠️ **NO hay auto-deploy. Mergear a `main` NO publica nada.** Railway se eliminó el 2026-08-19
+(ver más abajo) y el VPS de Vultr **no tiene webhook ni workflow de despliegue**: el único
+camino es el `ssh` manual de la tabla «Operación en el VPS». Esta línea decía lo contrario
+hasta el 2026-09-15 y costó un diagnóstico entero en el Plan 1, T1.6 — el merge del PR #42
+estuvo 12 minutos en `main` sin llegar al operador, y el smoke daba `Todo OK` porque **no
+comprueba ninguna ruta nueva**.
+
+Secuencia correcta tras cada merge: **desplegar a mano, y después el smoke.**
 
 ## Verificar la hoja de contactos (antes de capturar correos)
 
