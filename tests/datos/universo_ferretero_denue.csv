@@ -1,0 +1,26 @@
+# UNIVERSO FERRETERO DEL DENUE POR MACRO-REGION  (fixture de tests, no se edita a mano)
+#
+# Que es: todos los municipios de Mexico con al menos UNA ferreteria (SCIAN 467111),
+# agregados por la macro-region del generador. Es el DENOMINADOR con el que
+# tests/test_catalogo_ciudades.py mide que parte del mercado real cubre el catalogo.
+#
+# Fuente : DENUE 05_2026, denue_00_46591-46911_csv.zip (INEGI)
+# Bytes  : 60209960
+# Filas leidas del ZIP: 638861
+# Establecimientos 467111: 75726
+# Municipios con >=1 ferreteria: 2227
+#
+# Regenerar (requiere el ZIP del INEGI en cache):
+#   python tools/auditar_cobertura_ciudades.py <zip> datos/ciudades_mx.json <salida.json>
+#
+# OJO: si alguien regenera el catalogo con un corte del DENUE mas nuevo, este
+# archivo queda viejo y la cobertura medida deja de ser comparable. Se regenera junto.
+region,municipios_con_ferreteria,ferreterias_universo
+Centro-Norte,188,8650
+Centro-Sur,459,11799
+Noreste,220,9615
+Noroeste,109,5348
+Occidente,245,8886
+Peninsula,129,2913
+Sureste,736,9564
+Valle de Mexico,141,18951
