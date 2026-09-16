@@ -3,7 +3,7 @@
 > **Archivo único que se SOBRESCRIBE al cerrar CADA tarea.** Siempre contiene el mensaje
 > completo para arrancar una sesión nueva.
 >
-> **Estado: Plan 1 CERRADO Y EN PRODUCCIÓN (8/8) · Plan 4 EN CURSO (T4.0 y T4.1 hechas).** Siguiente: **T4.2 — gate del owner**.
+> **Estado: Plan 1 CERRADO Y EN PRODUCCIÓN (8/8) · Plan 4 EN CURSO (T4.0-T4.2).** ✅ **Dirección visual APROBADA por el owner.** Siguiente: **T4.3**.
 
 ---
 
@@ -68,7 +68,7 @@ Verifica siempre después: `ssh root@155.138.200.66 'cd /srv/panel/app && git lo
 
 ## AVANCE
 
-- **Global: 1 / 4 planes (25 %)** · Tareas **10 / 34 (29.4 %)** · **Plan 4 en curso (2/12)**
+- **Global: 1 / 4 planes (25 %)** · Tareas **11 / 34 (32.4 %)** · **Plan 4 en curso (3/12)**
 - **Plan 1: CERRADO, MERGEADO Y DESPLEGADO.** El operador ve **1,004 ciudades** donde había 606.
 
 ---
@@ -154,24 +154,72 @@ hipótesis, que yo confirmé y medí en la rama.
 
 ---
 
+## ✅ T4.2 — EL GATE DEL OWNER, CERRADO EN VERDE
+
+| Pregunta | Respuesta literal |
+|---|---|
+| (a) ¿Se aprueba la dirección visual? | **«Tal cual»** |
+| (b) ¿Alguna superficie empeoró? | **«Ninguna»** |
+| (c) ¿Los estados de carga transmiten? | **«Sí, transmiten bien»** |
+
+**CE1 y CE2 cerrados. Sin ajustes pedidos por el negocio**, así que T4.3 arranca con el alcance
+ya conocido y nada añadido.
+
+**Efecto lateral que importa:** el supuesto que el PR llevaba colgando —*«que Aprobados es lo
+que el owner mira primero»*, anotado como no confirmado por nadie— **queda confirmado**. Se le
+presentó explícitamente como el momento barato de cambiarlo y no lo cambió. **Deja de ser
+supuesto.**
+
+⚠️ **Lo que esta aprobación NO cierra** (no la cites de más):
+- **No aprueba el acabado.** Los 4 bloqueantes siguen bloqueando el **merge**.
+- **No valida la jornada del operador.** Se resolvió sobre capturas y mediciones, no sobre un
+  turno real de trabajo.
+- **No valida el importador a 1,004 ciudades.** Lo aprobado se construyó con 606.
+
+---
+
+## ⚠️ RETRACTACIÓN DE T4.1 QUE HAY QUE CONOCER
+
+**B1 quedó RETIRADO: era error mío, no del PR.** Acusé a las capturas del «después» de estar a
+cero comparándolas contra las mías de producción. El «antes» del propio PR **también** está a
+cero: misma herramienta, mismas condiciones, comparación equivalente.
+
+Y su `tools/capturar_superficies.py` **corta las dos vías de credencial y aborta si el panel
+consigue autenticarse igualmente**, para que ninguna captura del repo lleve datos de clientes
+(riesgo R8). **Su estándar es más estricto que el que yo apliqué en T4.0.**
+
+**Consecuencia incómoda y pendiente del owner:** las 9 capturas de `docs/diseno/antes-2026-09-15/`
+que commiteé en T4.0 llevan datos de producción (7,180 contactos, tasa real, ranking de
+ciudades). **No llevan PII** —lo verifiqué, y por eso rehice las del formulario— pero sí datos
+de negocio, y el proyecto se puso una regla más estricta. **No lo resuelvo por mi cuenta:**
+borrar no es opción aquí, y decidir si un agregado cae bajo R8 es del owner.
+
+---
+
 ## SIGUIENTE PASO EXACTO
 
-**Plan 4, Tarea T4.2 — Gate del owner: aprobar la dirección visual antes de invertir más.**
+**Plan 4, Tarea T4.3 — Cerrar la brecha: movimiento accesible y estados de carga.**
 
 ```
-ANCLA · Plan 4 Tarea T4.2 · importador nacional barato veraz profesional · avance 10/34 ·
+ANCLA · Plan 4 Tarea T4.3 · importador nacional barato veraz profesional · avance 11/34 ·
+ gates: python-reviewer + code-reviewer + typescript-reviewer (toca static/js/*) ·
  baseline: python -m pytest tests/  -> 525 passed, 1 skipped
 ```
 
-⚠️ **NO presentes el gate sin cerrar B1 primero.** Las capturas del «después» del tablero están
-a cero: el owner compararía «con datos» contra «sin datos» y lo que juzgaría no sería el
-rediseño. **Recapturar las tres superficies con datos**, con el procedimiento de anonimización
-de T4.0 (interceptar `/api/formulario/siguiente`; el script está en el informe de T4.0 §2.1).
+Lee el bloque de T4.3 en el plan. **El alcance ya está fijado y el negocio no añadió nada:**
+son los **4 bloqueantes de T4.1**, en este orden de daño al operador:
 
-Después, lee el bloque de T4.2 en el plan y presenta al owner **la dirección**, no los huecos:
-*editorial/Swiss, denso y escaneable, sin fuente web, sin profundidad ni textura, con el color
-como significado*. La auditoría la respalda. B2–B5 son deuda de implementación y su sitio es
-T4.3, no el juicio del owner.
+| # | Hueco | Por qué ese orden |
+|---|---|---|
+| **1º · B5** | 🔍 El buscador **no normaliza acentos**: teclear `leon` no encuentra `León`. **319 de 1,004** ciudades (31.8 %), 39 del top-100 | **Es el único que cuesta algo HOY y en cada uso.** El arreglo ya existe en Python (`normalizar()` del generador); falta su gemela en JS. Normalizar las dos puntas: al construir `buscable` y una vez por pulsación |
+| **2º · B4** | El CLS está medido **al cargar**, no **al interactuar**. Cuatro bloques con `hidden` del importador empujan al pulsar «Buscar» | **Sin ese número CE6 no se firma.** El patrón de arreglo ya está en el PR: a la caja de ciudades se le puso `min-height` |
+| **3º · B2** | `dashboard.css` y `formulario.css` **no usan el sistema**: espaciado 9/86 y 0/31 contra 29/29 y 50/52. Y redeclaran `'Segoe UI'` contra el ADR | El más grande y el que menos se ve. `importador.css` es el modelo a seguir |
+| **4º · B3** | Tarjetas dentro de tarjetas: `.men-card` dentro de `.table-box` | Minutos: quitar sombra o borde del interior |
+
+**Y las 8 mejoras** (M1-M3, M4′, M5, M6, M8, M9, M10) están en la auditoría con su detalle.
+
+⚠️ **T4.3 toca `static/js/*`**, así que el gate de `typescript-reviewer` **es obligatorio**
+además de los dos de siempre.
 
 ---
 
