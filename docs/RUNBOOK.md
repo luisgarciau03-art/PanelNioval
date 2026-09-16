@@ -483,6 +483,29 @@ cuántos contactos hay detrás. Nada se descarta en silencio.
 Para reducir ese grupo se añade el valor real como `alias` del municipio correcto en
 `ALIAS_EXTRA` de `tools/generar_catalogo_ciudades.py` y se regenera.
 
+**Medido en producción el 2026-09-16**, con el catálogo ya en 1,004 municipios: quedan
+**32 valores sin clasificar**.
+
+> ### ⚠️ Esos 32 valores incluyen DATOS PERSONALES
+>
+> **8 son teléfonos y 1 es un correo** de clientes: celdas donde alguien tecleó el contacto en
+> la columna CIUDAD. El endpoint los devuelve **verbatim** en `sin_clasificar[].ciudad` y la UI
+> los muestra en el aviso amarillo.
+>
+> **El docstring de `api_importador_ciudades` dice lo contrario** —*«Ningun telefono ni nombre
+> de contacto sale de aqui»*— y **es falso**. Esa promesa es el riesgo real: alguien decidirá
+> que este endpoint es seguro para un contexto nuevo (un panel compartido, un log, una captura
+> en un documento) apoyándose en ella.
+>
+> Lo que acota el daño hoy: el endpoint responde **401 sin token**, así que es el owner viendo
+> sus propios datos; y **no lo introdujo el Plan 1** — el endpoint viejo
+> `/api/prospectos/ciudades` publica exactamente los mismos valores desde antes.
+>
+> **Decisión pendiente del owner:** o se sanea la salida (enmascarar lo que parezca teléfono o
+> correo **conservando el aviso**, que existe a propósito para que esos contactos no
+> desaparezcan del ranking en silencio), o se corrige la promesa del docstring. Lo que no puede
+> quedarse es la promesa falsa. Detalle: `docs/auditoria/2026-09-15-verificacion-produccion-plan1.md` §10.
+
 
 ## Gates del owner pendientes (seguridad)
 
