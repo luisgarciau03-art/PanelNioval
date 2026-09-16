@@ -1016,13 +1016,16 @@ def api_importador_ciudades():
         )
 
     vacio = {'total': 0, 'llamados': 0, 'aprobados': 0, 'interes_pct': 0}
-    ciudades = []
+    # Se lleva la clave INEGI AL LADO, no dentro: es el desempate que manda el
+    # ADR 7 y el endpoint no la publica a proposito (ver el test
+    # test_no_expone_la_clave_inegi_como_dato_de_negocio).
+    ordenables = []
     for reg in catalogo:
         m = por_clave.get(reg['clave_inegi'], vacio)
         unidades = reg['indicadores']['unidades_ferreteras']
         saturacion = _factor_saturacion(m['total'], unidades)
         factor = _calcular_factor_nioval(m, unidades, referencia)
-        ciudades.append({
+        ordenables.append((reg['clave_inegi'], {
             'ciudad': reg['nombre'],
             'estado': reg['estado'],
             'region': reg['region'],
@@ -1035,11 +1038,20 @@ def api_importador_ciudades():
             'llamados': m['llamados'],
             'aprobados': m['aprobados'],
             'interes_pct': m['interes_pct'],
-        })
+        }))
 
-    # Desempate del ADR: prioridad, luego ferreterias, luego nombre. Determinista:
-    # dos peticiones sobre los mismos datos devuelven el mismo orden.
-    ciudades.sort(key=lambda c: (-c['prioridad'], -c['unidades_ferreteras'], c['ciudad']))
+    # Desempate del ADR 7: prioridad, luego ferreterias, luego CLAVE INEGI
+    # ascendente. Desempataba por nombre, que no es lo que dice el ADR: con 606
+    # ciudades daba igual, pero las 1,004 de T1.3 traen 103 empates exactos y el
+    # listado servido salia distinto del catalogo en 100 posiciones. Ninguno de
+    # los dos era aleatorio, asi que no se veia; la clave gana porque es estable
+    # y el nombre no (la desambiguacion puede reescribirlo).
+    def _clave_desempate(par):
+        clave_inegi, entrada = par
+        return (-entrada['prioridad'], -entrada['unidades_ferreteras'], clave_inegi)
+
+    ordenables.sort(key=_clave_desempate)
+    ciudades = [entrada for _, entrada in ordenables]
     sin_clasificar.sort(key=lambda c: -c['total'])
 
     conteo = Counter(c['region'] for c in ciudades)
