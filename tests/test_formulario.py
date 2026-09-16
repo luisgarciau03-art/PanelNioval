@@ -171,10 +171,15 @@ class TestGetContactoPendiente:
         monkeypatch.setattr(app, "get_gs_client", lambda: _fake_client(self._ws(rows)))
         assert app.get_contacto_pendiente(0) is None
 
-    def test_bug_conocido_error_de_sheets_indistinguible_de_sin_pendientes(self, monkeypatch):
-        # BUG conocido (auditoría Plan 2, hallazgo 3): un error de la API se traga y
-        # devuelve None, igual que "no hay pendientes" → el endpoint muestra {'fin': True}.
+    def test_un_error_de_sheets_ya_no_se_confunde_con_sin_pendientes(self, monkeypatch):
+        # Era el hallazgo 3 de la auditoría del Plan 2: la excepción de la API se
+        # tragaba y devolvía None, igual que "no hay pendientes", así que el
+        # endpoint respondía {'fin': True} y el formulario remataba con la
+        # pantalla de confeti. Corregido en el Plan 4, T4.5: ahora se relanza y
+        # el endpoint responde 503. La cobertura del contrato completo está en
+        # tests/test_plan4_estados.py.
         ws = MagicMock()
         ws.get_all_values.side_effect = Exception("429 RESOURCE_EXHAUSTED")
         monkeypatch.setattr(app, "get_gs_client", lambda: _fake_client(ws))
-        assert app.get_contacto_pendiente(0) is None
+        with pytest.raises(Exception, match="RESOURCE_EXHAUSTED"):
+            app.get_contacto_pendiente(0)

@@ -9,6 +9,7 @@ import pytest
 
 import app
 import nucleo_catalogo as nc
+from conftest import servir_superficie
 
 
 @pytest.fixture
@@ -64,10 +65,15 @@ class TestSeccionCatalogo:
     def test_dashboard_incluye_seccion_catalogo(self, client):
         r = client.get("/")
         assert r.status_code == 200
-        html = r.data.decode("utf-8", "ignore")
+        html = servir_superficie(client, "/", "dashboard")
         # Sección, nav, badge y funciones JS presentes.
         assert 'id="sec-catalogo"' in html
-        assert "showSection('catalogo')" in html
+        # La navegacion dejo de colgar de un `onclick` en el marcado (Plan 4,
+        # T4.7): los 12 `div` pasaron a `<button data-seccion>` para que se
+        # pudiera llegar a ellos con el teclado. Lo que este test comprueba
+        # sigue siendo lo mismo -que a la seccion se llega desde el menu-,
+        # solo cambia por donde.
+        assert 'data-seccion="catalogo"' in html
         assert 'id="cat-badge"' in html
         assert "function loadCatalogo" in html
         assert "catGuardarCorreccion" in html
@@ -346,18 +352,18 @@ class TestColumnaTelefonoContactos:
 class TestFormatoTelefonoContactos:
     """La hoja guarda el numero nacional con espacios: 6787 de 7054 telefonos
     tienen 10 digitos y el formato dominante es 'NNN NNN NNNN'. Escribir
-    '+526623534185' seria ajeno al resto de la columna."""
+    '+525551234567' seria ajeno al resto de la columna."""
 
     @pytest.mark.parametrize("entrada", [
-        "526623534185",        # el caso que fallo, con lada de pais
-        "6623534185",          # nacional pelado
-        "+52 662 353 4185",    # ya formateado con prefijo
-        "5216623534185",       # con el '1' de movil que Mexico ya no usa
-        "662-353-4185",        # con guiones
-        "(662) 353 4185",      # con parentesis
+        "525551234567",        # el caso que fallo, con lada de pais
+        "5551234567",          # nacional pelado  barrido-ok: numero sintetico de fixture, prefijo 555 de ficcion
+        "+52 555 123 4567",    # ya formateado con prefijo
+        "5215551234567",       # con el '1' de movil que Mexico ya no usa
+        "555-123-4567",        # con guiones
+        "(555) 123 4567",      # con parentesis
     ])
     def test_normaliza_al_formato_de_la_hoja(self, entrada):
-        assert nc.formatear_telefono_contactos(entrada) == "662 353 4185"
+        assert nc.formatear_telefono_contactos(entrada) == "555 123 4567"
 
     def test_no_inventa_agrupacion_si_no_son_10_digitos(self):
         """Agrupar a ciegas un numero raro escribiria algo falso en produccion."""

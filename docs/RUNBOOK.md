@@ -97,7 +97,7 @@ quieres envíos automáticos.
 - **Cierra cualquier Chrome que use ese perfil antes de correr el worker** (el perfil no admite 2 instancias a la vez).
 - Si ves `spinner`/timeout al abrir chats, casi siempre es que **WhatsApp Web no terminó de sincronizar** o **la sesión expiró** (repite el paso 3).
 - El arranque del worker tarda ~1 min en cargar dependencias (imprime `[worker] cargando dependencias...`); es normal, **no lo interrumpas**.
-- **Formato de teléfono México:** `52` + 10 dígitos (ej. `526623534185`).
+- **Formato de teléfono México:** `52` + 10 dígitos (ej. `525551234567`).
 - **`Video1.mp4`** debe existir en `C:\Users\PC 1\Files mensajes` para enviar el video; si falta, el resto de archivos igual se envían.
 
 ## Gate de seguridad de envío (contraseña)
@@ -116,10 +116,24 @@ El worker **no envía nada** sin autorización explícita (para evitar disparos 
 
 ## Smoke test post-deploy
 
+⚠️ **Lo que el smoke NO cubre:** comprueba `/`, `/formulario`, `/api/formulario/siguiente`,
+`/api/catalogo/envios` y `/api/catalogo/worker-estado`. **No toca `/api/importador/ciudades`**,
+así que puede dar `Todo OK ✅` con un despliegue que no incluya el catálogo de ciudades. Si lo
+que quieres verificar es el importador, compruébalo aparte.
+
 ```bash
 python tools/smoke_panel.py https://panelnioval.duckdns.org --token <valor>
 ```
-Debe imprimir `Todo OK ✅`. El VPS auto-deploya `main`: correr el smoke tras cada merge.
+Debe imprimir `Todo OK ✅`.
+
+⚠️ **NO hay auto-deploy. Mergear a `main` NO publica nada.** Railway se eliminó el 2026-08-19
+(ver más abajo) y el VPS de Vultr **no tiene webhook ni workflow de despliegue**: el único
+camino es el `ssh` manual de la tabla «Operación en el VPS». Esta línea decía lo contrario
+hasta el 2026-09-15 y costó un diagnóstico entero en el Plan 1, T1.6 — el merge del PR #42
+estuvo 12 minutos en `main` sin llegar al operador, y el smoke daba `Todo OK` porque **no
+comprueba ninguna ruta nueva**.
+
+Secuencia correcta tras cada merge: **desplegar a mano, y después el smoke.**
 
 ## Verificar la hoja de contactos (antes de capturar correos)
 
@@ -475,6 +489,115 @@ Un ahorro que en realidad es una caché heredada se lee igual que un ahorro real
 y no lo es.
 
 
+## Catálogo de ciudades del importador (desde 2026-08-28)
+
+El importador ya **no** trae la lista de ciudades escrita a mano en `app.py`. La sirve
+`/api/importador/ciudades` desde **`datos/ciudades_mx.json`**: 1,004 municipios con clave
+INEGI, estado, macro-región, alias, potencial de mercado e indicadores.
+
+**El archivo se versiona.** El `.gitignore` cubre `*.json` para atrapar credenciales, y hay
+una excepción explícita por ruta exacta (`!datos/ciudades_mx.json`). Sin ella el catálogo
+quedaba fuera del repo **en silencio** y el panel arrancaría sin él en el VPS mientras en
+local funciona perfecto. Dos tests lo vigilan (`tests/test_catalogo_ciudades.py`,
+clase `TestElCatalogoLlegaAlDespliegue`).
+
+### Cómo se regenera
+
+```bash
+python tools/generar_catalogo_ciudades.py
+```
+
+Descarga cuatro archivos públicos del INEGI (~118 MB en total) y los cachea en
+`~/.cache/inegi`, así que la segunda corrida no vuelve a bajarlos. **No usa token ni API de
+pago**: son descargas estáticas.
+
+| Opción | Para qué |
+|---|---|
+| `--cache DIR` | Dónde guardar los zips entre corridas |
+| `--min-ferreterias N` | Corte del catálogo. Por defecto **10** → 995 municipios, más los del array viejo y los rescates de cobertura estatal = **1,004**. Bajó de 20 a 10 el 2026-09-15 (Plan 1, T1.3): ver la sección 9 del ADR `2026-08-28-modelo-relevancia-ciudades.md` |
+| `--verificar` | **No escribe**: compara el catálogo en disco contra lo que dan las fuentes hoy y devuelve 1 si difieren |
+| `--salida ARCHIVO` | Escribir a otra ruta |
+
+Es **reproducible**: dos corridas seguidas sobre las mismas fuentes dan un archivo idéntico
+byte a byte. Si sale distinto, es que el INEGI publicó una edición nueva.
+
+### Cuándo regenerarlo
+
+Cuando el INEGI publique una edición nueva del DENUE (es anual). La edición actual es
+**05_2026**, con fecha `Modified: 2026-05-20`. La población es del **Censo 2020** y no
+cambia hasta el censo siguiente.
+
+Tras regenerar: correr `python -m pytest tests/test_catalogo_ciudades.py` **antes** de
+commitear. Los 16 tests comprueban que no hay duplicados por clave ni por nombre
+normalizado, que ningún nombre lleva abreviatura de estado pegada, que están las 32
+entidades y que ninguna entrada del array viejo se quedó sin destino.
+
+### Dos trampas de las descargas, ya pagadas
+
+- **`denue_00_46_csv.zip` existe y pesa CERO bytes.** Responde `HTTP 200` con
+  `Content-Type` de zip. Un script que mire el código de estado se traga el archivo vacío
+  sin enterarse. El generador verifica tamaño mínimo **y** que el zip abra. El SCIAN
+  ferretero (`4671*`) está en `denue_00_46591-46911_csv.zip`, no en ningún archivo "467".
+- **Los encodings no coinciden entre fuentes.** DENUE va en **latin-1**; el ITER del Censo
+  en **utf-8 con BOM**. Leer el segundo sin `utf-8-sig` da `KeyError: 'ENTIDAD'` en tiempo
+  de ejecución, no al abrir.
+
+### Qué hacer si el panel se queda sin catálogo
+
+Si `datos/ciudades_mx.json` falta o está corrupto, `/api/importador/ciudades` responde
+**200 con la lista vacía** y lo registra en el log del servidor
+(`[catalogo] no se pudo leer ...`). El importador muestra *"No se pudo cargar el catálogo
+de ciudades. Escribe la ciudad a mano"* y **el campo de texto sigue funcionando**: se puede
+importar igual escribiendo la ciudad. Se degrada el ranking, no el servicio.
+
+No hay fallback a una lista antigua **a propósito**: volver a una lista obsoleta sin avisar
+es peor que no tener lista, porque nadie se entera de que está usando datos viejos.
+
+### El nombre del catálogo es el que se le manda a Google Places
+
+El `nombre` de cada registro es el **comercial**, no el del INEGI, porque va literal en la
+consulta `"Ferreterías en <nombre>"`. INEGI llama `Benito Juárez` a Cancún y `Ahome` a Los
+Mochis; buscar `"Ferreterías en Benito Juárez"` traería la alcaldía de la CDMX. El nombre
+INEGI viaja como **alias**, que es lo que reconcilia lo ya escrito en `LISTA DE CONTACTOS`.
+
+Los nombres repetidos entre estados llevan el estado completo (`Juárez, Chihuahua`), nunca
+la abreviatura (`Juárez Chih`), que es lo que hacía el array viejo y no lo escribe nadie en
+Google.
+
+### Ciudades "sin clasificar"
+
+La hoja `LISTA DE CONTACTOS` trae **116 valores distintos** en la columna CIUDAD, escritos
+a mano, y algunos **no son ciudades**: dicen `Chiapas`, `Guerrero`, `Guanajuato`. Lo que no
+casa contra el catálogo aparece en un aviso amarillo **visible** encima de los chips, con
+cuántos contactos hay detrás. Nada se descarta en silencio.
+
+Para reducir ese grupo se añade el valor real como `alias` del municipio correcto en
+`ALIAS_EXTRA` de `tools/generar_catalogo_ciudades.py` y se regenera.
+
+**Medido en producción el 2026-09-16**, con el catálogo ya en 1,004 municipios: quedan
+**32 valores sin clasificar**.
+
+> ### ⚠️ Esos 32 valores incluyen DATOS PERSONALES
+>
+> **8 son teléfonos y 1 es un correo** de clientes: celdas donde alguien tecleó el contacto en
+> la columna CIUDAD. El endpoint los devuelve **verbatim** en `sin_clasificar[].ciudad` y la UI
+> los muestra en el aviso amarillo.
+>
+> **El docstring de `api_importador_ciudades` dice lo contrario** —*«Ningun telefono ni nombre
+> de contacto sale de aqui»*— y **es falso**. Esa promesa es el riesgo real: alguien decidirá
+> que este endpoint es seguro para un contexto nuevo (un panel compartido, un log, una captura
+> en un documento) apoyándose en ella.
+>
+> Lo que acota el daño hoy: el endpoint responde **401 sin token**, así que es el owner viendo
+> sus propios datos; y **no lo introdujo el Plan 1** — el endpoint viejo
+> `/api/prospectos/ciudades` publica exactamente los mismos valores desde antes.
+>
+> **Decisión pendiente del owner:** o se sanea la salida (enmascarar lo que parezca teléfono o
+> correo **conservando el aviso**, que existe a propósito para que esos contactos no
+> desaparezcan del ranking en silencio), o se corrige la promesa del docstring. Lo que no puede
+> quedarse es la promesa falsa. Detalle: `docs/auditoria/2026-09-15-verificacion-produccion-plan1.md` §10.
+
+
 ## Gates del owner pendientes (seguridad)
 
 - **Rotar** `TELEGRAM_TOKEN` (bot `8404009072`, expuesto en ~14 copias del historial) y la **Google Places key**; cargarlas en `/srv/panel/secretos/.env` y `/srv/bruce/secretos/.env` en el VPS (ya no en Railway).
@@ -509,7 +632,13 @@ servidor con Bruce.
 |---|---|
 | Ver logs | `ssh root@155.138.200.66 'docker logs -f panel'` |
 | Reiniciar | `ssh root@155.138.200.66 'docker restart panel'` |
-| Desplegar cambios | `ssh root@155.138.200.66 'cd /srv/panel/app && git pull && cd /srv/panel && docker compose up -d --build'` |
+| Desplegar cambios | `ssh root@155.138.200.66 'cd /srv/panel/app && git fetch origin && git checkout main && git merge --ff-only origin/main && cd /srv/panel && docker compose up -d --build'` |
+
+⚠️ **El comando llevaba `git pull` y no servía:** el repo del servidor estaba en **HEAD
+desacoplado** (`FETCH_HEAD`), donde `git pull` no avanza nada. Corregido el 2026-09-15 tras
+toparse con ello en el Plan 1, T1.6. Comprueba siempre el commit servido después de desplegar:
+`ssh root@155.138.200.66 'cd /srv/panel/app && git log -1 --oneline'`.
+
 | Smoke test | `python tools/smoke_panel.py https://panelnioval.duckdns.org --token <token>` |
 | Consumo | `ssh root@155.138.200.66 'docker stats --no-stream'` |
 

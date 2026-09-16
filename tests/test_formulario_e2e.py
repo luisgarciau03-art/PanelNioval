@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import app
+from conftest import servir_superficie
 
 
 @pytest.fixture
@@ -34,7 +35,7 @@ def test_formulario_html_se_sirve(client):
 
 def test_formulario_tiene_validador_catalogo(client):
     # El validador PRE-envío (confirmar/corregir número) debe estar en el formulario.
-    html = client.get("/formulario").data.decode("utf-8", "ignore")
+    html = servir_superficie(client, "/formulario", "formulario")
     assert "modal-validar-catalogo" in html
     assert "abrirValidadorCatalogo" in html
     assert "confirmarEnviarCatalogo" in html

@@ -1,0 +1,96 @@
+# NOMBRES DE MUNICIPIO QUE SE REPITEN EN MEXICO  (fixture de tests, no se edita a mano)
+#
+# Un nombre de esta lista NO identifica una ciudad: 'Juarez' son tres municipios y
+# 'Hidalgo' dos. El nombre del catalogo viaja LITERAL a la consulta de Google Places,
+# asi que una entrada ambigua no es un detalle cosmetico: gasta llamadas facturables
+# trayendo ferreterias del municipio equivocado. Ese fallo ya ocurrio antes.
+#
+# Condicion 1 del consejo de T1.2: antes de ampliar el catalogo hay que garantizar
+# que las ciudades nuevas tienen el nombre desambiguado. Esta lista es contra que.
+#
+# Fuente: DENUE 05_2026, denue_00_46591-46911_csv.zip - municipios con >=1 ferreteria
+# Nombres normalizados repetidos: 82 de 2097 distintos
+#
+# Normalizados: minusculas, sin acentos y sin puntuacion (misma normalizar() del test).
+abasolo
+acajete
+acatlan
+actopan
+ahuacatlan
+aldama
+allende
+alvaro obregon
+arteaga
+atoyac
+benito juarez
+bustamante
+camargo
+cardenas
+chiautla
+coatepec
+cocula
+coxcatlan
+coyotepec
+cuauhtemoc
+cuautla
+el arenal
+el oro
+emiliano zapata
+francisco i madero
+gomez farias
+guadalupe
+guadalupe victoria
+guerrero
+hidalgo
+huehuetla
+hueyapan
+jesus maria
+jilotepec
+jimenez
+juarez
+la paz
+lagunillas
+lazaro cardenas
+loreto
+los reyes
+magdalena
+matamoros
+mazatan
+melchor ocampo
+metepec
+minatitlan
+moctezuma
+morelos
+nogales
+ocampo
+ocotepec
+pantepec
+panuco
+pueblo nuevo
+rayon
+rosario
+san felipe
+san fernando
+san juan del rio
+san lucas
+san marcos
+santa catarina
+santa maria del oro
+tenancingo
+tepetzintla
+tequila
+tierra blanca
+tlaxco
+toliman
+tomatlan
+tonala
+tuxpan
+venustiano carranza
+vicente guerrero
+victoria
+villa guerrero
+villa hidalgo
+villagran
+xoxocotla
+zacualpan
+zaragoza
