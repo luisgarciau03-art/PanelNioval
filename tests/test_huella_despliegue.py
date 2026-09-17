@@ -17,10 +17,13 @@ tests fijan las dos propiedades de las que depende que sirva para algo:
        renombra uno, la guarda empieza a mentir y hay que enterarse aqui, no en
        produccion tres semanas despues.
 """
+import sys
+
 import pytest
 
 import app
-from tools.huella_despliegue import MARCADORES, veredicto
+import tools.huella_despliegue as hd
+from tools.huella_despliegue import MARCADORES, veredicto  # noqa: E402  (orden intencional: app primero)
 
 
 # El panel tal como estaba desplegado del 24-ago al 16-sep (commit 51520f3): un
@@ -92,3 +95,140 @@ class TestLosMarcadoresNoSePuedenOxidar:
 def cliente():
     app.app.config["TESTING"] = True
     return app.app.test_client()
+
+
+# ═══════ Lo que el gate de seguridad encontro (T3.4, revision) ═══════
+#
+# `X-Dashboard-Token` es una cabecera propia, y `requests` SOLO limpia
+# `Authorization` y `Cookie` al cambiar de host en una redireccion: una cabecera
+# nuestra se reenvia intacta a donde diga el `Location`. Con DNS dinamico
+# (duckdns) eso no es teorico: quien controle el nombre puede devolver un 30x y
+# quedarse con el token. El endpoint no tiene ninguna razon para redirigir.
+
+
+class TestElTokenNoViajaADondeDigaOtro:
+
+    def test_la_consulta_no_sigue_redirecciones(self, monkeypatch):
+        capturado = {}
+
+        def falso_get(url, **kw):
+            capturado.update(kw)
+            class R:
+                status_code = 200
+            return R()
+
+        monkeypatch.setattr(hd.requests, "get", falso_get)
+        hd.consultar("https://ejemplo.mx", "/api/importador/estado", "token-de-prueba")
+
+        assert capturado.get("allow_redirects") is False
+
+    def test_un_3xx_no_se_sigue_y_no_se_lee_como_verde(self, monkeypatch):
+        class Redirige:
+            status_code = 302
+            headers = {"Location": "https://otro-host.example/roba"}
+            text = ""
+
+        monkeypatch.setattr(hd, "consultar", lambda *a, **k: Redirige())
+        monkeypatch.setattr(sys, "argv", ["huella", "https://ejemplo.mx", "--token", "x"])
+
+        assert hd.main() != 0
+
+
+class TestUnFalloDeMedicionNoEsUnVerde:
+    """Exit 0 significa «al dia». No puede significar «no pude comprobarlo»."""
+
+    def test_un_error_de_red_tiene_codigo_de_salida_propio(self, monkeypatch, capsys):
+        def revienta(*a, **k):
+            raise hd.requests.exceptions.ConnectTimeout("sin ruta al host")
+
+        monkeypatch.setattr(hd, "consultar", revienta)
+        monkeypatch.setattr(sys, "argv", ["huella", "https://ejemplo.mx", "--token", "x"])
+
+        codigo = hd.main()
+
+        assert codigo not in (0, 1), "se confunde con «al dia» o con «rancio»"
+        assert "token" not in capsys.readouterr().out.lower().replace("token:", "")
+
+
+class TestElTokenNoTieneQueIrEnLaLineaDeComandos:
+    """`--token` queda visible en `ps` y en el historial del shell."""
+
+    def test_se_toma_de_la_variable_de_entorno_si_no_se_pasa(self, monkeypatch):
+        vistos = {}
+        monkeypatch.setenv("PANEL_DASHBOARD_TOKEN", "desde-el-entorno")
+        monkeypatch.setattr(hd, "consultar",
+                            lambda base, ruta, tok: vistos.setdefault("tok", tok) and None
+                            or _respuesta_ok())
+        monkeypatch.setattr(sys, "argv", ["huella", "https://ejemplo.mx"])
+
+        hd.main()
+
+        assert vistos["tok"] == "desde-el-entorno"
+
+
+def _respuesta_ok():
+    class R:
+        status_code = 200
+        def json(self):
+            return {c: 0 for c, _, _ in MARCADORES}
+    return R()
+
+
+class TestUnCampoPresenteQueNoSirveNoCuenta:
+    """El CRITICAL del gate: `clave in datos` da por bueno un `None`.
+
+    Hoy el endpoint nunca devuelve `None` en estos campos, asi que no era un
+    incidente vivo. Pero un cambio de una linea en `app.py` lo dispararia sin que
+    nada se enterara, y "un fallo de medicion que se lee como exito" es justo lo
+    que esta herramienta existe para evitar.
+    """
+
+    def test_un_marcador_en_None_cuenta_como_ausente(self):
+        datos = {c: None for c, _, _ in MARCADORES}
+
+        v = veredicto(datos)
+
+        assert v.rancio is True
+        assert "nuevos_en_sheet" in v.faltantes
+
+    def test_pero_cero_y_cadena_vacia_SI_valen(self):
+        """Un importador en reposo tiene los contadores a 0 y la fase en ''.
+        Tratarlos como ausentes daria rancio un panel al dia."""
+        datos = {c: 0 for c, _, _ in MARCADORES}
+        datos["fase"] = ""
+        datos["medidor"] = {}
+
+        assert veredicto(datos).rancio is False
+
+    def test_un_dict_vacio_falla_cerrado(self):
+        assert veredicto({}).rancio is True
+
+
+class TestLaRespuestaQueNoSePuedeInterpretar:
+
+    def test_json_valido_que_no_es_objeto_no_revienta_con_traceback(self, monkeypatch):
+        class NoEsObjeto:
+            status_code = 200
+            headers = {"Content-Type": "application/json"}
+            content = b"null"
+            text = "null"
+            def json(self):
+                return None
+
+        monkeypatch.setattr(hd, "consultar", lambda *a, **k: NoEsObjeto())
+        monkeypatch.setattr(sys, "argv", ["huella", "https://ejemplo.mx", "--token", "x"])
+
+        assert hd.main() == hd.NO_INTERPRETABLE
+
+    def test_el_cuerpo_no_se_vuelca_salvo_que_se_pida(self, monkeypatch, capsys):
+        class Rara:
+            status_code = 503
+            headers = {"Content-Type": "text/html"}
+            content = b"x" * 50
+            text = "SECRETO-DE-UN-PROXY-INTERMEDIO"
+
+        monkeypatch.setattr(hd, "consultar", lambda *a, **k: Rara())
+        monkeypatch.setattr(sys, "argv", ["huella", "https://ejemplo.mx", "--token", "x"])
+        hd.main()
+
+        assert "SECRETO-DE-UN-PROXY" not in capsys.readouterr().out

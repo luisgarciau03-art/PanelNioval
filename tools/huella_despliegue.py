@@ -15,9 +15,17 @@ responda da una **cota inferior** de lo que corre. No prueba que corra `main` ex
 prueba que corre algo **igual o posterior** al commit de ese marcador.
 
 Uso:
-    python tools/huella_despliegue.py https://panelnioval.duckdns.org --token <valor>
+    PANEL_DASHBOARD_TOKEN=<valor> python tools/huella_despliegue.py https://panelnioval.duckdns.org
 
 El token no se imprime nunca, ni entero ni en fragmentos.
+
+**Codigos de salida, que son tres y no dos:**
+
+    0  al dia      1  rancio (falta algo del arreglo)
+    2  no se pudo interpretar la respuesta      3  no se pudo medir
+
+Confundir "no pude comprobarlo" con "esta al dia" convertiria esta herramienta en lo
+que vino a evitar.
 
 La decision vive en `veredicto()`, que es pura y no toca la red: asi puede probarse
 (`tests/test_huella_despliegue.py`) en las dos direcciones, que es lo unico que hace
@@ -27,8 +35,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 import requests
 
@@ -46,6 +56,10 @@ MARCADORES = [
 
 ARREGLO = "ae0e1c9"
 
+# Tercer y cuarto resultado, distintos de 0 (al dia) y de 1 (rancio).
+NO_INTERPRETABLE = 2
+NO_MEDIDO = 3
+
 
 @dataclass
 class Veredicto:
@@ -62,56 +76,117 @@ class Veredicto:
     posterior_al_arreglo: bool = False
 
 
-def veredicto(datos: dict) -> Veredicto:
+def _sirve(datos: dict[str, object], clave: str) -> bool:
+    """¿El panel publica este marcador con un valor utilizable?
+
+    Comprobar solo `clave in datos` no basta: un campo presente con valor `None` es
+    un marcador que NO sirve, y darlo por bueno es exactamente el "fallo de medicion
+    que se lee como exito" que esta herramienta existe para evitar. Hoy el endpoint
+    nunca devuelve `None` en estos campos, pero un cambio de una linea en `app.py`
+    lo haria sin que nada se enterara.
+
+    `0`, `''` y `{}` SI valen: son valores legitimos de un importador en reposo.
+    """
+    return datos.get(clave) is not None
+
+
+def veredicto(datos: dict[str, object]) -> Veredicto:
     """Decide sobre el cuerpo de `/api/importador/estado`. No toca la red."""
     del_arreglo = [c for c, desde, _ in MARCADORES if desde == ARREGLO]
-    faltantes = [c for c in del_arreglo if c not in datos]
     return Veredicto(
-        rancio=bool(faltantes),
-        faltantes=faltantes,
-        presentes=[c for c, _, _ in MARCADORES if c in datos],
+        rancio=bool([c for c in del_arreglo if not _sirve(datos, c)]),
+        faltantes=[c for c in del_arreglo if not _sirve(datos, c)],
+        presentes=[c for c, _, _ in MARCADORES if _sirve(datos, c)],
         # Un marcador que nacio DESPUES del arreglo prueba que lo servido es
         # estrictamente posterior, no solo "igual o posterior".
         posterior_al_arreglo=any(
-            c in datos for c, desde, _ in MARCADORES
+            _sirve(datos, c) for c, desde, _ in MARCADORES
             if desde not in (ARREGLO, "pre-" + ARREGLO)
         ),
     )
 
 
-def consultar(base: str, ruta: str, token: str | None):
+def _pista(respuesta: requests.Response, con_cuerpo: bool) -> str:
+    """Que decir de una respuesta que no se pudo interpretar.
+
+    Por defecto, su forma -- no su contenido: el cuerpo puede venir de un proxy o un
+    WAF intermedio y no hay razon para volcarlo a la terminal por rutina.
+    """
+    forma = (f"Content-Type={respuesta.headers.get('Content-Type', '?')!r}, "
+             f"{len(respuesta.content)} bytes")
+    if not con_cuerpo:
+        return forma + ". Con --cuerpo se vuelcan los primeros 200 caracteres."
+    return forma + f". Cuerpo (200 primeros): {respuesta.text[:200]!r}"
+
+
+def consultar(base: str, ruta: str, token: str | None) -> requests.Response:
+    """Una peticion, sin seguir redirecciones.
+
+    `X-Dashboard-Token` es una cabecera NUESTRA, y `requests` solo limpia
+    `Authorization` y `Cookie` al cambiar de host en un 30x: una cabecera propia se
+    reenvia intacta a donde diga el `Location`. Con DNS dinamico eso no es teorico
+    -- quien controle el nombre devuelve un 302 y se queda con el token --, y este
+    endpoint no tiene ninguna razon legitima para redirigir.
+    """
     cab = {"X-Dashboard-Token": token} if token else {}
-    return requests.get(f"{base.rstrip('/')}{ruta}", headers=cab, timeout=25)
+    return requests.get(f"{base.rstrip('/')}{ruta}", headers=cab, timeout=25,
+                        allow_redirects=False)
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("url")
-    ap.add_argument("--token", default=None)
+    ap.add_argument("--token", default=None,
+                    help="Por defecto se toma de PANEL_DASHBOARD_TOKEN. Pasarlo aqui lo "
+                         "deja visible en `ps` y en el historial del shell.")
+    ap.add_argument("--cuerpo", action="store_true",
+                    help="Volcar el cuerpo de la respuesta cuando no se pueda interpretar. "
+                         "Apagado por defecto: puede venir de un proxy o WAF intermedio.")
     args = ap.parse_args()
 
-    print(f"Panel: {args.url}")
-    print(f"Token: {'presente' if args.token else 'AUSENTE'}\n")
+    token = args.token or os.environ.get("PANEL_DASHBOARD_TOKEN")
 
-    r = consultar(args.url, "/api/importador/estado", args.token)
+    print(f"Panel: {args.url}")
+    print(f"Token: {'presente' if token else 'AUSENTE'}\n")
+
+    try:
+        r = consultar(args.url, "/api/importador/estado", token)
+    except requests.exceptions.RequestException as e:
+        print(f"NO SE PUDO MEDIR: {type(e).__name__}.")
+        print("  Ni al dia ni rancio: sin medicion. Revisa red, DNS o el nombre del host.")
+        return NO_MEDIDO
+
     print(f"GET /api/importador/estado -> HTTP {r.status_code}")
 
+    if 300 <= r.status_code < 400:
+        destino = urlsplit(r.headers.get("Location", "")).netloc or "(sin Location)"
+        print(f"  REDIRECCION a {destino}, y NO se sigue: la cabecera del token viajaria")
+        print("  con ella. Este endpoint no deberia redirigir; averigua por que lo hace.")
+        return NO_INTERPRETABLE
     if r.status_code in (401, 403):
         print("  El panel exige token y el que se paso no sirve. Sin token no hay huella.")
-        return 2
+        return NO_INTERPRETABLE
     if r.status_code != 200:
-        print(f"  Respuesta inesperada. Cuerpo (200 primeros): {r.text[:200]!r}")
-        return 2
+        print(f"  Respuesta inesperada. {_pista(r, args.cuerpo)}")
+        return NO_INTERPRETABLE
 
     try:
         datos = r.json()
     except json.JSONDecodeError:
-        print(f"  No es JSON. Cuerpo (200 primeros): {r.text[:200]!r}")
-        return 2
+        print(f"  No es JSON. {_pista(r, args.cuerpo)}")
+        return NO_INTERPRETABLE
+
+    # JSON valido pero que no es un objeto (`null`, un numero, `true`) no revienta en
+    # `.json()`: revienta dos lineas mas abajo, con traceback en vez de mensaje.
+    if not isinstance(datos, dict):
+        print(f"  JSON valido pero no es un objeto ({type(datos).__name__}). "
+              f"{_pista(r, args.cuerpo)}")
+        return NO_INTERPRETABLE
 
     print(f"  Claves devueltas: {len(datos)}\n")
     for clave, desde, que_es in MARCADORES:
-        print(f"  {'SI' if clave in datos else 'NO':2}  {clave:16} (desde {desde})  {que_es}")
+        print(f"  {'SI' if _sirve(datos, clave) else 'NO':2}  {clave:16} "
+              f"(desde {desde})  {que_es}")
 
     v = veredicto(datos)
     print()
@@ -123,7 +198,8 @@ def main() -> int:
         print("  seccion 'Como saber que version sirve el VPS'.")
         return 1
 
-    print("VEREDICTO: H1 DESCARTADA -- los 5 marcadores del fix de agosto estan presentes.")
+    print(f"VEREDICTO: H1 DESCARTADA -- {len(v.presentes)} marcadores confirmados, "
+          f"y los 5 del arreglo estan entre ellos.")
     if v.posterior_al_arreglo:
         print("  Y ademas hay un marcador POSTERIOR al fix: el codigo servido es mas")
         print("  reciente que el arreglo, no solo igual.")

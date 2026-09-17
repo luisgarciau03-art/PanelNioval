@@ -148,14 +148,24 @@ ni commit, ni hostname, ni rutas— y **no se revierte**. Así que el despliegue
 **comportamiento**: se le pregunta al panel por campos que sólo existen después de un arreglo.
 
 ```bash
-python tools/huella_despliegue.py https://panelnioval.duckdns.org --token <valor>
+PANEL_DASHBOARD_TOKEN=<valor> python tools/huella_despliegue.py https://panelnioval.duckdns.org
 ```
+
+⚠️ **El token va por variable de entorno, no por `--token`.** Pasarlo como argumento lo deja
+visible en el listado de procesos del VPS y en el historial del shell. `--token` sigue existiendo
+como override explícito, pero no es el camino por defecto.
 
 | Salida | Qué significa | Qué hacer |
 |---|---|---|
-| `H1 DESCARTADA` + *«marcador POSTERIOR al fix»* | El VPS sirve algo **estrictamente posterior** al arreglo | Nada. Si hay un síntoma, no es de despliegue |
+| `H1 DESCARTADA` + *«marcador POSTERIOR al fix»* (exit **0**) | El VPS sirve algo **estrictamente posterior** al arreglo | Nada. Si hay un síntoma, no es de despliegue |
 | `H1 CONFIRMADA` (exit **1**) | **Falta algo del arreglo: el VPS está rancio** | Desplegar a mano (tabla «Operación en el VPS») y repetir |
-| exit **2** | No se pudo medir: token inválido, HTTP raro o respuesta que no es JSON | Arreglar el acceso. **Un fallo de medición no es un verde** |
+| exit **2** | Respondió, pero no se pudo interpretar: token inválido, HTTP raro, redirección o cuerpo que no es un objeto JSON | Arreglar el acceso |
+| exit **3** | **No se pudo medir**: red, DNS o host | **Ni al día ni rancio. Un fallo de medición no es un verde** |
+
+**Si sale una redirección, no la sigas a mano.** La herramienta se niega a propósito: la cabecera
+`X-Dashboard-Token` es propia, y `requests` sólo limpia `Authorization` y `Cookie` al cambiar de
+host — una cabecera nuestra viajaría intacta a donde diga el `Location`. Con DNS dinámico eso no
+es teórico. Este endpoint no tiene motivo para redirigir; si lo hace, averigua por qué.
 
 **Qué NO prueba.** Da una **cota inferior**: «lo servido es igual o posterior al commit de ese
 marcador». No prueba que el VPS corra `main` exacto. Para eso, compara el front-end servido

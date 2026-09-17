@@ -380,7 +380,7 @@ claude-mem, superpowers) + built-in. **claude-ads descartada con justificación 
 | T3.1 | — | — | — | Síntoma reproducido con **números**; H1 resuelta |
 | T3.2 | — | `debugger` + `error-detective` | — | **CE1: una causa, con evidencia** |
 | T3.3 | **RED obligatorio** | — | — | **CE2: salida en rojo pegada en PROGRESO** |
-| T3.4 | GREEN | `python-reviewer` + `code-reviewer` + `silent-failure-hunter` + `security-reviewer` | ≥ 626 + nuevos | Los **tres** caminos verificados |
+| T3.4 | Fix (GREEN) | **HECHO** | `veredicto()` pura + guarda de despliegue; suite **1,193 → 1,208** (15 tests). Verificado contra producción: `H1 DESCARTADA`, 7 marcadores, con uno posterior al arreglo | El plan ya lo preveía: *«si es H1, aquí no hay código»*. **Gates: `python-reviewer` (1 CRITICAL + 2 MEDIUM) y `security-reviewer` (1 HIGH + 2 MEDIUM + 1 LOW) — los 7 cerrados**, cada uno con su test, y **las 6 guardas probadas por mutación**. El CRITICAL era el propio fallo que la herramienta venía a evitar: un campo en `None` contaba como presente |
 | T3.5 | — | `click-path-audit` | — | 6 estados con veredicto y captura |
 | T3.6 | RED→GREEN por estado | `typescript-reviewer` + `code-reviewer` + `silent-failure-hunter` | ≥ 626 + nuevos | **CE4** |
 | T3.7 | CI verde | `pr-test-analyzer` | ≥ 626 sobre `main` | **CE3 y CE5 con la aritmética a la vista** |
