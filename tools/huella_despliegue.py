@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 """Fecha el codigo que sirve el VPS por su comportamiento, no por su version.
 
+**Por que existe.** El bug de conteo del importador se arreglo el 2026-08-27 y el
+operador lo siguio sufriendo tres semanas: el arreglo estaba en `main` y produccion
+seguia sirviendo `51520f3`. No hay auto-deploy, y nadie tenia forma de notarlo.
+
 `/salud` es deliberadamente mudo -- no dice version, ni commit, ni hostname. Es una
 decision de seguridad del Plan 5 y no se revierte. Asi que la unica forma de saber si
 un fix esta desplegado es preguntarle al panel por un **rasgo que solo existe despues
@@ -14,12 +18,17 @@ Uso:
     python tools/huella_despliegue.py https://panelnioval.duckdns.org --token <valor>
 
 El token no se imprime nunca, ni entero ni en fragmentos.
+
+La decision vive en `veredicto()`, que es pura y no toca la red: asi puede probarse
+(`tests/test_huella_despliegue.py`) en las dos direcciones, que es lo unico que hace
+creible un barrido.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+from dataclasses import dataclass, field
 
 import requests
 
@@ -34,6 +43,40 @@ MARCADORES = [
     ("fase",            "ae0e1c9",     "B6: que esta haciendo ahora mismo"),
     ("medidor",         "PR #38",      "Tope de gasto de Places (posterior al fix)"),
 ]
+
+ARREGLO = "ae0e1c9"
+
+
+@dataclass
+class Veredicto:
+    """Que se pudo concluir del estado que devolvio el panel.
+
+    `rancio` responde a la pregunta que importa: ¿le falta algo del arreglo?
+    `faltantes` dice QUE le falta, porque un "esta rancio" sin detalle obliga a
+    rediagnosticar desde cero.
+    """
+
+    rancio: bool
+    faltantes: list[str] = field(default_factory=list)
+    presentes: list[str] = field(default_factory=list)
+    posterior_al_arreglo: bool = False
+
+
+def veredicto(datos: dict) -> Veredicto:
+    """Decide sobre el cuerpo de `/api/importador/estado`. No toca la red."""
+    del_arreglo = [c for c, desde, _ in MARCADORES if desde == ARREGLO]
+    faltantes = [c for c in del_arreglo if c not in datos]
+    return Veredicto(
+        rancio=bool(faltantes),
+        faltantes=faltantes,
+        presentes=[c for c, _, _ in MARCADORES if c in datos],
+        # Un marcador que nacio DESPUES del arreglo prueba que lo servido es
+        # estrictamente posterior, no solo "igual o posterior".
+        posterior_al_arreglo=any(
+            c in datos for c, desde, _ in MARCADORES
+            if desde not in (ARREGLO, "pre-" + ARREGLO)
+        ),
+    )
 
 
 def consultar(base: str, ruta: str, token: str | None):
@@ -53,7 +96,7 @@ def main() -> int:
     r = consultar(args.url, "/api/importador/estado", args.token)
     print(f"GET /api/importador/estado -> HTTP {r.status_code}")
 
-    if r.status_code == 401 or r.status_code == 403:
+    if r.status_code in (401, 403):
         print("  El panel exige token y el que se paso no sirve. Sin token no hay huella.")
         return 2
     if r.status_code != 200:
@@ -67,33 +110,25 @@ def main() -> int:
         return 2
 
     print(f"  Claves devueltas: {len(datos)}\n")
-
-    presentes, ausentes = [], []
     for clave, desde, que_es in MARCADORES:
-        hay = clave in datos
-        (presentes if hay else ausentes).append((clave, desde, que_es))
-        print(f"  {'SI' if hay else 'NO':2}  {clave:16} (desde {desde})  {que_es}")
+        print(f"  {'SI' if clave in datos else 'NO':2}  {clave:16} (desde {desde})  {que_es}")
 
+    v = veredicto(datos)
     print()
-    del_fix = [c for c, d, _ in MARCADORES if d == "ae0e1c9"]
-    faltan_del_fix = [c for c in del_fix if c not in datos]
 
-    if faltan_del_fix:
-        print("VEREDICTO: H1 CONFIRMADA -- el VPS sirve codigo ANTERIOR a ae0e1c9.")
-        print(f"  Faltan del fix de agosto: {', '.join(faltan_del_fix)}")
-        print("  El problema es de DESPLIEGUE, no de codigo.")
+    if v.rancio:
+        print(f"VEREDICTO: H1 CONFIRMADA -- el VPS sirve codigo ANTERIOR a {ARREGLO}.")
+        print(f"  Faltan del fix de agosto: {', '.join(v.faltantes)}")
+        print("  El problema es de DESPLIEGUE, no de codigo. Ver docs/RUNBOOK.md,")
+        print("  seccion 'Como saber que version sirve el VPS'.")
         return 1
 
-    tiene_posterior = any(c in datos for c, d, _ in MARCADORES if d == "PR #38")
     print("VEREDICTO: H1 DESCARTADA -- los 5 marcadores del fix de agosto estan presentes.")
-    if tiene_posterior:
+    if v.posterior_al_arreglo:
         print("  Y ademas hay un marcador POSTERIOR al fix: el codigo servido es mas")
-        print("  reciente que ae0e1c9, no solo igual.")
-    print("  El VPS tiene el fix. Si el sintoma sigue vivo, es H2 (regresion) o H3")
-    print("  (caso residual). Sigue T3.2.")
+        print("  reciente que el arreglo, no solo igual.")
+    print("  El VPS tiene el fix. Si el sintoma sigue vivo, es regresion o caso residual.")
 
-    # El estado en si mismo es informacion util para T3.1: si hay una corrida viva,
-    # los numeros de abajo son los que el operador esta viendo ahora.
     interesantes = ("status", "ciudad", "encontrados", "nuevos_en_sheet",
                     "duplicados", "descartados")
     print("\nEstado actual del importador en produccion:")
