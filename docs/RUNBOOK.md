@@ -386,6 +386,31 @@ existe, se marca como interrumpido y se sigue adelante.
 
 Antes, los dos primeros terminaban en ✅ con la hoja intacta.
 
+### Antes de migrar a Places API (New): la Fase 0 (desde 2026-09-17)
+
+El ADR `2026-09-15-ruta-de-telefono-places` **no autoriza migrar**. Autoriza **trece llamadas que
+no escriben nada**, y que compran los dos números que le faltan a la decisión:
+
+```bash
+GMAPS_API_KEY=<valor> python tools/comparar_places_new.py "Puebla"
+```
+
+Elige una ciudad **ya trabajada**: son las que tienen claves en la hoja contra las que la
+migración tendría que casar. Cuesta **≈ $0.46** y **no toca la hoja, ni la caché, ni el estado**.
+
+| Código de salida | Qué significa | Qué hacer |
+|---:|---|---|
+| **0** | La clave de deduplicación casa **≥ 99 %** | Se cumple la condición (a) del ADR. Falta la (b): sin-teléfono ≥ 30 % |
+| **1** | **Casa por debajo del 99 %** | 🔴 **El ADR cancela la migración.** Migrar llenaría la hoja de duplicados de todo lo ya importado |
+| **3** | Ningún Place ID en común: **no se pudo medir** | No es un veredicto. Repetir con otra ciudad |
+
+**Por qué esto y no migrar directamente.** `_clave_contacto` es `f"{nombre}|{dirección}"` y se
+calcula en **tres sitios que deben coincidir carácter a carácter**. Si la API New formatea el
+nombre o la dirección distinto —un código postal de más, un `S.A. de C.V.`—, la clave nueva no
+casa con ninguna de las viejas y el importador **duplica todo sin lanzar una sola excepción**.
+Hoy **no hay ninguna guarda** que lo detecte; el operador se enteraría marcando teléfonos
+repetidos.
+
 ### Caché de detalles de Places (desde 2026-08-28)
 
 El importador guarda los detalles que pide a Google (teléfono, sitio web, horario)
