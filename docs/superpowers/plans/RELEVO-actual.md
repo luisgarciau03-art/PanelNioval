@@ -10,8 +10,10 @@
 Continúas **PanelNioval**. **NO empieces de cero.**
 
 **PROYECTO:** `C:\Users\PC 1\PanelNioval`
-**`main`:** **`edda166`** · **0 PR abiertos** · baseline **1,193 passed, 2 skipped**
-**El VPS sirve `edda166`:** lo desplegado y lo mergeado coinciden **por primera vez en la tanda**.
+**`main`:** **`3c6bca3`** · **0 PR abiertos** · baseline **1,193 passed, 2 skipped**
+**El VPS sirve `edda166`**, que es `main` **menos el commit de documentacion del T4.8**. No hay
+codigo sin desplegar: `git diff edda166..main --stat -- '*.py' '*.js' '*.css' '*.html'` da vacio.
+Comprueba eso mismo antes de dar por buena cualquier afirmacion de «esta desplegado».
 **RAMA A CREAR:** `fix/conteo-importador-reincidencia`, desde `main`.
 
 ---
