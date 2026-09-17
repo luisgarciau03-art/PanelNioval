@@ -3,7 +3,7 @@
 > **Archivo único que se SOBRESCRIBE al cerrar CADA tarea.** Siempre contiene el mensaje
 > completo para arrancar una sesión nueva.
 >
-> **Estado: PLANES 1 y 4 CERRADOS Y EN PRODUCCIÓN · PLAN 3 en 8/9 (T3.7 bloqueada en CE3).** Siguiente: **Plan 2 · T2.0**.
+> **Estado: PLANES 1 y 4 CERRADOS Y EN PRODUCCIÓN · PLAN 3 en 8/9 (T3.7 bloqueada en CE3).** Siguiente: **Plan 2 · T2.1**.
 
 ---
 
@@ -15,7 +15,7 @@ Continúas **PanelNioval**. **NO empieces de cero.**
 **El VPS sirve `edda166`**, que es `main` **menos el commit de documentacion del T4.8**. No hay
 codigo sin desplegar: `git diff edda166..main --stat -- '*.py' '*.js' '*.css' '*.html'` da vacio.
 Comprueba eso mismo antes de dar por buena cualquier afirmacion de «esta desplegado».
-**RAMA A CREAR:** `perf/gasto-places-minimo`, desde `main`.
+**RAMA VIVA:** `perf/gasto-places-minimo` (ya creada, T2.0 commiteada, sin PR).
 
 ---
 
@@ -49,7 +49,7 @@ mediana de 3 por esto. **No reportes una regresión sobre una muestra suelta.**
 
 ## AVANCE
 
-- **2 / 4 planes (50 %)** · **25 / 34 tareas (73.5 %)** — Plan 3 en **8 / 9**, con **T3.7 BLOQUEADA**
+- **2 / 4 planes (50 %)** · **26 / 34 tareas (76.5 %)** — Plan 3 en **8 / 9**, con **T3.7 BLOQUEADA**
 - **Planes 1 y 4 cerrados y en producción.** La tanda de **agosto** quedó en **53/53**.
 
 ---
@@ -77,32 +77,62 @@ mediana de 3 por esto. **No reportes una regresión sobre una muestra suelta.**
 
 ## SIGUIENTE PASO EXACTO
 
-**Plan 2, Tarea T2.0 — Tarea Cero: rama, respaldo y medicion del gasto actual de Places.**
-**Plan 3 cerrado en 8 / 9: T3.7 queda BLOQUEADA en CE3** (ver abajo). Es el ultimo plan.
+**Plan 2, Tarea T2.1 — Cuantificar la fuga: Details pagados que nunca llegan a la hoja.**
+**T2.0 CERRADA.** Rama viva: `perf/gasto-places-minimo` (sin PR aun). `main`: **`47df48b`**.
 
 ```
-ANCLA - Plan 2 Tarea T2.0 - importador nacional barato veraz profesional - avance 25/34 -
+ANCLA - Plan 2 Tarea T2.1 - importador nacional barato veraz profesional - avance 26/34 -
+ ESTA TAREA DECIDE SI EL RESTO DEL PLAN VALE LA PENA -
  baseline: python -m pytest tests/  -> 1,208 passed, 2 skipped
 ```
 
-1. Rama `perf/gasto-places-minimo` desde `main` actualizado (ya con los planes 1, 4 y 3).
-2. Baseline. Anotar el numero exacto.
-3. `tools/medir_llamadas_places.py` sobre **una ciudad virgen y otra ya trabajada**, con
-   desglose por tipo de llamada.
-4. Respaldo a `docs/auditoria/respaldos/2026-09-15-plan2/`.
-5. **Comparar contra `docs/investigacion/2026-08-28-costo-places-despues.md`.** Si los numeros
-   cambiaron, los planes 1/4/3 tocaron la ruta de Places sin querer. **Eso es un hallazgo.**
+### ⚠️ LA TRAMPA QUE T2.0 DEJO AVISADA, Y QUE HUNDE ESTA TAREA SI SE IGNORA
 
-**Criterio de cierre.** Dos mediciones con desglose, comparadas contra la linea de agosto.
+**El desperdicio que persigues NO es medible con el doble actual.** El `GmapsContador` de
+`tools/medir_llamadas_places.py` **aprueba a todos**: ningun negocio se queda sin telefono, asi
+que `sin_telefono` nunca descarta a nadie y el medidor dara **cero fuga**.
 
-**Insumos que el Plan 3 le deja, y que NO hay que redescubrir:**
+**Cero no seria un resultado: seria el fixture.** Antes de medir nada, el doble necesita
+negocios que **fallen los filtros DESPUES de pagar su Details** — sin telefono, con pocas
+reseñas, con calificacion baja. Si no, T2.1 concluye "no hay fuga" y el plan se cancela por un
+defecto del instrumento.
 
-- El `break` de `app.py` corta **reintentos**, no variaciones: **las 3 variaciones siempre
-  corren** -> 3 consultas de texto por categoria, **6 por corrida**.
-- Una consulta que devuelve legitimamente cero **se repite 3 veces sin backoff**: el
-  `2 ** intento` solo esta en la rama `except`. Gasto pequeño pero real.
-- `presupuesto_agotado` guarda lo ya pagado antes de cortar (`app.py:3509`). El plan no lo
-  listaba entre las rutas que tocan contadores.
+### Lo que T2.0 ya midio y NO hay que repetir
+
+| Escenario | Text | Details | Filas |
+|---|---:|---:|---:|
+| Ciudad nueva | 13 | 80 | 80 |
+| A medio trabajar (30 en la hoja) | 13 | 60 | 60 |
+| Ya trabajada (90 en la hoja) | 13 | 0 | 0 |
+| Segunda corrida (cache caliente) | 13 | 0 | 80 |
+
+**Identicos a la linea de agosto: ningun plan de la tanda toco la ruta de Places.**
+Place Details es el **86 %** del gasto en una ciudad nueva; Text Search es un suelo fijo de 13.
+
+### 🔍 EL HALLAZGO DE T2.0, que es material de esta tarea
+
+**`MAX_VARIACIONES_SIN_APORTE` no ahorra NADA.** Ponerlo en 99 —desactivarlo— no cambia una sola
+llamada. El corte **por pagina** dispara antes y el contador de variaciones nunca llega a 2.
+
+```
+sin ningun corte            18 Text Search
+solo corte por pagina       13
+con los dos cortes          13     <- el segundo corte aporta 0
+```
+
+Con la salvedad: medido sobre el doble, donde todas las variaciones devuelven lo mismo. **No
+prueba que sea inutil en una ciudad real; prueba que el escenario de referencia no lo ejercita.**
+La pregunta ya no es cuanto ahorra, sino **si se ejecuta alguna vez**.
+
+**Y el medidor esta sano**, comprobado en la otra direccion: `MAX_PAGINAS_POR_CONSULTA=1` lo baja
+a 6 y `CORTAR_PAGINAS_SIN_APORTE=False` lo sube a 18.
+
+### Deuda cosmetica anotada
+
+El escenario de cache caliente imprime **«pagados y tirados: -80»**. El documento de agosto dice
+que un negativo es **imposible** y que por eso disparo una revision. Aquel -18 si era un defecto;
+este no —80 filas pagando 0 Details es el ahorro que la cache existe para producir— pero **la
+formula no aplica a ese escenario y aun asi se imprime**.
 
 ---
 
