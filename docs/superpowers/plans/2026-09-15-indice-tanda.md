@@ -5,7 +5,7 @@
 
 **SESIÓN ACTUAL: 2** · **ÚLTIMO RELEVO: 2026-09-16, tras T1.7 ([`RELEVO-actual.md`](RELEVO-actual.md), apuntando a Plan 4 · T4.0)**
 
-**PROGRESO GLOBAL: 2 / 4 planes completados (50 %) · 17 / 34 tareas (50 %)**
+**PROGRESO GLOBAL: 2 / 4 planes completados (50 %) · 22 / 34 tareas (64.7 %)** — Plan 3 en **5 / 9**: bug de conteo **diagnosticado y cerrado** (era despliegue, no código)
 
 > ✅ **Planes 1 y 4 CERRADOS y EN PRODUCCIÓN.** Los tres PR que llevaban meses abiertos —#42, #43 y #44— están en `main`, y el VPS sirve `edda166`. El operador ve **1,004 ciudades** y el panel rediseñado.
 >

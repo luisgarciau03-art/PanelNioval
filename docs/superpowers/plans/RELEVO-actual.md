@@ -10,7 +10,8 @@
 Continúas **PanelNioval**. **NO empieces de cero.**
 
 **PROYECTO:** `C:\Users\PC 1\PanelNioval`
-**`main`:** **`3c6bca3`** · **0 PR abiertos** · baseline **1,193 passed, 2 skipped**
+**`main`:** **`13e2cdb`** · **0 PR abiertos** · baseline en `main`: **1,193 passed, 2 skipped**
+**En la rama viva `fix/conteo-importador-reincidencia`: 1,199 passed, 2 skipped** (+6 de T3.3)
 **El VPS sirve `edda166`**, que es `main` **menos el commit de documentacion del T4.8**. No hay
 codigo sin desplegar: `git diff edda166..main --stat -- '*.py' '*.js' '*.css' '*.html'` da vacio.
 Comprueba eso mismo antes de dar por buena cualquier afirmacion de «esta desplegado».
@@ -48,7 +49,7 @@ mediana de 3 por esto. **No reportes una regresión sobre una muestra suelta.**
 
 ## AVANCE
 
-- **2 / 4 planes (50 %)** · **17 / 34 tareas (50 %)**
+- **2 / 4 planes (50 %)** · **22 / 34 tareas (64.7 %)** — Plan 3 en **5 / 9**
 - **Planes 1 y 4 cerrados y en producción.** La tanda de **agosto** quedó en **53/53**.
 
 ---
@@ -76,49 +77,56 @@ mediana de 3 por esto. **No reportes una regresión sobre una muestra suelta.**
 
 ## SIGUIENTE PASO EXACTO
 
-**Plan 3, Tarea T3.3 — el test que falla (RED), con el objeto CAMBIADO.**
-**T3.0, T3.1 y T3.2 CERRADAS.** Rama `fix/conteo-importador-reincidencia` (sin PR aun).
+**Plan 3, Tarea T3.5 — Auditoria de las pantallas de carga: ¿cual miente?**
+**T3.0, T3.1, T3.2, T3.3 y T3.4 CERRADAS.** Rama `fix/conteo-importador-reincidencia`, sin PR.
 
 ```
-ANCLA - Plan 3 Tarea T3.3 - importador nacional barato veraz profesional - avance 20/34 -
- baseline: python -m pytest tests/  -> 1,193 passed, 2 skipped
+ANCLA - Plan 3 Tarea T3.5 - importador nacional barato veraz profesional - avance 22/34 -
+ gates: a11y/ux + silent-failure-hunter - CE4 con captura de los 6 estados -
+ baseline: python -m pytest tests/  -> 1,199 passed, 2 skipped
 ```
 
-### 🔴 LA CAUSA YA ESTA IDENTIFICADA. NO se vuelve a diagnosticar.
+### 🔴 EL BUG DE CONTEO ESTA CERRADO. No se vuelve a diagnosticar ni a "arreglar".
 
-> **El arreglo se mergeo a `main` el 27-ago y nadie lo desplego.** El VPS siguio sirviendo
-> `51520f3` —cuyo `app.py` es **byte a byte** el mismo sobre el que agosto reprodujo el
-> «20 vs 10»— **tres semanas**, hasta el 16-sep, y solo llego a produccion como **efecto
-> colateral** del despliegue del Plan 1 (T1.6).
+> **Causa (CE1, con prueba directa):** el arreglo se mergeo el 27-ago y **nadie lo desplego**.
+> El VPS sirvio `51520f3` —cuyo `app.py` es **byte a byte** el de la reproduccion de agosto—
+> hasta el 16-sep, y llego a produccion como **efecto colateral** del despliegue del Plan 1.
 
-Prueba: `git merge-base --is-ancestor ae0e1c9 51520f3` es **falso**; `nuevos_en_sheet` tiene
-**0 apariciones** en el `app.py` desplegado; y su linea 4918 rotulaba `encontrados` como
-**«Guardados en Google Sheets»**, que es el sintoma literal.
+`git merge-base --is-ancestor ae0e1c9 51520f3` = **falso** · `nuevos_en_sheet` = **0 apariciones**
+en el `app.py` desplegado · su linea 4918 rotulaba `encontrados` como **«Guardados en Google
+Sheets»**, que es el sintoma literal. **H2 descartada** (la repro pasa identica en `ae0e1c9` y en
+`main`). **H3 no hace falta.**
 
-**H2 descartada** (la repro pasa identica en `ae0e1c9` y en `main`). **H3 no hace falta.**
-**CE1 cerrado.**
+**T3.3/T3.4 entregaron la guarda que faltaba**, que no era de conteo —hay 80 tests vigilandolo—
+sino **de despliegue rancio**: `tools/huella_despliegue.py` con `veredicto()` pura + 6 tests
+probados **por mutacion**, y la seccion nueva del RUNBOOK «Como saber que version sirve el VPS».
 
-⚠️ Y el matiz que evita rehacer T3.1: su «H1 descartada» era correcta **para hoy**. La huella se
-midio el 17-sep y el despliegue fue el 16. **Un dia antes habria dado H1 CONFIRMADA.** Medir el
-presente no explica un sintoma del pasado.
+### Lo que T3.5 tiene que hacer
 
-### Por que T3.3 cambia de objeto
+Los **seis estados** del importador: reposo, corriendo, completado, detenido, error y
+**`presupuesto_agotado`**. Cazar el que **afirme algo que no es** — no el que sea feo (eso era
+Plan 4). Capturar cada uno. **CE4.**
 
-**No hay defecto de codigo que arreglar**: lleva arreglado desde agosto y 80 tests lo vigilan.
-Lo que fallo fue el camino entre `main` y el operador, y **de eso no hay ninguna guarda**.
+**Tres pistas que ya estan sobre la mesa, no hay que buscarlas:**
 
-El test RED de T3.3 deberia ser **la deteccion de despliegue rancio**.
-`tools/huella_despliegue.py` ya lo hace y ya esta verificado en las dos direcciones; lo que le
-falta es **ser una guarda**, no un script que alguien recuerde correr.
+1. **Telegram es un SEPTIMO canal de estado** que el plan no cuenta entre los seis de la UI. Y
+   claude-mem tiene dos hallazgos de agosto sin verificar hoy: **#17575** «Completado» enviado en
+   corridas **canceladas**, y **#17826** «❌ Importador FALLÓ» cuando solo se alcanzo el **tope de
+   gasto** — un corte por tope **no es un fallo**.
+2. **`presupuesto_agotado`** (`app.py:3509`) no estaba en la lista de rutas del plan y si toca
+   los contadores. Merece su propio escenario.
+3. **`_estado_catalogo`** (`app.py:895-897`) es cache de proceso que **no se invalida**: un fallo
+   transitorio al arrancar serviria `catalogo_cargado: false` hasta el reinicio.
 
-**Candidato secundario, del §5 del diagnostico:** `app.py:3238` devuelve `len(nuevos)` —filas
-**enviadas** a `append_rows`, no las que Google confirmo; `updates.updatedRows` se tira sin
-mirarlo— y **ningun test puede verlo** porque todos los dobles hacen
-`self.escrituras += len(filas)`. **No es la causa de este sintoma**, pero es un fallo silencioso
-latente. ⚠️ Si se escribe su test, **el doble TIENE QUE PODER MENTIR**.
+### Deuda anotada que NO bloquea T3.5
 
-**Despues de T3.3 viene T3.5** (auditoria de los 6 estados de carga), que es independiente del
-conteo y sigue vigente tal cual.
+`app.py:3238` devuelve `len(nuevos)` — filas **enviadas** a `append_rows`, no las que Google
+confirmo (`updates.updatedRows` se tira sin mirarlo). **Ningun doble puede verlo**, porque todos
+hacen `self.escrituras += len(filas)`. No es la causa del sintoma; es un fallo silencioso
+latente. ⚠️ Si se le escribe test, **el doble TIENE QUE PODER MENTIR**.
+
+⚠️ **T3.7 sigue necesitando la corrida real**, con **respaldo de hojas antes** — y esta maquina
+**no tiene credenciales de Google**. Es el gate CE1 que agosto dejo abierto y nunca se cerro.
 
 ---
 
