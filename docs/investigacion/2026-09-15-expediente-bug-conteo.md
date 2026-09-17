@@ -223,6 +223,46 @@ anotado como lo primero de T3.7, con sus credenciales.
 
 ---
 
+## 7bis. POR QUÉ EL FIX DE AGOSTO NO BASTÓ
+
+*(Añadido al cerrar el plan, T3.8. Es el dato más valioso de todo el Plan 3.)*
+
+El Plan 3 de agosto cerró **10/10 tareas**, con **15 defectos** arreglados, **84 tests nuevos** y
+una medición antes/después en toda regla. Y el operador siguió viendo el bug **tres semanas
+más**. No falló ninguna de sus tareas. Falló lo que había **entre** su última tarea y el
+operador.
+
+### Las tres cosas que lo explican
+
+**1. El fix nació después del último despliegue, y nadie volvió a desplegar.**
+Último despliegue real: **24-ago**. Fix: **27-ago**. Llegó a producción el **16-sep**, y sólo de
+rebote, porque el Plan 1 necesitaba publicar sus 1,004 ciudades. Sin ese rebote seguiría sin
+llegar.
+
+**2. Tres de sus once criterios quedaron esperando al owner, y ninguno se cerró.**
+Corrida real, gunicorn en el VPS, navegador. Los tres eran justamente **los que salían de la
+máquina de desarrollo**. Los ocho que se cerraron se cerraron con dobles.
+
+**3. Nada podía notar la diferencia.**
+`/salud` es mudo por decisión de seguridad. El smoke no toca ninguna ruta del importador. No hay
+auto-deploy. La suite pasa igual de verde con el panel rancio que con el panel al día, porque la
+suite no mira producción. **La verificación de agosto era correcta y no podía ver lo que
+importaba.**
+
+### Lo que este plan añade para que no se repita
+
+| | |
+|---|---|
+| `tools/huella_despliegue.py` | Fecha el código servido **por comportamiento**, con 4 códigos de salida — y `exit 3` significa «no pude medir», que **no es un verde** |
+| `tests/test_huella_despliegue.py` | 15 tests, y el que importa vigila que los marcadores **no se oxiden**: si alguien renombra un campo, la guarda empieza a mentir y se descubre aquí |
+| RUNBOOK, *«Cómo saber qué versión sirve el VPS»* | El procedimiento, con la tabla de qué hacer ante cada salida |
+| `tools/auditar_estados_importador.py` | Recorre los estados y dice **COINCIDE / MIENTE**, y funciona también **contra el panel desplegado** |
+
+**La lección, en una frase:** *un plan que cierra todas sus tareas y deja tres gates abiertos no
+está cerrado — está esperando, y nadie avisa de que espera.*
+
+---
+
 ## 8. Estado de la tarea
 
 | | |

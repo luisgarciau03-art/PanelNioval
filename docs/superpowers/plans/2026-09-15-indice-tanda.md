@@ -5,16 +5,16 @@
 
 **SESIÓN ACTUAL: 2** · **ÚLTIMO RELEVO: 2026-09-16, tras T1.7 ([`RELEVO-actual.md`](RELEVO-actual.md), apuntando a Plan 4 · T4.0)**
 
-**PROGRESO GLOBAL: 2 / 4 planes completados (50 %) · 22 / 34 tareas (64.7 %)** — Plan 3 en **5 / 9**: bug de conteo **diagnosticado y cerrado** (era despliegue, no código)
+**PROGRESO GLOBAL: 2 / 4 planes completados · 25 / 34 tareas (73.5 %)** — Plan 3 en **8 / 9**: todo cerrado salvo **T3.7, BLOQUEADA en CE3** (corrida real: gate del owner). **No se marca 3/4 mientras CE3 siga rojo** — hacerlo repetiría el error de agosto, que cerró 10/10 con tres gates abiertos y el operador siguió viendo el bug tres semanas
 
 > ✅ **Planes 1 y 4 CERRADOS y EN PRODUCCIÓN.** Los tres PR que llevaban meses abiertos —#42, #43 y #44— están en `main`, y el VPS sirve `edda166`. El operador ve **1,004 ciudades** y el panel rediseñado.
 >
-> **Siguiente: Plan 3 · T3.5** — auditoría de las pantallas de carga. **El bug de conteo ya está cerrado (CE1, con prueba directa):** la causa no era código sino que el arreglo del 27-ago no llegó a producción hasta el 16-sep, de rebote con el despliegue del Plan 1.
+> **Siguiente: Plan 2 · T2.0** — el gasto de Places. **El bug de conteo está resuelto:** la causa era que el arreglo del 27-ago no llegó a producción hasta el 16-sep. Lo único abierto del Plan 3 es **CE3, la corrida real contra la hoja**, que es gate del owner.
 
 > ✅ **Plan 1 CERRADO y EN PRODUCCIÓN** (2026-09-16). PR #42 mergeado (`main` `8bac782`) y desplegado a mano en el VPS. El operador ve **1,004 ciudades** donde había 606.
 >
 > ⚠️ **HALLAZGO QUE AFECTA A LOS OTROS TRES PLANES:** el invariante «el VPS auto-deploya `main`» **es FALSO** desde el 2026-08-19. No hay auto-deploy: el despliegue es un `ssh` manual. **«Mergeado» y «desplegado» son dos estados distintos**, y los Planes 2, 3 y 4 llevan el invariante falso escrito. Cada uno necesita su paso de despliegue explícito. Detalle: `docs/auditoria/2026-09-15-verificacion-produccion-plan1.md`.
-**Planes 1 y 4: CERRADOS (8/8 y 12/12) y en producción. Plan 3 en 5/9. Siguiente: Plan 3 · T3.5 · Baseline sobre `main`: 1,193 passed, 2 skipped; sobre la rama viva `fix/conteo-importador-reincidencia`: 1,199** · **0 PR abiertos**
+**Planes 1 y 4: CERRADOS (8/8 y 12/12) y en producción. Plan 3: 8/9, T3.7 BLOQUEADA. Siguiente: Plan 2 · T2.0 · Baseline: 1,208 passed, 2 skipped**
 
 **Biblioteca de herramientas leída en la sesión de diseño:**
 `C:\Users\PC 1\.claude\BIBLIOTECA-HERRAMIENTAS.md` — **653 herramientas (229 agentes + 424

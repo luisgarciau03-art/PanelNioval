@@ -342,6 +342,16 @@ se descartan *antes* de aprobar, no son una parte de los aprobados.
 > leía como "guardados". No lo era: contaba los aprobados. De ahí el "dice 20 y
 > aparecen 10".
 
+### Y una advertencia que costó tres semanas (2026-09-17)
+
+Estos cuatro números son correctos **desde el 2026-08-27**… en `main`. **Llegaron al panel el
+2026-09-16.** En medio, el operador vio un solo número rotulado *«Guardados en Google Sheets»*
+que en realidad contaba los aprobados — el arreglo existía y no estaba desplegado.
+
+**Antes de diagnosticar cualquier síntoma del importador, comprueba qué versión sirve el VPS:**
+la sección «Cómo saber qué versión sirve el VPS» de este mismo documento. Cuesta un comando y
+descarta la causa más probable de todas.
+
 ### Cómo detener una corrida
 
 Botón **⏹ Detener** mientras la búsqueda corre. La cancelación se comprueba

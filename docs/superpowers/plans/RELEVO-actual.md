@@ -3,7 +3,7 @@
 > **Archivo único que se SOBRESCRIBE al cerrar CADA tarea.** Siempre contiene el mensaje
 > completo para arrancar una sesión nueva.
 >
-> **Estado: ✅ PLANES 1 y 4 CERRADOS Y EN PRODUCCIÓN.** Siguiente: **Plan 3 · T3.0**.
+> **Estado: PLANES 1 y 4 CERRADOS Y EN PRODUCCIÓN · PLAN 3 en 8/9 (T3.7 bloqueada en CE3).** Siguiente: **Plan 2 · T2.0**.
 
 ---
 
@@ -15,7 +15,7 @@ Continúas **PanelNioval**. **NO empieces de cero.**
 **El VPS sirve `edda166`**, que es `main` **menos el commit de documentacion del T4.8**. No hay
 codigo sin desplegar: `git diff edda166..main --stat -- '*.py' '*.js' '*.css' '*.html'` da vacio.
 Comprueba eso mismo antes de dar por buena cualquier afirmacion de «esta desplegado».
-**RAMA A CREAR:** `fix/conteo-importador-reincidencia`, desde `main`.
+**RAMA A CREAR:** `perf/gasto-places-minimo`, desde `main`.
 
 ---
 
@@ -49,7 +49,7 @@ mediana de 3 por esto. **No reportes una regresión sobre una muestra suelta.**
 
 ## AVANCE
 
-- **2 / 4 planes (50 %)** · **22 / 34 tareas (64.7 %)** — Plan 3 en **5 / 9**
+- **2 / 4 planes (50 %)** · **25 / 34 tareas (73.5 %)** — Plan 3 en **8 / 9**, con **T3.7 BLOQUEADA**
 - **Planes 1 y 4 cerrados y en producción.** La tanda de **agosto** quedó en **53/53**.
 
 ---
@@ -77,56 +77,69 @@ mediana de 3 por esto. **No reportes una regresión sobre una muestra suelta.**
 
 ## SIGUIENTE PASO EXACTO
 
-**Plan 3, Tarea T3.5 — Auditoria de las pantallas de carga: ¿cual miente?**
-**T3.0, T3.1, T3.2, T3.3 y T3.4 CERRADAS.** Rama `fix/conteo-importador-reincidencia`, sin PR.
+**Plan 2, Tarea T2.0 — Tarea Cero: rama, respaldo y medicion del gasto actual de Places.**
+**Plan 3 cerrado en 8 / 9: T3.7 queda BLOQUEADA en CE3** (ver abajo). Es el ultimo plan.
 
 ```
-ANCLA - Plan 3 Tarea T3.5 - importador nacional barato veraz profesional - avance 22/34 -
- gates: a11y/ux + silent-failure-hunter - CE4 con captura de los 6 estados -
- baseline: python -m pytest tests/  -> 1,199 passed, 2 skipped
+ANCLA - Plan 2 Tarea T2.0 - importador nacional barato veraz profesional - avance 25/34 -
+ baseline: python -m pytest tests/  -> 1,208 passed, 2 skipped
 ```
 
-### 🔴 EL BUG DE CONTEO ESTA CERRADO. No se vuelve a diagnosticar ni a "arreglar".
+1. Rama `perf/gasto-places-minimo` desde `main` actualizado (ya con los planes 1, 4 y 3).
+2. Baseline. Anotar el numero exacto.
+3. `tools/medir_llamadas_places.py` sobre **una ciudad virgen y otra ya trabajada**, con
+   desglose por tipo de llamada.
+4. Respaldo a `docs/auditoria/respaldos/2026-09-15-plan2/`.
+5. **Comparar contra `docs/investigacion/2026-08-28-costo-places-despues.md`.** Si los numeros
+   cambiaron, los planes 1/4/3 tocaron la ruta de Places sin querer. **Eso es un hallazgo.**
 
-> **Causa (CE1, con prueba directa):** el arreglo se mergeo el 27-ago y **nadie lo desplego**.
+**Criterio de cierre.** Dos mediciones con desglose, comparadas contra la linea de agosto.
+
+**Insumos que el Plan 3 le deja, y que NO hay que redescubrir:**
+
+- El `break` de `app.py` corta **reintentos**, no variaciones: **las 3 variaciones siempre
+  corren** -> 3 consultas de texto por categoria, **6 por corrida**.
+- Una consulta que devuelve legitimamente cero **se repite 3 veces sin backoff**: el
+  `2 ** intento` solo esta en la rama `except`. Gasto pequeño pero real.
+- `presupuesto_agotado` guarda lo ya pagado antes de cortar (`app.py:3509`). El plan no lo
+  listaba entre las rutas que tocan contadores.
+
+---
+
+## 🔴 LO QUE EL PLAN 3 DEJA ABIERTO, Y ES DEL OWNER
+
+**CE3: la corrida real.** Contar las filas de `LISTA DE CONTACTOS` antes, correr una ciudad,
+contarlas despues, y comprobar que **la diferencia es exactamente el `nuevos_en_sheet` de la
+UI**. Receta exacta en `docs/investigacion/2026-09-15-verificacion-produccion-plan3.md` §5.1.
+
+Necesita tres cosas que esta maquina no tiene: **credenciales de Google**, **confirmacion del
+coste** de Places, y **respaldo de hojas previo** (que tampoco se puede hacer sin credenciales).
+
+⚠️ **La ciudad tiene que ser pequeña Y YA TRABAJADA.** Pequeña acota el gasto; ya trabajada hace
+que `nuevos` y `aprobados` sean **distintos**, que es lo unico que prueba que se distinguen. Una
+ciudad virgen los deja iguales y la comprobacion no prueba nada.
+
+**Lleva bloqueado desde el 2026-08-27**, y es la razon de que exista el Plan 3 entero.
+
+---
+
+## LO QUE EL PLAN 3 DESCUBRIO (no reabrir)
+
+> **La causa del «dice 20 y aparecen 10»: el arreglo se mergeo el 27-ago y nadie lo desplego.**
 > El VPS sirvio `51520f3` —cuyo `app.py` es **byte a byte** el de la reproduccion de agosto—
 > hasta el 16-sep, y llego a produccion como **efecto colateral** del despliegue del Plan 1.
 
-`git merge-base --is-ancestor ae0e1c9 51520f3` = **falso** · `nuevos_en_sheet` = **0 apariciones**
-en el `app.py` desplegado · su linea 4918 rotulaba `encontrados` como **«Guardados en Google
-Sheets»**, que es el sintoma literal. **H2 descartada** (la repro pasa identica en `ae0e1c9` y en
-`main`). **H3 no hace falta.**
+- **H2 descartada** (la repro pasa identica en `ae0e1c9` y en `main`). **H3 no hace falta.**
+- **Los estados son SIETE**, no seis: `interrumpido` (SIGTERM) no estaba en la lista. Y
+  **Telegram es un octavo canal**. Los 9 escenarios COINCIDEN, en local **y contra el desplegado**.
+- **Guardas nuevas:** `tools/huella_despliegue.py` (15 tests; `exit 3` = «no pude medir», que
+  **no es un verde») y `tools/auditar_estados_importador.py` (modo `--contra <url>`).
+- **Este plan no cambia nada de lo que el VPS sirve**, medido con `git diff`. No hay que desplegar.
 
-**T3.3/T3.4 entregaron la guarda que faltaba**, que no era de conteo —hay 80 tests vigilandolo—
-sino **de despliegue rancio**: `tools/huella_despliegue.py` con `veredicto()` pura + 6 tests
-probados **por mutacion**, y la seccion nueva del RUNBOOK «Como saber que version sirve el VPS».
-
-### Lo que T3.5 tiene que hacer
-
-Los **seis estados** del importador: reposo, corriendo, completado, detenido, error y
-**`presupuesto_agotado`**. Cazar el que **afirme algo que no es** — no el que sea feo (eso era
-Plan 4). Capturar cada uno. **CE4.**
-
-**Tres pistas que ya estan sobre la mesa, no hay que buscarlas:**
-
-1. **Telegram es un SEPTIMO canal de estado** que el plan no cuenta entre los seis de la UI. Y
-   claude-mem tiene dos hallazgos de agosto sin verificar hoy: **#17575** «Completado» enviado en
-   corridas **canceladas**, y **#17826** «❌ Importador FALLÓ» cuando solo se alcanzo el **tope de
-   gasto** — un corte por tope **no es un fallo**.
-2. **`presupuesto_agotado`** (`app.py:3509`) no estaba en la lista de rutas del plan y si toca
-   los contadores. Merece su propio escenario.
-3. **`_estado_catalogo`** (`app.py:895-897`) es cache de proceso que **no se invalida**: un fallo
-   transitorio al arrancar serviria `catalogo_cargado: false` hasta el reinicio.
-
-### Deuda anotada que NO bloquea T3.5
-
-`app.py:3238` devuelve `len(nuevos)` — filas **enviadas** a `append_rows`, no las que Google
-confirmo (`updates.updatedRows` se tira sin mirarlo). **Ningun doble puede verlo**, porque todos
-hacen `self.escrituras += len(filas)`. No es la causa del sintoma; es un fallo silencioso
-latente. ⚠️ Si se le escribe test, **el doble TIENE QUE PODER MENTIR**.
-
-⚠️ **T3.7 sigue necesitando la corrida real**, con **respaldo de hojas antes** — y esta maquina
-**no tiene credenciales de Google**. Es el gate CE1 que agosto dejo abierto y nunca se cerro.
+**Deuda anotada:** `app.py:3238` devuelve `len(nuevos)` — filas **enviadas** a `append_rows`, no
+las que Google confirmo. **Ningun doble puede verlo** porque todos hacen
+`self.escrituras += len(filas)`. No es la causa; es un fallo silencioso latente. ⚠️ Si se le
+escribe test, **el doble TIENE QUE PODER MENTIR**.
 
 ---
 
