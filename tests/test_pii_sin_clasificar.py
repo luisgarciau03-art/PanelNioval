@@ -148,3 +148,68 @@ class TestLaRutaHERMANA_TambienCumple:
         datos = app.app.test_client().get("/api/prospectos/ciudades").get_json()
 
         assert len(datos) == 2, "sanear no puede hacer desaparecer un contacto real"
+
+
+# ═══════════ Lo que encontro el gate de seguridad ═══════════
+
+class TestElCorreoNoSeEscapaPorLaPUERTA_DE_ATRAS:
+    """HIGH del gate: el detector exigia un punto DESPUES de la arroba.
+
+    `juan_perez1234@gmail` -- un dominio truncado al teclear -- salia entero. Y el
+    docstring promete que ningun *nombre de contacto* sale de aqui, no solo que no
+    salgan correos bien formados.
+    """
+
+    @pytest.mark.parametrize("crudo", [
+        "juan_perez1234@gmail",          # dominio sin TLD
+        "ventas@nioval",
+        "Copiadoras.Mx@gmail.com",
+        "  ferreteria@hotmail.com  ",
+    ])
+    def test_cualquier_cosa_con_arroba_se_enmascara(self, crudo):
+        salida = app._sanear_etiqueta_ciudad(crudo)
+
+        assert "@" in salida, "se pierde la pista de que era un correo"
+        for trozo in ("juan", "ventas", "Copiadoras", "ferreteria", "gmail", "hotmail", "nioval"):
+            assert trozo not in salida, f"salio {trozo!r} en claro: {salida!r}"
+
+
+class TestElEnmascaradoSIGUE_LA_CONVENCION_DEL_PROYECTO:
+    """MEDIUM del gate: `nucleo_catalogo.enmascarar_telefono` deja SOLO los ultimos 4.
+
+    Dos funciones de la misma base de codigo con el mismo proposito no pueden dar
+    garantias distintas. Y el prefijo de lada no hacia falta para localizar la fila:
+    los ultimos digitos ya desambiguan entre 32 entradas.
+    """
+
+    def test_no_se_publica_la_lada(self):
+        salida = app._sanear_etiqueta_ciudad("6141234519")
+
+        assert "614" not in salida, f"la lada sigue publicandose: {salida!r}"
+
+    def test_pero_quedan_los_ultimos_digitos_para_ubicar_la_fila(self):
+        assert "4519" in app._sanear_etiqueta_ciudad("6141234519")
+
+
+class TestUnaDIRECCION_CON_NUMEROS_NO_ES_UN_TELEFONO:
+    """MEDIUM del gate: sumar digitos dispersos por toda la celda daba falsos positivos.
+
+    Enmascarar una direccion legitima no es una fuga, pero le quita al operador la
+    visibilidad de una celda que si puede arreglar -- que es para lo que existe el
+    aviso.
+    """
+
+    @pytest.mark.parametrize("crudo", [
+        "Manzana 3 Lote 25 CP 31125",
+        "Km 123.456 Carretera Federal 45",
+        "Calle 5 de Mayo 123 Col. Centro 4",
+    ])
+    def test_sale_entera(self, crudo):
+        assert app._sanear_etiqueta_ciudad(crudo) == crudo
+
+    @pytest.mark.parametrize("crudo", [
+        "6141234519", "614 123 4519", "+52 614 123 4519", "(614) 123-4519",
+    ])
+    def test_pero_una_racha_larga_de_digitos_SI_es_un_telefono(self, crudo):
+        assert "4519" in app._sanear_etiqueta_ciudad(crudo)
+        assert crudo.strip() != app._sanear_etiqueta_ciudad(crudo)
