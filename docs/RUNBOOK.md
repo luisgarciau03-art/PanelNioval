@@ -386,6 +386,38 @@ existe, se marca como interrumpido y se sigue adelante.
 
 Antes, los dos primeros terminaban en ✅ con la hoja intacta.
 
+### El tope de gasto por corrida: cómo se calibra (desde 2026-09-17)
+
+Hay **dos topes**, y sólo uno funciona hoy:
+
+| Variable de entorno | Qué hace | Estado |
+|---|---|---|
+| `PLACES_MAX_LLAMADAS_CORRIDA` | Corta la corrida al llegar a N llamadas | **Es el utilizable**: no necesita tarifas |
+| `PLACES_PRESUPUESTO_CORRIDA` + `PLACES_COSTO_TEXT_SEARCH` + `PLACES_COSTO_DETAILS` | Corta por importe | Necesita las tarifas de la consola. **Sin tarifa no se publica importe** |
+
+**Ninguna tiene valor por defecto.** Si no está en el entorno, `_float_de_entorno` devuelve
+`None` y **el tope no existe**. Eso es deliberado —un tope inventado es peor que ninguno— pero
+tiene una consecuencia incómoda: **un tope que nadie ha confirmado que está puesto no es un
+tope.** Ningún endpoint lo expone, así que la única forma de saberlo es mirar el `.env` del VPS.
+
+**La aritmética para calibrarlo**, con la corrida medida en T2.0 (**13 Text Search + 80 Place
+Details = 93 llamadas** en una ciudad nueva):
+
+| Tope | Ciudades nuevas completas antes de cortar |
+|---:|---|
+| 100 | 1 |
+| 200 | 2 |
+| 500 | 5 |
+
+⚠️ **El catálogo del Plan 1 pasó de 606 a 1,004 ciudades.** El barrido nacional completo son
+**93,372 llamadas**. El tope por corrida **no** limita eso: limita **una** corrida. Protege
+contra una ciudad que se desboque, no contra correr el país entero.
+
+Y una advertencia para el día que se migre a la API New: la corrida pasa de **93 llamadas a 13**.
+Un tope de 120 dejaba pasar una ciudad; después dejaría pasar **nueve**. Recalibrarlo es parte
+del despliegue de la migración, **no un ajuste posterior** — y vive en el `.env` del servidor,
+fuera de git.
+
 ### Antes de migrar a Places API (New): la Fase 0 (desde 2026-09-17)
 
 El ADR `2026-09-15-ruta-de-telefono-places` **no autoriza migrar**. Autoriza **trece llamadas que
