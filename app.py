@@ -3213,6 +3213,24 @@ def _valor_para_celda(valor):
     return _escapar_formula(valor if isinstance(valor, str) else str(valor))
 
 
+def _avisar_corrida(mensaje: str) -> None:
+    """Deja el aviso donde el operador SI mira: el log de la corrida, y stdout.
+
+    Todas las incidencias del importador van a `_import_job['log']`, que es lo que
+    publica `/api/importador/estado` y lo que la pantalla muestra junto a los
+    contadores. Un aviso que solo va al stdout del contenedor es un aviso que nadie
+    lee -- la misma clase de fallo silencioso que este modulo vino a cerrar,
+    reabierta en el canal de aviso.
+    """
+    print(f'[importador] {mensaje}')
+    try:
+        with _import_lock:
+            _import_job['log'].append(f'⚠ {mensaje}')
+    except Exception:
+        # El aviso es lo accesorio; la escritura ya ocurrio. Nunca al reves.
+        pass
+
+
 def _filas_confirmadas(respuesta, enviadas: int, categoria: str = '') -> int:
     """Cuantas filas dice Google haber anadido, no cuantas le mandamos.
 
@@ -3224,25 +3242,24 @@ def _filas_confirmadas(respuesta, enviadas: int, categoria: str = '') -> int:
 
     **Ante la duda, se conserva lo enviado.** Si la respuesta no trae el dato -- otra
     version de la API, un doble antiguo, un `None` -- exigirlo convertiria un camino
-    que funciona en un cero, que es un fallo peor que el que se esta tapando.
-
-    Lo que NO se toca aqui: cuando la escritura es parcial no se sabe QUE filas
-    aterrizaron, asi que el conjunto de deduplicacion se deja como estaba. Adivinar
-    cuales excluir seria inventar, y el precio de no hacerlo es volver a pagar su
-    detalle en la siguiente corrida -- caro, pero honesto.
+    que funciona en un cero, que es un fallo peor que el que se esta tapando. Pero
+    **se dice**: un camino mudo seria indistinguible del feliz, y ahi es donde este
+    arreglo se volveria a romper sin que nadie lo note.
     """
     try:
         confirmadas = int(respuesta['updates']['updatedRows'])
-    except (TypeError, KeyError, ValueError, IndexError):
+    except (TypeError, KeyError, ValueError):
+        _avisar_corrida(
+            f'no se pudo verificar la escritura en {categoria or "la hoja"}: la '
+            f'respuesta de Sheets no trae `updatedRows`. Se asumen {enviadas} filas '
+            f'SIN VERIFICAR.')
         return enviadas
     if confirmadas < enviadas:
-        # Un numero corregido en silencio es mejor que uno falso, pero no basta:
-        # esto es una anomalia de Sheets y el operador tiene que poder verla.
-        print(f'[importador] ESCRITURA PARCIAL en {categoria or "la hoja"}: '
-              f'se enviaron {enviadas} filas y Google confirmo {confirmadas}. '
-              f'Se publica {confirmadas}.')
+        _avisar_corrida(
+            f'ESCRITURA PARCIAL en {categoria or "la hoja"}: se enviaron {enviadas} '
+            f'filas y Google confirmo {confirmadas}. Se publica {confirmadas}, y las '
+            f'que faltan NO se dan por escritas.')
     return confirmadas
-
 
 def _exportar_a_sheets(resultados, categoria, ciudad, claves_existentes=None):
     """Exporta a LISTA DE CONTACTOS con columnas idénticas al script original.
@@ -3305,11 +3322,20 @@ def _exportar_a_sheets(resultados, categoria, ciudad, claves_existentes=None):
     if nuevos:
         nuevos = [[_escapar_formula(v) for v in fila] for fila in nuevos]
         respuesta = ws.append_rows(nuevos, value_input_option='USER_ENTERED')
+        confirmadas = _filas_confirmadas(respuesta, len(nuevos), categoria)
         # Solo ahora: si append_rows revienta, el conjunto del que depende el
         # prefiltro no se queda afirmando que estos negocios ya estan en la hoja.
-        nombres_existentes.update(claves_nuevas)
+        #
+        # Y solo si Google confirmo TODAS. Este conjunto lo comparten las dos
+        # categorias de la corrida: marcar como presentes unas filas que se
+        # perdieron haria que la siguiente las saltara sin haberse escrito nunca.
+        # No se sabe CUALES aterrizaron, asi que no se marca ninguna -- y no hay
+        # riesgo de duplicar, porque esta funcion RELEE la hoja en cada llamada y
+        # las que si entraron vuelven por `frescas`.
+        if confirmadas >= len(nuevos):
+            nombres_existentes.update(claves_nuevas)
         _cache_pop('contactos')
-        return _filas_confirmadas(respuesta, len(nuevos), categoria)
+        return confirmadas
     return len(nuevos)
 
 

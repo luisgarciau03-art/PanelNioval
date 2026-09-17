@@ -122,3 +122,90 @@ class TestElOperadorSeENTERA:
         salida = capsys.readouterr().out
         assert "6" in salida and "2" in salida, (
             f"no se dejo rastro de que Google confirmo menos filas: {salida!r}")
+
+
+# ═══════════ Lo que encontro el gate de fallos silenciosos ═══════════
+
+class TestElDedupNoSeCONTAMINA:
+    """CRITICAL del gate, y ademas mi docstring afirmaba lo contrario.
+
+    `nombres_existentes.update(claves_nuevas)` volcaba las claves ENVIADAS antes de
+    saber cuantas confirmo Google. Ese conjunto lo comparten todas las categorias de
+    la corrida: un negocio perdido en la escritura parcial de "Ferreterias" quedaba
+    marcado como "ya en la hoja" y la categoria siguiente lo saltaba **sin haberse
+    escrito nunca**.
+
+    Y no hay riesgo de duplicar por no marcarlas: `_exportar_a_sheets` RELEE la hoja
+    en cada llamada, asi que las filas que si aterrizaron vuelven por `frescas`.
+    """
+
+    def test_una_escritura_parcial_no_marca_como_presentes_las_que_faltan(self, monkeypatch):
+        ws = WorksheetQueMiente(confirma=2)
+        monkeypatch.setattr(app, 'get_worksheet', lambda _n: ws)
+        compartidas = set()
+
+        app._exportar_a_sheets([_fila(i) for i in range(5)], 'Ferreterías',
+                               'CiudadDemo', claves_existentes=compartidas)
+
+        # Las 2 confirmadas si estan (vuelven al releer la hoja); las 3 perdidas NO.
+        marcadas = {c for c in compartidas if c.startswith('Ferreteria ')}
+        assert len(marcadas) <= 2, (
+            f"se marcaron {len(marcadas)} claves como presentes y Google confirmo 2: "
+            "la categoria siguiente saltaria negocios que nunca se escribieron")
+
+    def test_si_confirma_todas_SI_se_marcan(self, monkeypatch):
+        """La otra direccion: el camino feliz no puede dejar de deduplicar."""
+        ws = WorksheetQueMiente()
+        monkeypatch.setattr(app, 'get_worksheet', lambda _n: ws)
+        compartidas = set()
+
+        app._exportar_a_sheets([_fila(i) for i in range(4)], 'Ferreterías',
+                               'CiudadDemo', claves_existentes=compartidas)
+
+        assert len({c for c in compartidas if c.startswith('Ferreteria ')}) == 4
+
+
+class TestElAvisoLLEGA_A_DONDE_MIRA_EL_OPERADOR:
+    """HIGH del gate: `print()` va al stdout del contenedor, donde nadie mira.
+
+    Todas las demas incidencias del importador van a `_import_job['log']`, que es lo
+    que el endpoint de estado publica y la pantalla muestra. Dejar justo esta fuera
+    reabre, en el canal de aviso, la misma clase de fallo que el arreglo cierra.
+    """
+
+    def test_la_escritura_parcial_queda_en_el_log_de_la_corrida(self, monkeypatch):
+        ws = WorksheetQueMiente(confirma=1)
+        monkeypatch.setattr(app, 'get_worksheet', lambda _n: ws)
+        app._import_job = app._nuevo_import_job('CiudadDemo', status='running')
+
+        app._exportar_a_sheets([_fila(i) for i in range(4)], 'Ferreterías', 'CiudadDemo')
+
+        log = ' '.join(app._import_job['log'])
+        assert 'parcial' in log.lower(), f"no hay rastro en el log: {app._import_job['log']!r}"
+        assert '4' in log and '1' in log
+
+
+class TestUnaRESPUESTA_MUDA_TAMPOCO_ES_MUDA:
+    """HIGH del gate: el camino `except` era totalmente silencioso.
+
+    Si la forma de la respuesta cambia -- otra version de gspread, un 200 raro --
+    el codigo vuelve a publicar lo enviado sin verificar, que es el bug que este
+    arreglo existe para cerrar, y esta vez sin ni siquiera el aviso.
+    """
+
+    def test_deja_rastro_de_que_no_se_pudo_verificar(self, monkeypatch, capsys):
+        class WsMudo(WorksheetQueMiente):
+            def append_rows(self, filas, **kw):
+                self.filas.extend(filas)
+                return {"algo": "con otra forma"}
+
+        monkeypatch.setattr(app, 'get_worksheet', lambda _n: WsMudo())
+        app._import_job = app._nuevo_import_job('CiudadDemo', status='running')
+
+        escritas = app._exportar_a_sheets([_fila(i) for i in range(3)],
+                                          'Ferreterías', 'CiudadDemo')
+
+        assert escritas == 3, "ante la duda se conserva lo enviado"
+        rastro = capsys.readouterr().out + ' '.join(app._import_job['log'])
+        assert 'verific' in rastro.lower(), (
+            f"se asumio sin verificar y sin decirlo: {rastro!r}")
