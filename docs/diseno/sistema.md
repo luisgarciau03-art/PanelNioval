@@ -147,12 +147,37 @@ cuando el lector construyó el árbol **no se anuncia** — los lectores anuncia
 
 ## 6. Movimiento
 
+### 6.0 La tabla que faltaba: duraciones y curvas
+
+*(Añadida en la T4.8. La auditoría de T4.1 la marcó como hueco: los tokens existían en
+`tokens.css` desde la T4.6, pero el sistema no los publicaba, así que quien viniera a añadir
+una animación no tenía contra qué alinearse.)*
+
+| Token | Valor | Cuándo |
+|---|---|---|
+| `--dur-rapida` | **120 ms** | Respuesta a algo que el operador **acaba de hacer**: foco, hover, cambio de color de un control. Si tarda más, se siente pegajoso |
+| `--dur-normal` | **200 ms** | Aparición de contenido: `.fila-entra`, `.seccion-entra`. Es el que se usa por defecto |
+| `--dur-lenta` | **320 ms** | Entradas grandes, una sola vez. Hoy sólo `fadeIn` de la tarjeta del formulario |
+| `--curva-salida` | `cubic-bezier(.16, 1, .3, 1)` | **Entradas.** Arranca rápido y frena al final: el elemento «llega» |
+| `--curva-estandar` | `cubic-bezier(.4, 0, .2, 1)` | **Transiciones entre dos estados** que ya existen: hover, foco, color |
+
+**Regla al elegir:** si el movimiento responde a un gesto del operador, `--dur-rapida` y
+`--curva-estandar`. Si aparece contenido, `--dur-normal` y `--curva-salida`. Si dudas, la
+normal.
+
+⚠️ **Nunca escribas un tiempo a mano.** El bloque `prefers-reduced-motion` de `tokens.css`
+colapsa **los tres tokens a 1 ms**; una duración literal se salta esa reducción y sigue
+animando para alguien que pidió que no lo hiciera.
+
+### 6.1 Qué se anima
+
 Dos animaciones en todo el sistema, y las dos existen porque **aclaran** algo:
 
 - `.fila-entra` — las filas llegan de arriba abajo: se ve que es contenido nuevo y en qué orden.
 - `.seccion-entra` — la sección nueva entra desde abajo: se ve que el clic hizo algo.
 
-Reglas duras:
+### 6.2 Reglas duras
+
 
 - **Sólo `transform`, `opacity` y `color`/`background-color`.** Nada de `transition: all`
   —anima también lo que fuerza layout— ni de animar `width`/`height`/`top`/`left`/`border`.
@@ -164,6 +189,62 @@ Reglas duras:
   terminales**.
 - **`prefers-reduced-motion` se respeta en los dos sitios.** El CSS no alcanza a Chart.js,
   que dibuja en `<canvas>`: hay que apagarlo desde JavaScript con `matchMedia`.
+
+---
+
+## 6bis. Cómo añadir cosas sin reinventar el sistema
+
+*(Añadido en la T4.8, que es la tarea que cierra el Plan 4. Lo de arriba describe lo que hay;
+esto es el procedimiento.)*
+
+### Un componente nuevo
+
+1. **Mira primero si ya existe.** `.btn`, `.tarjeta`, `.chip`, `.stat`, `.insignia` y
+   `.estado--*` cubren casi todo. Un componente nuevo que se parece a uno existente es deuda,
+   no diseño.
+2. **Va en `componentes.css`**, no en el CSS de una superficie. Si sólo sirve para una
+   pantalla, pregúntate si de verdad es un componente.
+3. **Sólo tokens.** Ni un color, ni un espaciado, ni un tamaño de letra literal.
+   `componentes.css` está en **20/20 y 29/29** de adopción y ésa es la vara.
+4. **Los cuatro estados de interacción**, siempre: reposo, `:hover`, `:focus-visible`,
+   `:active`. Y `:disabled` si se puede deshabilitar.
+5. **El foco usa los dos anillos** (`--foco-oscuro` fuera, `--foco-claro` dentro). Un solo
+   color no sirve: `--azul` da 7.57:1 sobre blanco y **1.43:1** sobre la barra lateral.
+
+### Un estado de carga nuevo
+
+1. **El esqueleto va en la plantilla, no en el JavaScript.** Es lo único que evita el salto de
+   layout del primer render: pintarlo desde JS llega *después* y provoca justo lo que viene a
+   evitar.
+2. **Con la forma Y la altura del contenido real.** Un esqueleto genérico es peor que ninguno,
+   porque el salto ocurre igual cuando llega el dato. Las variantes (`.esqueleto-tarjeta`,
+   `-tabla__fila`, `-chip`, `-campo`, `-boton`) ya traen su alto.
+3. **Un error siempre trae salida.** `Estados.error` **exige** `reintentar`; no es opcional.
+4. **Nada celebra sin verificar.** Ni verde de éxito ni marca de verificación hasta que el
+   resultado esté confirmado.
+5. **No lo pintes por debajo de 200 ms.** Un esqueleto que parpadea es ruido.
+
+### Lo que NO se toca sin medir
+
+| | Por qué |
+|---|---|
+| El alto de `.chart-lienzo` | Reserva el sitio del `<canvas>`. Quitarlo devolvió **0.30 de CLS** a 768 px |
+| `maintainAspectRatio: false` en las 6 gráficas | Sin él, Chart.js redimensiona y el alto reservado no sirve de nada |
+| `min-height` de `.chips-caja` (240 px) | Tiene techo **y suelo** a propósito: con el esqueleto mide menos que con las 1,004 ciudades |
+| `flex-shrink: 0` en `.actions` | Sin él la cabecera envolvía a dos líneas a los 477 ms y empujaba todo: **0.11 de CLS** |
+| `static/js/vendor/**` | Está en `.gitattributes` como `binary`. Si se normaliza, su sha256 cambia y el guarda de integridad falla |
+
+### ⚠️ Deuda conocida, para que no la descubras a golpes
+
+**`dashboard.css` y `formulario.css` no usan el sistema como el resto.** En espaciado,
+`componentes.css` va 29/29 e `importador.css` 50/52; el tablero va **9/86** y el formulario
+**0/31**. La T4.3 tokenizó las **45 sustituciones seguras** —las que coinciden exacto con un
+escalón, cero cambio de píxel— y **paró ahí a propósito**.
+
+Las ~109 restantes **no son mecánicas**: los literales caen fuera de la escala (3, 5, 6, 10,
+18, 20, 22, 40 px) y los `font-size` están en **`em`** mientras los tokens están en **`rem`**.
+Forzarlos **cambiaría el render de un diseño que el owner aprobó**. Eso es una decisión de
+diseño, no una limpieza — y si se hace, se hace con `tools/comparar_capturas.py` delante.
 
 ---
 
