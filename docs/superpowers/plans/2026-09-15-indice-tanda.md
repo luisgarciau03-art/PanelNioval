@@ -14,7 +14,7 @@
 > ✅ **Plan 1 CERRADO y EN PRODUCCIÓN** (2026-09-16). PR #42 mergeado (`main` `8bac782`) y desplegado a mano en el VPS. El operador ve **1,004 ciudades** donde había 606.
 >
 > ⚠️ **HALLAZGO QUE AFECTA A LOS OTROS TRES PLANES:** el invariante «el VPS auto-deploya `main`» **es FALSO** desde el 2026-08-19. No hay auto-deploy: el despliegue es un `ssh` manual. **«Mergeado» y «desplegado» son dos estados distintos**, y los Planes 2, 3 y 4 llevan el invariante falso escrito. Cada uno necesita su paso de despliegue explícito. Detalle: `docs/auditoria/2026-09-15-verificacion-produccion-plan1.md`.
-**Planes 1 y 4: CERRADOS (8/8 y 12/12) y en producción. Siguiente: Plan 3 · T3.0 · Baseline vigente sobre `main`: 1,193 passed, 2 skipped** · **0 PR abiertos**
+**Planes 1 y 4: CERRADOS (8/8 y 12/12) y en producción. Plan 3 en 5/9. Siguiente: Plan 3 · T3.5 · Baseline sobre `main`: 1,193 passed, 2 skipped; sobre la rama viva `fix/conteo-importador-reincidencia`: 1,199** · **0 PR abiertos**
 
 **Biblioteca de herramientas leída en la sesión de diseño:**
 `C:\Users\PC 1\.claude\BIBLIOTECA-HERRAMIENTAS.md` — **653 herramientas (229 agentes + 424
