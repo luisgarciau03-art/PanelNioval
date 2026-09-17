@@ -386,6 +386,33 @@ existe, se marca como interrumpido y se sigue adelante.
 
 Antes, los dos primeros terminaban en ✅ con la hoja intacta.
 
+### Celdas mal tecleadas en la columna CIUDAD (desde 2026-09-17)
+
+El aviso *«N contactos en M ciudades que no están en el catálogo»* del importador lista los
+valores de la columna CIUDAD que no casaron. Algunos son legítimos —estados como `Chiapas`, o
+`Sin ciudad`— y **otros son celdas donde alguien tecleó un teléfono o un correo**.
+
+Desde hoy esos salen **enmascarados**: `…4519 (teléfono en la columna CIUDAD)`. El endpoint
+promete en su docstring que ningún teléfono sale de ahí, y hasta hoy era falso — medido en
+producción el 2026-09-16: **8 teléfonos y 1 correo** de 32 entradas.
+
+**Enmascarar no es esconder, y la diferencia importa:** se conservan el prefijo y los dos últimos
+dígitos justamente **para que puedas encontrar la fila y arreglarla en la hoja**. Si desaparecen
+del aviso, dejas de saber que tienes celdas que corregir — que es peor que la fuga.
+
+Lo que **no** se enmascara: nombres legítimos con dígitos (`Zona 5`, `Km 23 Carretera`,
+`Sector 2`, `Manzana 3 Lote 25 CP 31125`). Se exige una **racha contigua** de 8 dígitos o más
+—admitiendo sólo separadores de teléfono entre medias—, no la suma de los dígitos sueltos de la
+celda: una dirección rural con varios números no es un teléfono, y enmascararla te quitaría de la
+vista una celda que sí puedes arreglar.
+
+Los últimos **4 dígitos** se conservan, igual que `enmascarar_telefono` en el resto del proyecto.
+**No se publica la lada.**
+
+⚠️ **Límite conocido:** un correo ofuscado a mano —`juan (arroba) nioval punto com`— no se
+detecta. No se añadió heurística para eso porque **no hay evidencia de que exista en la hoja**, y
+un patrón así enmascararía texto legítimo. Si aparece, se mide primero y se decide después.
+
 ### El tope de gasto por corrida: cómo se calibra (desde 2026-09-17)
 
 Hay **dos topes**, y sólo uno funciona hoy:
