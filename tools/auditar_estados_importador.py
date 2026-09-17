@@ -20,6 +20,17 @@ Ni red, ni hoja de produccion, ni un centavo de Places. Los negocios son inventa
 
 Uso:
     python tools/auditar_estados_importador.py [directorio-de-capturas]
+
+    # Y el mismo recorrido contra el front-end DESPLEGADO, sin provocar corridas:
+    PANEL_DASHBOARD_TOKEN=<valor> python tools/auditar_estados_importador.py         docs/investigacion/estados-produccion --contra https://panelnioval.duckdns.org
+
+En el modo `--contra` los estados NO se provocan: se reutilizan los que ya produjo el
+backend en la corrida local (`estados.json`) y se le dan a la pantalla que sirve el
+VPS. Provocarlos contra produccion costaria dinero de Places y escribiria filas en
+`LISTA DE CONTACTOS`; eso es la corrida real, que es gate del owner.
+
+Lo que este modo SI demuestra: que el front-end desplegado saca los mismos veredictos
+sobre los mismos datos.
 """
 import json
 import os
@@ -239,7 +250,7 @@ LEER_PANTALLA = """(d) => {
 
 
 LEER_EN_MARCHA = """(d) => {
-  pintar(d);
+  pintarEstado(d);
   const t = (id) => (document.getElementById(id) || {}).textContent || '';
   const caja = document.getElementById('result-box');
   return {
@@ -291,20 +302,33 @@ def _veredicto(estado, pantalla, aviso):
 
 
 def main():
-    destino = Path(sys.argv[1]) if len(sys.argv) > 1 else \
+    sueltos = [a for a in sys.argv[1:] if not a.startswith("--")]
+    contra = None
+    if "--contra" in sys.argv:
+        contra = sys.argv[sys.argv.index("--contra") + 1]
+        sueltos = [a for a in sueltos if a != contra]
+    destino = Path(sueltos[0]) if sueltos else \
         RAIZ / "docs" / "investigacion" / "estados-2026-09-17"
     destino.mkdir(parents=True, exist_ok=True)
 
-    import app as panel
-    import medir_cls
-    medir_cls.verificar_sin_credenciales()
-    _ORIGINAL["fn"] = panel._enviar_telegram_importador
+    servidor = None
+    if contra:
+        casos = _casos_guardados()
+        base = contra.rstrip("/")
+        print(f"Recorriendo los estados contra el front-end DESPLEGADO: {base}")
+        print("Los estados NO se provocan aqui: son los que produjo el backend local.\n")
+    else:
+        import app as panel
+        import medir_cls
+        medir_cls.verificar_sin_credenciales()
+        _ORIGINAL["fn"] = panel._enviar_telegram_importador
 
-    print("Provocando los siete estados contra el backend real…\n")
-    casos = escenarios(panel)
+        print("Provocando los siete estados contra el backend real…\n")
+        casos = escenarios(panel)
 
-    servidor = make_server("127.0.0.1", PUERTO, panel.app)
-    threading.Thread(target=servidor.serve_forever, daemon=True).start()
+        servidor = make_server("127.0.0.1", PUERTO, panel.app)
+        threading.Thread(target=servidor.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{PUERTO}"
 
     import verificar_importador as arnes
     from playwright.sync_api import sync_playwright
@@ -312,13 +336,25 @@ def main():
     filas, total_fallos = [], 0
     with sync_playwright() as p:
         navegador = p.chromium.launch()
+        tok = os.environ.get("PANEL_DASHBOARD_TOKEN") if contra else None
+        if contra and not tok:
+            print("FALTA PANEL_DASHBOARD_TOKEN: sin token el panel no abre. Sin medicion.")
+            return NO_MEDIDO
         try:
             for nombre, (estado, aviso) in casos.items():
                 pagina = arnes._pagina(navegador, estado=estado)
-                pagina.goto(f"http://127.0.0.1:{PUERTO}/importador", wait_until="load")
+                if tok:
+                    # El panel desplegado es fail-closed: sin la cabecera no sirve
+                    # ni el HTML. El token no se imprime en ningun momento.
+                    pagina.set_extra_http_headers({"X-Dashboard-Token": tok})
+                pagina.goto(f"{base}/importador", wait_until="load")
                 pagina.wait_for_selector(".chip-ciudad", timeout=15000)
-                pantalla = arnes.ev(pagina, LEER_PANTALLA, estado) \
-                    if estado["status"] != "idle" else _pantalla_en_reposo(arnes, pagina)
+                if estado["status"] == "idle":
+                    pantalla = _pantalla_en_reposo(arnes, pagina)
+                elif estado["status"] == "running":
+                    pantalla = arnes.ev(pagina, LEER_EN_MARCHA, estado)
+                else:
+                    pantalla = arnes.ev(pagina, LEER_PANTALLA, estado)
                 pagina.screenshot(path=str(destino / f"{nombre}.png"), full_page=True)
 
                 fallos = _veredicto(estado, pantalla, aviso)
@@ -327,14 +363,15 @@ def main():
 
                 marca = "MIENTE " if fallos else "COINCIDE"
                 print(f"  {marca}  {nombre:22} "
-                      f"nuevos={estado['nuevos_en_sheet']:>3} "
-                      f"aprobados={estado['encontrados']:>3} "
-                      f"pantalla={pantalla['titular_nuevos']:>3}")
+                      f"nuevos={estado['nuevos_en_sheet']!s:>3} "
+                      f"aprobados={estado['encontrados']!s:>3} "
+                      f"pantalla={pantalla['titular_nuevos']!s:>3}")
                 for f in fallos:
                     print(f"            └─ {f}")
         finally:
             navegador.close()
-            servidor.shutdown()
+            if servidor is not None:
+                servidor.shutdown()
 
     (destino / "estados.json").write_text(json.dumps(
         [{"estado": n, "backend": e, "pantalla": p, "telegram": a, "fallos": f}
@@ -344,6 +381,18 @@ def main():
     print(f"\n{len(filas)} estados recorridos · {total_fallos} afirmaciones falsas")
     print(f"Capturas y datos en {destino}")
     return 1 if total_fallos else 0
+
+
+NO_MEDIDO = 3
+
+
+def _casos_guardados():
+    """Los estados que ya produjo el backend local, para dárselos a otra pantalla."""
+    ruta = RAIZ / "docs" / "investigacion" / "estados-2026-09-17" / "estados.json"
+    if not ruta.exists():
+        raise SystemExit("Falta estados.json: corre primero la auditoria local.")
+    guardado = json.loads(ruta.read_text(encoding="utf-8"))
+    return {e["estado"]: (e["backend"], e["telegram"]) for e in guardado}
 
 
 def _pantalla_en_reposo(arnes, pagina):
