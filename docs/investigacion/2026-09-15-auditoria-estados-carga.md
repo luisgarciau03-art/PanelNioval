@@ -101,6 +101,67 @@ entonces la mutación salió en rojo.
 
 ---
 
+## 4bis. LO QUE EL GATE ENCONTRÓ DESPUÉS, y que invalida parte de lo de arriba
+
+*(Añadido tras la revisión de `python-reviewer`, que devolvió **BLOCK**.)*
+
+La primera versión reportó *«9 escenarios, 0 afirmaciones falsas»*. **Era cierto y era
+incompleto: uno de los nueve no comprobaba nada.**
+
+### El CRITICAL
+
+Todo el cuerpo de `_veredicto()` estaba detrás de `if st != "idle"`. Para el estado en reposo no
+quedaba ninguna rama aplicable —`icono` viene vacío por construcción, no hay final que vestir, y
+no hay aviso de Telegram—, así que **`idle` devolvía «coincide» pasara lo que pasara en la
+pantalla**. Incluso con la fila de contadores visible arrastrando las cifras de la corrida
+anterior, que es justo la forma en que el reposo puede mentir.
+
+Y lo irónico: `_pantalla_en_reposo` **sí capturaba** si la fila estaba oculta. El dato estaba
+ahí; el veredicto no lo miraba.
+
+**Arreglado:** `idle` ahora exige fila oculta **y** los cuatro contadores en cero o vacíos.
+
+### Y tres HIGH que también cambiaban el resultado
+
+| | |
+|---|---|
+| **Sólo se comparaban 2 de los 4 contadores** | «Ya estaban» y «Descartados» se leían de la pantalla y **no se comparaban con nada**. Ahora los cuatro |
+| **`googlemaps.Client` y `time.sleep` no se restauraban** | Son los módulos **reales del proceso**, no copias de `app`. Se restauraba con cuidado el tope de gasto y no estos dos — la asimetría delataba el olvido |
+| **`navegador.close()` se saltaba** en el camino `--contra` sin token | El `return` temprano caía entre el `launch()` y el `try/finally` |
+
+Más el parseo de `--contra`, que se tragaba un flag mal escrito en silencio y acababa usando la
+URL como nombre de directorio.
+
+### Las tres comprobaciones nuevas, probadas por mutación
+
+| Defecto introducido | |
+|---|---|
+| La fila de contadores se queda **visible en reposo** | ✅ `MIENTE idle` |
+| «Ya estaban» pinta el contador equivocado | ✅ `MIENTE done` |
+| El notificador de Telegram **se cae** (regresión simulada) | ✅ **6 estados en rojo** |
+
+El último cerraba un hueco propio: `app.py` **se traga las excepciones del notificador** y sólo
+las imprime. Sin esa comprobación, una regresión ahí se leía igual que *«este estado no avisa»*.
+Y hubo que acotarla: `idle`, `running` y `recarga_tras_reinicio` **no terminan ninguna corrida**,
+así que exigirles aviso habría sido inventar un fallo.
+
+### El resultado no cambia, pero ahora significa algo
+
+**9 escenarios, 0 afirmaciones falsas** — con nueve veredictos que de verdad comprueban algo,
+y con el auditor puesto a prueba **seis veces** en total.
+
+### 4bis.1 La trampa de la evidencia compartida, otra vez
+
+Volvió a pasar, y merece quedar escrito dos veces: la corrida de mutación del notificador
+sobrescribió `estados.json`, y la siguiente corrida contra producción leyó **esos** estados
+—todos sin aviso— y reportó **6 falsos positivos**.
+
+No era producción: era mi propia evidencia contaminada. Se regeneró con una corrida limpia y
+entonces dio 0. **El banco de pruebas y la evidencia siguen sin poder compartir carpeta**, y
+esta vez el aviso estaba escrito en §6 de este mismo documento.
+
+---
+
 ## 5. Dos correcciones al plan
 
 ### 5.1 Los estados son SIETE, no seis

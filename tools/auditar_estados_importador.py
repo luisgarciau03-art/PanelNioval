@@ -68,6 +68,7 @@ def _correr(app, ciudad, *, ws=None, gmaps=None, cancelar_en=None,
     gmaps = gmaps or repro.GmapsFalso(repro._catalogo(_negocios("Ferreteria", 6),
                                                       _negocios("Distribuidora", 3)))
     ws = ws if ws is not None else repro.WorksheetFalsa()
+    previo = _guardar_globales(app)
     repro._preparar(app, gmaps, ws)
 
     # `_preparar` silencia Telegram; aqui SI lo queremos, con su `post` capturado.
@@ -85,9 +86,33 @@ def _correr(app, ciudad, *, ws=None, gmaps=None, cancelar_en=None,
     try:
         app._worker_importador(ciudad, "clave-de-juguete")
     finally:
+        # TODO lo global vuelve a su sitio, no solo el tope. `app.googlemaps` y
+        # `app.time` son los modulos REALES del proceso, no copias de `app`:
+        # dejarlos parcheados convierte `time.sleep` en un no-op permanente para
+        # cualquier otro codigo que corra despues en este interprete.
         app.PLACES_MAX_LLAMADAS_CORRIDA = tope_previo
+        _restaurar(app, previo)
 
     return dict(app._import_job), (avisos[0] if avisos else None)
+
+
+def _guardar_globales(app):
+    """Todo lo que `_preparar` va a pisar, antes de que lo pise."""
+    return {
+        "GMAPS_OK": app.GMAPS_OK,
+        "Client": app.googlemaps.Client,
+        "sleep": app.time.sleep,
+        "get_worksheet": app.get_worksheet,
+        "telegram": app._enviar_telegram_importador,
+    }
+
+
+def _restaurar(app, previo):
+    app.GMAPS_OK = previo["GMAPS_OK"]
+    app.googlemaps.Client = previo["Client"]
+    app.time.sleep = previo["sleep"]
+    app.get_worksheet = previo["get_worksheet"]
+    app._enviar_telegram_importador = previo["telegram"]
 
 
 def _telegram_real(app, avisos):
@@ -95,8 +120,7 @@ def _telegram_real(app, avisos):
 
     Reimplementar el mensaje aqui probaria mi copia, no la suya.
     """
-    original = app.__dict__.get("_enviar_telegram_importador_original") \
-        or _original_telegram(app)
+    original = _original_telegram(app)
 
     class PostFalso:
         @staticmethod
@@ -168,25 +192,25 @@ def escenarios(app):
                                              for i in range(1, 5)])
     out["done"] = _correr(app, "Ciudad Ya Trabajada", gmaps=gmaps, ws=ws)
 
-    # 3. Detenida por el operador a mitad.
+    # 4. Detenida por el operador a mitad.
     out["cancelado"] = _correr(app, "Ciudad Detenida", cancelar_en=2)
 
-    # 4. Interrumpida por SIGTERM (redespliegue), que NO es lo mismo.
+    # 5. Interrumpida por SIGTERM (redespliegue), que NO es lo mismo.
     out["interrumpido"] = _correr(app, "Ciudad Interrumpida", cancelar_en=2,
                                   por_senal=True)
 
-    # 5. Fallo de escritura en Sheets.
+    # 6. Fallo de escritura en Sheets.
     out["error"] = _correr(app, "Ciudad Con Error",
                            ws=RuntimeError("cuota de Sheets agotada (simulado)"))
 
-    # 6. Tope de gasto: un limite respetado, no un fallo.
+    # 7. Tope de gasto: un limite respetado, no un fallo.
     out["presupuesto_agotado"] = _correr(app, "Ciudad Al Tope", tope=3)
 
-    # 7. Ciudad sin un solo resultado: `done` legitimo con cero filas.
+    # 8. Ciudad sin un solo resultado: `done` legitimo con cero filas.
     vacio = repro.GmapsFalso(repro._catalogo([], []))
     out["done_vacia"] = _correr(app, "Ciudad Vacia", gmaps=vacio)
 
-    # 8. Recargar tras un reinicio: memoria e historia en disco se separan.
+    # 9. Recargar tras un reinicio: memoria e historia en disco se separan.
     out["recarga_tras_reinicio"] = _tras_reinicio(app, out["running"][0])
 
     return out
@@ -262,20 +286,50 @@ LEER_EN_MARCHA = """(d) => {
 }"""
 
 
-def _veredicto(estado, pantalla, aviso):
+# Que titulo debe llevar el aviso de Telegram segun como acabo la corrida. Los
+# estados que NO estan aqui (idle, running) no notifican: no hay nada que avisar.
+TITULO_ESPERADO = {
+    "done": "Completado",
+    "cancelado": "DETENIDO",
+    "interrumpido": "DETENIDO",
+    "error": "FALLÓ",
+    "presupuesto_agotado": "TOPE DE GASTO",
+}
+
+
+# Escenarios en los que NO hay corrida que termine, asi que no hay nada que avisar:
+# el reposo, la instantanea de media corrida, y la recarga tras un reinicio -- que
+# lee un registro de disco, no ejecuta al worker. Exigirles aviso seria inventar un
+# fallo; NO exigirselo a los demas seria tragarse una regresion del notificador.
+SIN_AVISO = {"idle", "running", "recarga_tras_reinicio"}
+
+
+def _veredicto(estado, pantalla, aviso, escenario=""):
     """¿La pantalla (y Telegram) afirman algo que el backend no dice?"""
     fallos = []
     st = estado["status"]
 
-    if st != "idle":
-        if pantalla["titular_nuevos"] != str(estado["nuevos_en_sheet"]):
-            fallos.append(
-                f"el titular dice {pantalla['titular_nuevos']!r} y el backend tiene "
-                f"nuevos_en_sheet={estado['nuevos_en_sheet']}")
-        if pantalla["aprobados"] != str(estado["encontrados"]):
-            fallos.append(
-                f"«Aprobados» dice {pantalla['aprobados']!r} y encontrados="
-                f"{estado['encontrados']}")
+    if st == "idle":
+        # En reposo tambien se puede mentir, y de la peor manera: enseñando los
+        # numeros de la corrida ANTERIOR como si fueran de esta. Si aqui no se
+        # comprueba nada, el veredicto verde de `idle` no significa nada.
+        if pantalla["clase"] != "oculta":
+            fallos.append("en reposo la fila de contadores esta VISIBLE")
+        rancios = {k: pantalla[k] for k in
+                   ("titular_nuevos", "aprobados", "duplicados", "descartados")
+                   if pantalla[k] not in ("0", "")}
+        if rancios:
+            fallos.append(f"en reposo arrastra cifras de otra corrida: {rancios}")
+    else:
+        for campo, clave, etiqueta in (
+                ("titular_nuevos", "nuevos_en_sheet", "el titular"),
+                ("aprobados",      "encontrados",     "«Aprobados»"),
+                ("duplicados",     "duplicados",      "«Ya estaban»"),
+                ("descartados",    "descartados",     "«Descartados»")):
+            if pantalla[campo] != str(estado[clave]):
+                fallos.append(
+                    f"{etiqueta} dice {pantalla[campo]!r} y el backend tiene "
+                    f"{clave}={estado[clave]}")
 
     celebra = "✅" in pantalla["icono"] or "exito" in pantalla["clase"]
     if celebra and st != "done":
@@ -286,13 +340,13 @@ def _veredicto(estado, pantalla, aviso):
             and "error" in pantalla["clase"]:
         fallos.append(f"presenta {st!r} como si fuera un error")
 
-    if aviso is not None:
+    esperado = "" if escenario in SIN_AVISO else TITULO_ESPERADO.get(st, "")
+    if esperado and aviso is None:
+        # El notificador se traga sus excepciones (app.py) y solo las imprime. Sin
+        # esta rama, una regresion ahi se leeria igual que "este estado no avisa".
+        fallos.append(f"Telegram NO llego a construirse para un estado {st!r}")
+    elif aviso is not None:
         titulo = aviso.splitlines()[0] if aviso else ""
-        esperado = {
-            "done": "Completado", "done_vacia": "Completado",
-            "cancelado": "DETENIDO", "interrumpido": "DETENIDO",
-            "error": "FALLÓ", "presupuesto_agotado": "TOPE DE GASTO",
-        }.get(st if st != "done" else "done", "")
         if esperado and esperado not in titulo:
             fallos.append(f"Telegram titula {titulo!r} para un estado {st!r}")
         if f"<b>Nuevos en la hoja:</b> {estado['nuevos_en_sheet']}" not in aviso:
@@ -302,11 +356,20 @@ def _veredicto(estado, pantalla, aviso):
 
 
 def main():
-    sueltos = [a for a in sys.argv[1:] if not a.startswith("--")]
+    argv = sys.argv[1:]
     contra = None
-    if "--contra" in sys.argv:
-        contra = sys.argv[sys.argv.index("--contra") + 1]
-        sueltos = [a for a in sueltos if a != contra]
+    if "--contra" in argv:
+        i = argv.index("--contra")
+        if i + 1 >= len(argv):
+            raise SystemExit("--contra necesita una URL detras. Ej: --contra https://…")
+        contra = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
+    # Un flag mal escrito NO se descarta en silencio: sin esto, `--contras https://x`
+    # dejaba `contra` a None y la URL acababa de nombre de directorio.
+    desconocidos = [a for a in argv if a.startswith("--")]
+    if desconocidos:
+        raise SystemExit(f"Opcion desconocida: {', '.join(desconocidos)}")
+    sueltos = argv
     destino = Path(sueltos[0]) if sueltos else \
         RAIZ / "docs" / "investigacion" / "estados-2026-09-17"
     destino.mkdir(parents=True, exist_ok=True)
@@ -327,19 +390,23 @@ def main():
         casos = escenarios(panel)
 
         servidor = make_server("127.0.0.1", PUERTO, panel.app)
-        threading.Thread(target=servidor.serve_forever, daemon=True).start()
+        hilo = threading.Thread(target=servidor.serve_forever, daemon=True)
+        hilo.start()
         base = f"http://127.0.0.1:{PUERTO}"
 
     import verificar_importador as arnes
     from playwright.sync_api import sync_playwright
 
+    # El token se comprueba ANTES de lanzar Chromium: un `return` temprano entre el
+    # `launch()` y el `try/finally` dejaba el navegador sin cerrar.
+    tok = os.environ.get("PANEL_DASHBOARD_TOKEN") if contra else None
+    if contra and not tok:
+        print("FALTA PANEL_DASHBOARD_TOKEN: sin token el panel no abre. Sin medicion.")
+        return NO_MEDIDO
+
     filas, total_fallos = [], 0
     with sync_playwright() as p:
         navegador = p.chromium.launch()
-        tok = os.environ.get("PANEL_DASHBOARD_TOKEN") if contra else None
-        if contra and not tok:
-            print("FALTA PANEL_DASHBOARD_TOKEN: sin token el panel no abre. Sin medicion.")
-            return NO_MEDIDO
         try:
             for nombre, (estado, aviso) in casos.items():
                 pagina = arnes._pagina(navegador, estado=estado)
@@ -357,9 +424,11 @@ def main():
                     pantalla = arnes.ev(pagina, LEER_PANTALLA, estado)
                 pagina.screenshot(path=str(destino / f"{nombre}.png"), full_page=True)
 
-                fallos = _veredicto(estado, pantalla, aviso)
+                fallos = _veredicto(estado, pantalla, aviso, escenario=nombre)
                 total_fallos += len(fallos)
                 filas.append((nombre, estado, pantalla, aviso, fallos))
+
+                pagina.close()
 
                 marca = "MIENTE " if fallos else "COINCIDE"
                 print(f"  {marca}  {nombre:22} "
