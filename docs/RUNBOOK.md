@@ -622,6 +622,35 @@ Para reducir ese grupo se añade el valor real como `alias` del municipio correc
   redesplegar desde `main`.
 - **Corrida real de WhatsApp** (T5.5): 1 llamada de prueba end-to-end con un número propio.
 
+## Tocar el panel sin romper el diseño (desde 2026-09-16)
+
+El HTML y el JS **ya no viven en `app.py`**: están en `templates/` y `static/`. Antes de
+cambiar nada visual, `docs/diseno/sistema.md`.
+
+**Las tres cosas que más fácil se rompen, y cómo comprobarlas:**
+
+```bash
+# ¿Se ve igual que antes? Pixel a pixel, no a ojo.
+python tools/capturar_superficies.py docs/diseno/antes --sinteticos
+#   ... haz el cambio ...
+python tools/capturar_superficies.py /tmp/despues --sinteticos
+python tools/comparar_capturas.py docs/diseno/antes /tmp/despues
+
+# ¿Sigue accesible? Contraste con color EFECTIVO, desborde y foco.
+python tools/verificar_accesibilidad.py --detalle
+
+# ¿Sigue sin saltar? CLS de las 3 superficies en 3 anchos.
+python tools/medir_cls.py
+```
+
+⚠️ **Las capturas del repo NO llevan datos de clientes.** `capturar_superficies.py` corta las
+credenciales de Google y **aborta si el panel consigue autenticarse igualmente**. Si necesitas
+capturar producción, anonimiza **en el origen** interceptando el endpoint — difuminar después
+ya es tarde— y **abre las imágenes antes de commitearlas**.
+
+⚠️ **Un valor atípico puede ser 15× la mediana.** Las herramientas de medida usan mediana de 3
+por eso. Una sola muestra de LCP dio 6,064 ms donde la mediana era 416.
+
 ## Operación en el VPS (desde 2026-08-17)
 
 El panel corre en `155.138.200.66` (Vultr), servido en
