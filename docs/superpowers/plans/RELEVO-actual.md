@@ -76,53 +76,49 @@ mediana de 3 por esto. **No reportes una regresión sobre una muestra suelta.**
 
 ## SIGUIENTE PASO EXACTO
 
-**Plan 3, Tarea T3.2 — Diagnostico diferencial: H2 (regresion) contra H3 (caso residual).**
-**T3.0 y T3.1 estan CERRADAS.** Rama viva: `fix/conteo-importador-reincidencia` (sin PR aun).
+**Plan 3, Tarea T3.3 — el test que falla (RED), con el objeto CAMBIADO.**
+**T3.0, T3.1 y T3.2 CERRADAS.** Rama `fix/conteo-importador-reincidencia` (sin PR aun).
 
 ```
-ANCLA - Plan 3 Tarea T3.2 - importador nacional barato veraz profesional - avance 19/34 -
- cierra CE1 del plan: una causa CON EVIDENCIA ("podria ser X" no cierra) -
+ANCLA - Plan 3 Tarea T3.3 - importador nacional barato veraz profesional - avance 20/34 -
  baseline: python -m pytest tests/  -> 1,193 passed, 2 skipped
 ```
 
-### Lo que ya esta resuelto y NO se rehace
+### 🔴 LA CAUSA YA ESTA IDENTIFICADA. NO se vuelve a diagnosticar.
 
-- **Los 15 defectos de agosto** (B1-B15), su commit unico `ae0e1c9` (squash) y la guarda que
-  vigila cada uno. 80 tests. Mas las dos hipotesis que agosto ya descarto.
-- **H1 (despliegue rancio): DESCARTADA.** El VPS sirve 5 marcadores del fix **y uno posterior**,
-  y su front-end es el de `main` byte a byte salvo CRLF (975 B). Instrumento reutilizable:
-  `tools/huella_despliegue.py`, **verificado en las dos direcciones** contra un doble pre-fix.
-- **El sintoma NO reproduce.** La repro de agosto pasa entera sobre el `main` de hoy, y la
-  pantalla rotula bien: «Nuevos en la hoja» es el recuadro principal; el otro dice «Aprobados
-  por filtros», no «guardados».
+> **El arreglo se mergeo a `main` el 27-ago y nadie lo desplego.** El VPS siguio sirviendo
+> `51520f3` —cuyo `app.py` es **byte a byte** el mismo sobre el que agosto reprodujo el
+> «20 vs 10»— **tres semanas**, hasta el 16-sep, y solo llego a produccion como **efecto
+> colateral** del despliegue del Plan 1 (T1.6).
 
-### EL HALLAZGO QUE ORDENA T3.2
+Prueba: `git merge-base --is-ancestor ae0e1c9 51520f3` es **falso**; `nuevos_en_sheet` tiene
+**0 apariciones** en el `app.py` desplegado; y su linea 4918 rotulaba `encontrados` como
+**«Guardados en Google Sheets»**, que es el sintoma literal.
 
-`app.py:3238` devuelve **`len(nuevos)`**: las filas que se **enviaron** a `append_rows`, no las
-que Google **confirmo**. La respuesta trae `updates.updatedRows` y **se tira sin mirarla**. Una
-escritura parcial publicaria de mas **sin lanzar una sola excepcion**.
+**H2 descartada** (la repro pasa identica en `ae0e1c9` y en `main`). **H3 no hace falta.**
+**CE1 cerrado.**
 
-Y es **invisible para los 80 tests**, porque todos los dobles hacen
-`self.escrituras += len(filas)`: bajo ese doble `len(nuevos)` es correcto **por construccion**.
+⚠️ Y el matiz que evita rehacer T3.1: su «H1 descartada» era correcta **para hoy**. La huella se
+midio el 17-sep y el despliegue fue el 16. **Un dia antes habria dado H1 CONFIRMADA.** Medir el
+presente no explica un sintoma del pasado.
 
-⚠️ **Si T3.2 escribe el test, el doble TIENE QUE PODER MENTIR** — devolver menos filas de las
-que recibe. Un doble honesto no puede reproducir un fallo de honestidad.
+### Por que T3.3 cambia de objeto
 
-### Los dos candidatos de H3, por orden de sospecha
+**No hay defecto de codigo que arreglar**: lleva arreglado desde agosto y 80 tests lo vigilan.
+Lo que fallo fue el camino entre `main` y el operador, y **de eso no hay ninguna guarda**.
 
-1. **La escritura parcial silenciosa** (`app.py:3231-3238`).
-2. **El camino `presupuesto_agotado`** (`app.py:3509`), que el plan **no listaba** entre las
-   rutas que tocan el contador.
+El test RED de T3.3 deberia ser **la deteccion de despliegue rancio**.
+`tools/huella_despliegue.py` ya lo hace y ya esta verificado en las dos direcciones; lo que le
+falta es **ser una guarda**, no un script que alguien recuerde correr.
 
-H2 sigue disponible —`ae0e1c9` contra `main` son 24 commits que tocan `app.py`— pero **baja de
-prioridad**: la repro ya pasa en los dos extremos.
+**Candidato secundario, del §5 del diagnostico:** `app.py:3238` devuelve `len(nuevos)` —filas
+**enviadas** a `append_rows`, no las que Google confirmo; `updates.updatedRows` se tira sin
+mirarlo— y **ningun test puede verlo** porque todos los dobles hacen
+`self.escrituras += len(filas)`. **No es la causa de este sintoma**, pero es un fallo silencioso
+latente. ⚠️ Si se escribe su test, **el doble TIENE QUE PODER MENTIR**.
 
-**Criterio de cierre (CE1).** Una causa, con evidencia, y las otras dos hipotesis descartadas
-por escrito.
-
-⚠️ **Sin credenciales de Google en esta maquina.** CE1 del plan de agosto —comparar el numero de
-la UI contra la hoja de verdad— **nunca se ejecuto**, y es el unico criterio que habria mirado
-ese eslabon. La corrida real es **requisito de T3.7**, y necesita respaldo de hojas antes.
+**Despues de T3.3 viene T3.5** (auditoria de los 6 estados de carga), que es independiente del
+conteo y sigue vigente tal cual.
 
 ---
 
