@@ -392,7 +392,7 @@ devuelve la ruta de Places al comportamiento de `main` sin desplegar código nue
 
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
-| T2.0 | Tarea Cero: rama, respaldo y medición actual | PENDIENTE | | |
+| T2.0 | Tarea Cero: rama, respaldo y medición del gasto actual | **HECHO** | `docs/investigacion/2026-09-15-costo-places-antes-plan2.md` — 4 escenarios, **idénticos a la línea de agosto**: ningún plan de la tanda tocó la ruta de Places. Baseline **1,208 passed, 2 skipped**. Respaldo en `docs/auditoria/respaldos/2026-09-15-plan2/` | 🔍 **Hallazgo:** `MAX_VARIACIONES_SIN_APORTE` **no ahorra nada** — ponerlo en 99 no cambia una llamada. Todo el ahorro de Text Search (18→13) lo hace el corte **por página**. Y el doble de prueba **aprueba a todos**, así que T2.1 mediría **cero** desperdicio si no se amplía el fixture |
 | T2.1 | Cuantificar la fuga de Details sin teléfono | PENDIENTE | | |
 | T2.2 | Evaluar Places API (New) y field mask | PENDIENTE | | |
 | T2.3 | Decidir y escribir el ADR | PENDIENTE | | |
