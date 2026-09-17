@@ -3,7 +3,7 @@
 > **Archivo único que se SOBRESCRIBE al cerrar CADA tarea.** Siempre contiene el mensaje
 > completo para arrancar una sesión nueva.
 >
-> **Estado: PLANES 1 y 4 CERRADOS Y EN PRODUCCIÓN · PLAN 3 en 8/9 (T3.7 bloqueada en CE3).** Siguiente: **Plan 2 · T2.1**.
+> **Estado: PLANES 1 y 4 CERRADOS Y EN PRODUCCIÓN · PLAN 3 en 8/9 (T3.7 bloqueada en CE3).** Siguiente: **Plan 2 · T2.4 (Fase 0)**.
 
 ---
 
@@ -49,7 +49,7 @@ mediana de 3 por esto. **No reportes una regresión sobre una muestra suelta.**
 
 ## AVANCE
 
-- **2 / 4 planes (50 %)** · **26 / 34 tareas (76.5 %)** — Plan 3 en **8 / 9**, con **T3.7 BLOQUEADA**
+- **2 / 4 planes (50 %)** · **29 / 34 tareas (85.3 %)** — Plan 3 en **8 / 9**, con **T3.7 BLOQUEADA**
 - **Planes 1 y 4 cerrados y en producción.** La tanda de **agosto** quedó en **53/53**.
 
 ---
@@ -77,62 +77,50 @@ mediana de 3 por esto. **No reportes una regresión sobre una muestra suelta.**
 
 ## SIGUIENTE PASO EXACTO
 
-**Plan 2, Tarea T2.1 — Cuantificar la fuga: Details pagados que nunca llegan a la hoja.**
-**T2.0 CERRADA.** Rama viva: `perf/gasto-places-minimo` (sin PR aun). `main`: **`47df48b`**.
+**Plan 2, Tarea T2.4 — Implementar el ahorro elegido.** ⚠️ Pero **el ADR de T2.3 dice que el
+ahorro elegido NO es migrar todavía**, asi que T2.4 se reduce a la **Fase 0**: el comparador que
+no escribe nada.
+
+**T2.0, T2.1, T2.2 y T2.3 CERRADAS.** Rama `perf/gasto-places-minimo`, sin PR. `main`: `47df48b`.
 
 ```
-ANCLA - Plan 2 Tarea T2.1 - importador nacional barato veraz profesional - avance 26/34 -
- ESTA TAREA DECIDE SI EL RESTO DEL PLAN VALE LA PENA -
+ANCLA - Plan 2 Tarea T2.4 (Fase 0) - importador nacional barato veraz profesional - avance 29/34 -
  baseline: python -m pytest tests/  -> 1,208 passed, 2 skipped
 ```
 
-### ⚠️ LA TRAMPA QUE T2.0 DEJO AVISADA, Y QUE HUNDE ESTA TAREA SI SE IGNORA
+### LA DECISION YA ESTA TOMADA. No se reabre sin la evidencia del ADR.
 
-**El desperdicio que persigues NO es medible con el doble actual.** El `GmapsContador` de
-`tools/medir_llamadas_places.py` **aprueba a todos**: ningun negocio se queda sin telefono, asi
-que `sin_telefono` nunca descarta a nadie y el medidor dara **cero fuga**.
+> **No migrar todavia.** Antes, `tools/comparar_places_new.py`: sobre **una ciudad ya trabajada**,
+> 13 busquedas contra la API New, **sin tocar la hoja ni `_buscar_negocios`**. Coste ≈ **$0.46**.
 
-**Cero no seria un resultado: seria el fixture.** Antes de medir nada, el doble necesita
-negocios que **fallen los filtros DESPUES de pagar su Details** — sin telefono, con pocas
-reseñas, con calificacion baja. Si no, T2.1 concluye "no hay fuga" y el plan se cancela por un
-defecto del instrumento.
+Mide **dos numeros que le faltan a la decision**:
 
-### Lo que T2.0 ya midio y NO hay que repetir
+1. **¿`_clave_contacto` construida desde la respuesta New casa contra las claves que la hoja ya
+   tiene?** → si es **< 99 %**, la migracion **se cancela**, no se discute.
+2. **¿Que % trae `nationalPhoneNumber`?** → **eso cierra CE1**, el gate que T2.1 dejo en rojo.
 
-| Escenario | Text | Details | Filas |
-|---|---:|---:|---:|
-| Ciudad nueva | 13 | 80 | 80 |
-| A medio trabajar (30 en la hoja) | 13 | 60 | 60 |
-| Ya trabajada (90 en la hoja) | 13 | 0 | 0 |
-| Segunda corrida (cache caliente) | 13 | 0 | 80 |
+**El modo de fallo que manda:** `_clave_contacto` (`app.py:3104`) es `f"{nombre}|{direccion}"`,
+calculada en **tres sitios que deben coincidir caracter a caracter** (`app.py:2969`, `:3202`,
+`:3252`) y **sin ninguna guarda**. Un cambio de formateo llenaria la hoja de duplicados **sin una
+sola excepcion ni un test rojo**.
 
-**Identicos a la linea de agosto: ningun plan de la tanda toco la ruta de Places.**
-Place Details es el **86 %** del gasto en una ciudad nueva; Text Search es un suelo fijo de 13.
+### Lo que T2.2 dejo medido y citado (no rehacer)
 
-### 🔍 EL HALLAZGO DE T2.0, que es material de esta tarea
+`places.nationalPhoneNumber` esta en el field mask de `searchText`, **en el mismo SKU** que
+`rating` y `userRatingCount`: **el telefono sale gratis**. 13 TS Enterprise + 0 Details =
+**$0.455/ciudad** contra **$2.016** migrando «tal cual» → **−77 %**, ≈ **$1,567** en 1,004
+ciudades. Tarifas de la pagina de pricing, «Last updated 2026-09-16 UTC». ⚠️ El credito de
+**$200/mes caduco el 2025-02-28**.
 
-**`MAX_VARIACIONES_SIN_APORTE` no ahorra NADA.** Ponerlo en 99 —desactivarlo— no cambia una sola
-llamada. El corte **por pagina** dispara antes y el contador de variaciones nunca llega a 2.
+**Legacy NO tiene fecha de retiro:** *«there is no date yet for when this will happen»*, con
+**12 meses de aviso** prometidos. Es deuda **sin reloj**.
 
-```
-sin ningun corte            18 Text Search
-solo corte por pagina       13
-con los dos cortes          13     <- el segundo corte aporta 0
-```
+### Dos cosas antes de encender nada (fase 3, no antes)
 
-Con la salvedad: medido sobre el doble, donde todas las variaciones devuelven lo mismo. **No
-prueba que sea inutil en una ciudad real; prueba que el escenario de referencia no lo ejercita.**
-La pregunta ya no es cuanto ahorra, sino **si se ejecuta alguna vez**.
-
-**Y el medidor esta sano**, comprobado en la otra direccion: `MAX_PAGINAS_POR_CONSULTA=1` lo baja
-a 6 y `CORTAR_PAGINAS_SIN_APORTE=False` lo sube a 18.
-
-### Deuda cosmetica anotada
-
-El escenario de cache caliente imprime **«pagados y tirados: -80»**. El documento de agosto dice
-que un negativo es **imposible** y que por eso disparo una revision. Aquel -18 si era un defecto;
-este no —80 filas pagando 0 Details es el ahorro que la cache existe para producir— pero **la
-formula no aplica a ese escenario y aun asi se imprime**.
+1. **Recalibrar `PLACES_MAX_LLAMADAS_CORRIDA` y las tarifas** (`app.py:2388-2394`): son
+   **variables de entorno del VPS, fuera de git**. El tope esta calibrado contra 93 llamadas;
+   migrada una corrida son 13.
+2. **Escribir el rollback en el RUNBOOK.** Hoy **no existe**, y sin el no se toca Places.
 
 ---
 
