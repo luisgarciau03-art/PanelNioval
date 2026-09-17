@@ -135,6 +135,48 @@ comprueba ninguna ruta nueva**.
 
 Secuencia correcta tras cada merge: **desplegar a mano, y después el smoke.**
 
+## Cómo saber qué versión sirve el VPS (desde 2026-09-17)
+
+**El problema que esto resuelve costó tres semanas de operador.** El bug de conteo del
+importador se arregló el 2026-08-27 y llegó a producción el **2026-09-16**, de rebote con el
+despliegue del Plan 1. En medio, el panel decía *«Guardados en Google Sheets»* sobre un número
+que no eran guardados, y **nadie tenía forma de notarlo**: el arreglo estaba en `main`, el
+smoke daba verde y `/salud` no dice qué versión corre.
+
+**`/salud` seguirá sin decirlo.** Es una decisión de seguridad del Plan 5 —no revela versión,
+ni commit, ni hostname, ni rutas— y **no se revierte**. Así que el despliegue se fecha por
+**comportamiento**: se le pregunta al panel por campos que sólo existen después de un arreglo.
+
+```bash
+PANEL_DASHBOARD_TOKEN=<valor> python tools/huella_despliegue.py https://panelnioval.duckdns.org
+```
+
+⚠️ **El token va por variable de entorno, no por `--token`.** Pasarlo como argumento lo deja
+visible en el listado de procesos del VPS y en el historial del shell. `--token` sigue existiendo
+como override explícito, pero no es el camino por defecto.
+
+| Salida | Qué significa | Qué hacer |
+|---|---|---|
+| `H1 DESCARTADA` + *«marcador POSTERIOR al fix»* (exit **0**) | El VPS sirve algo **estrictamente posterior** al arreglo | Nada. Si hay un síntoma, no es de despliegue |
+| `H1 CONFIRMADA` (exit **1**) | **Falta algo del arreglo: el VPS está rancio** | Desplegar a mano (tabla «Operación en el VPS») y repetir |
+| exit **2** | Respondió, pero no se pudo interpretar: token inválido, HTTP raro, redirección o cuerpo que no es un objeto JSON | Arreglar el acceso |
+| exit **3** | **No se pudo medir**: red, DNS o host | **Ni al día ni rancio. Un fallo de medición no es un verde** |
+
+**Si sale una redirección, no la sigas a mano.** La herramienta se niega a propósito: la cabecera
+`X-Dashboard-Token` es propia, y `requests` sólo limpia `Authorization` y `Cookie` al cambiar de
+host — una cabecera nuestra viajaría intacta a donde diga el `Location`. Con DNS dinámico eso no
+es teórico. Este endpoint no tiene motivo para redirigir; si lo hace, averigua por qué.
+
+**Qué NO prueba.** Da una **cota inferior**: «lo servido es igual o posterior al commit de ese
+marcador». No prueba que el VPS corra `main` exacto. Para eso, compara el front-end servido
+contra el del repo — su sha256 debe coincidir **normalizando CRLF a LF**, porque el checkout de
+Windows infla el archivo (975 bytes en `importador.js`) sin cambiar el contenido.
+
+**Al añadir un arreglo que el operador deba poder verificar**, añade su marcador a `MARCADORES`
+en `tools/huella_despliegue.py`. `tests/test_huella_despliegue.py` **falla si un marcador deja
+de existir en el endpoint**, que es el modo en que esta guarda se pudre en silencio: vigilando
+un campo renombrado y dando rancio un panel que está al día.
+
 ## Verificar la hoja de contactos (antes de capturar correos)
 
 ```bash
@@ -299,6 +341,16 @@ se descartan *antes* de aprobar, no son una parte de los aprobados.
 > Antes del 2026-08-27 el panel mostraba un solo número, rotulado de forma que se
 > leía como "guardados". No lo era: contaba los aprobados. De ahí el "dice 20 y
 > aparecen 10".
+
+### Y una advertencia que costó tres semanas (2026-09-17)
+
+Estos cuatro números son correctos **desde el 2026-08-27**… en `main`. **Llegaron al panel el
+2026-09-16.** En medio, el operador vio un solo número rotulado *«Guardados en Google Sheets»*
+que en realidad contaba los aprobados — el arreglo existía y no estaba desplegado.
+
+**Antes de diagnosticar cualquier síntoma del importador, comprueba qué versión sirve el VPS:**
+la sección «Cómo saber qué versión sirve el VPS» de este mismo documento. Cuesta un comando y
+descarta la causa más probable de todas.
 
 ### Cómo detener una corrida
 
