@@ -1230,6 +1230,33 @@ def _explicar_ciudad(reg: dict, metricas: dict, saturacion: float) -> str:
     return ' - '.join(partes)
 
 
+def _sanear_etiqueta_ciudad(valor: str) -> str:
+    """Enmascara lo que no es un nombre de ciudad antes de publicarlo.
+
+    La columna CIUDAD de la hoja a veces trae un telefono o un correo tecleado por
+    error. Esos valores caian en `sin_clasificar` y salian **verbatim** por
+    `/api/importador/ciudades`, que promete en su docstring que ningun telefono ni
+    nombre de contacto sale de ahi. Medido en produccion el 2026-09-16: 8 telefonos
+    y 1 correo de 32 entradas.
+
+    Enmascarar NO es borrar, y esa es la mitad que importa: el aviso de
+    `sin_clasificar` existe para que el operador arregle esas celdas, asi que se
+    conserva lo justo para poder encontrarlas. Un saneador que enmascare de mas
+    esconde el problema, que es peor que la fuga.
+
+    Y se es conservador en la otra direccion: "Zona 5", "Km 23 Carretera" o
+    "Sector 2" son nombres legitimos con digitos, y salen enteros. Solo se enmascara
+    lo que de verdad parece un telefono (>= 8 digitos) o un correo.
+    """
+    crudo = (valor or '').strip()
+    if '@' in crudo and '.' in crudo.split('@')[-1]:
+        return '…@… (correo en la columna CIUDAD)'
+    digitos = re.sub(r'\D', '', crudo)
+    if len(digitos) >= 8:
+        return f'{digitos[:3]}…{digitos[-2:]} (teléfono en la columna CIUDAD)'
+    return crudo
+
+
 @app.route('/api/importador/ciudades')
 def api_importador_ciudades():
     """Catalogo nacional + metricas de la hoja, ordenado por prioridad.
@@ -1256,7 +1283,9 @@ def api_importador_ciudades():
             # Nada se descarta en silencio: la hoja trae 116 valores distintos y
             # algunos son estados ("Chiapas", "Guerrero"), no ciudades.
             sin_clasificar.append({
-                'ciudad': m['ciudad'], 'total': m['total'],
+                # Saneada: la columna CIUDAD a veces trae un telefono o un correo,
+                # y el docstring de este endpoint promete que no salen de aqui.
+                'ciudad': _sanear_etiqueta_ciudad(m['ciudad']), 'total': m['total'],
                 'llamados': m['llamados'], 'aprobados': m['aprobados'],
                 'interes_pct': m['interes_pct'],
             })

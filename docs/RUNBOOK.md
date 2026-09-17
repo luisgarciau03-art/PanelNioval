@@ -386,6 +386,23 @@ existe, se marca como interrumpido y se sigue adelante.
 
 Antes, los dos primeros terminaban en ✅ con la hoja intacta.
 
+### Celdas mal tecleadas en la columna CIUDAD (desde 2026-09-17)
+
+El aviso *«N contactos en M ciudades que no están en el catálogo»* del importador lista los
+valores de la columna CIUDAD que no casaron. Algunos son legítimos —estados como `Chiapas`, o
+`Sin ciudad`— y **otros son celdas donde alguien tecleó un teléfono o un correo**.
+
+Desde hoy esos salen **enmascarados**: `614…19 (teléfono en la columna CIUDAD)`. El endpoint
+promete en su docstring que ningún teléfono sale de ahí, y hasta hoy era falso — medido en
+producción el 2026-09-16: **8 teléfonos y 1 correo** de 32 entradas.
+
+**Enmascarar no es esconder, y la diferencia importa:** se conservan el prefijo y los dos últimos
+dígitos justamente **para que puedas encontrar la fila y arreglarla en la hoja**. Si desaparecen
+del aviso, dejas de saber que tienes celdas que corregir — que es peor que la fuga.
+
+Lo que **no** se enmascara: nombres legítimos con dígitos (`Zona 5`, `Km 23 Carretera`,
+`Sector 2`). Sólo se toca lo que tiene **8 dígitos o más**, o una arroba con dominio.
+
 ### El tope de gasto por corrida: cómo se calibra (desde 2026-09-17)
 
 Hay **dos topes**, y sólo uno funciona hoy:
