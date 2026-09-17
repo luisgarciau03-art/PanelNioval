@@ -109,3 +109,42 @@ class TestElEndpointCumpleSuPromesa:
         datos = app.app.test_client().get("/api/importador/ciudades").get_json()
 
         assert sum(c["total"] for c in datos["sin_clasificar"]) == 3
+
+
+class TestLaRutaHERMANA_TambienCumple:
+    """`/api/prospectos/ciudades` publica la MISMA columna, y filtraba igual de mal.
+
+    La auditoria del 2026-09-16 ya lo decia: *"el endpoint viejo publica exactamente
+    los mismos 8 patrones y la misma arroba"*. Arreglar solo uno de los dos habria
+    dejado la promesa rota por la puerta de al lado.
+
+    Su consumidor (`dashboard.js`) usa `ciudad` como **etiqueta de busqueda**, no
+    como clave de union, asi que enmascarar no rompe nada: un telefono deja de
+    aparecer cuando el operador teclea el nombre de una ciudad, que es lo correcto.
+    """
+
+    def test_no_publica_el_telefono_crudo(self, monkeypatch):
+        contactos = [
+            {"Ciudad": "6141234519", "Nombre": "N1", "Telefono": "6141234519"},
+            {"Ciudad": "Chiapas", "Nombre": "N2", "Telefono": "5551112222"},
+        ]
+        monkeypatch.setattr(app, "get_data", lambda _q: contactos)
+        monkeypatch.setattr(app, "get_all_respuestas", lambda: [])
+
+        app.app.config["TESTING"] = True
+        datos = app.app.test_client().get("/api/prospectos/ciudades").get_json()
+
+        crudo = " ".join(str(c.get("ciudad", "")) for c in datos)
+        assert "6141234519" not in crudo, f"el telefono salio verbatim: {crudo!r}"
+        assert "Chiapas" in crudo, "se enmascaro un valor legitimo"
+
+    def test_no_pierde_filas_al_sanear(self, monkeypatch):
+        contactos = [{"Ciudad": "6141234519", "Nombre": "N1", "Telefono": "1"},
+                     {"Ciudad": "Chiapas", "Nombre": "N2", "Telefono": "2"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: contactos)
+        monkeypatch.setattr(app, "get_all_respuestas", lambda: [])
+
+        app.app.config["TESTING"] = True
+        datos = app.app.test_client().get("/api/prospectos/ciudades").get_json()
+
+        assert len(datos) == 2, "sanear no puede hacer desaparecer un contacto real"

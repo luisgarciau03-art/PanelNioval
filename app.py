@@ -1479,6 +1479,12 @@ def api_ciudades():
         -x['relevancia'],
         x['ciudad'],
     ))
+    # La MISMA columna CIUDAD, la misma fuga: la auditoria del 2026-09-16 confirmo
+    # que este endpoint publica los mismos 8 telefonos que `sin_clasificar`. Se
+    # sanea DESPUES de ordenar para no alterar el orden por nombre, y despues de
+    # cruzar con el catalogo para no romper el emparejamiento por ciudad.
+    for r in result:
+        r['ciudad'] = _sanear_etiqueta_ciudad(r['ciudad'])
     return jsonify(result)
 
 
