@@ -9,7 +9,7 @@
 
 > ✅ **Planes 1 y 4 CERRADOS y EN PRODUCCIÓN.** Los tres PR que llevaban meses abiertos —#42, #43 y #44— están en `main`, y el VPS sirve `edda166`. El operador ve **1,004 ciudades** y el panel rediseñado.
 >
-> **Siguiente: Plan 3 · T3.0** — el bug de conteo del importador.
+> **Siguiente: Plan 3 · T3.5** — auditoría de las pantallas de carga. **El bug de conteo ya está cerrado (CE1, con prueba directa):** la causa no era código sino que el arreglo del 27-ago no llegó a producción hasta el 16-sep, de rebote con el despliegue del Plan 1.
 
 > ✅ **Plan 1 CERRADO y EN PRODUCCIÓN** (2026-09-16). PR #42 mergeado (`main` `8bac782`) y desplegado a mano en el VPS. El operador ve **1,004 ciudades** donde había 606.
 >
