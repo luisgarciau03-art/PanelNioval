@@ -352,6 +352,27 @@ que en realidad contaba los aprobados — el arreglo existía y no estaba desple
 la sección «Cómo saber qué versión sirve el VPS» de este mismo documento. Cuesta un comando y
 descarta la causa más probable de todas.
 
+### Si el log dice «ESCRITURA PARCIAL» (desde 2026-09-17)
+
+```
+[importador] ESCRITURA PARCIAL en Ferreterías: se enviaron 12 filas y Google
+             confirmó 9. Se publica 9.
+```
+
+**Qué pasó:** Google aceptó la petición con un 200 pero añadió menos filas de las pedidas. El
+panel publica **lo que Google confirmó**, no lo que se le mandó — el número que ves sigue siendo
+el de la hoja.
+
+**Qué hacer:** volver a correr la misma ciudad. El dedup impide duplicar lo que sí entró, así que
+la segunda corrida sólo escribe lo que falta.
+
+⚠️ **Y algo que sí cuesta dinero:** en una escritura parcial **no se sabe cuáles** de las filas
+aterrizaron, así que las que faltan **vuelven a pagar su Place Details** en el reintento.
+Adivinar cuáles excluir sería inventar; el precio de no inventar es ése.
+
+Hasta hoy esto no dejaba rastro: el panel publicaba las filas **enviadas** y el número dejaba de
+ser el de la hoja **sin lanzar una sola excepción**.
+
 ### Cómo detener una corrida
 
 Botón **⏹ Detener** mientras la búsqueda corre. La cancelación se comprueba

@@ -3213,6 +3213,37 @@ def _valor_para_celda(valor):
     return _escapar_formula(valor if isinstance(valor, str) else str(valor))
 
 
+def _filas_confirmadas(respuesta, enviadas: int, categoria: str = '') -> int:
+    """Cuantas filas dice Google haber anadido, no cuantas le mandamos.
+
+    `append_rows` devuelve `{'updates': {'updatedRows': N}}`. Se tiraba sin mirar, y
+    el panel publicaba `len(nuevos)` -- las ENVIADAS. Una escritura parcial (200 con
+    menos filas de las pedidas) habria hecho que el numero del operador dejara de ser
+    el de la hoja **sin lanzar una sola excepcion**: el mismo "20 vs 10" por otro
+    camino y sin nadie mirando.
+
+    **Ante la duda, se conserva lo enviado.** Si la respuesta no trae el dato -- otra
+    version de la API, un doble antiguo, un `None` -- exigirlo convertiria un camino
+    que funciona en un cero, que es un fallo peor que el que se esta tapando.
+
+    Lo que NO se toca aqui: cuando la escritura es parcial no se sabe QUE filas
+    aterrizaron, asi que el conjunto de deduplicacion se deja como estaba. Adivinar
+    cuales excluir seria inventar, y el precio de no hacerlo es volver a pagar su
+    detalle en la siguiente corrida -- caro, pero honesto.
+    """
+    try:
+        confirmadas = int(respuesta['updates']['updatedRows'])
+    except (TypeError, KeyError, ValueError, IndexError):
+        return enviadas
+    if confirmadas < enviadas:
+        # Un numero corregido en silencio es mejor que uno falso, pero no basta:
+        # esto es una anomalia de Sheets y el operador tiene que poder verla.
+        print(f'[importador] ESCRITURA PARCIAL en {categoria or "la hoja"}: '
+              f'se enviaron {enviadas} filas y Google confirmo {confirmadas}. '
+              f'Se publica {confirmadas}.')
+    return confirmadas
+
+
 def _exportar_a_sheets(resultados, categoria, ciudad, claves_existentes=None):
     """Exporta a LISTA DE CONTACTOS con columnas idénticas al script original.
 
@@ -3273,11 +3304,12 @@ def _exportar_a_sheets(resultados, categoria, ciudad, claves_existentes=None):
 
     if nuevos:
         nuevos = [[_escapar_formula(v) for v in fila] for fila in nuevos]
-        ws.append_rows(nuevos, value_input_option='USER_ENTERED')
+        respuesta = ws.append_rows(nuevos, value_input_option='USER_ENTERED')
         # Solo ahora: si append_rows revienta, el conjunto del que depende el
         # prefiltro no se queda afirmando que estos negocios ya estan en la hoja.
         nombres_existentes.update(claves_nuevas)
         _cache_pop('contactos')
+        return _filas_confirmadas(respuesta, len(nuevos), categoria)
     return len(nuevos)
 
 
