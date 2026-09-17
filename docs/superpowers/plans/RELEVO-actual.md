@@ -76,48 +76,53 @@ mediana de 3 por esto. **No reportes una regresión sobre una muestra suelta.**
 
 ## SIGUIENTE PASO EXACTO
 
-**Plan 3, Tarea T3.1 — Reproducir el sintoma y descartar H1 (despliegue rancio).**
-**T3.0 esta CERRADA.** Rama viva: `fix/conteo-importador-reincidencia` (sin PR aun; el plan
-pide una rama por plan). Expediente: `docs/investigacion/2026-09-15-expediente-bug-conteo.md`.
+**Plan 3, Tarea T3.2 — Diagnostico diferencial: H2 (regresion) contra H3 (caso residual).**
+**T3.0 y T3.1 estan CERRADAS.** Rama viva: `fix/conteo-importador-reincidencia` (sin PR aun).
 
 ```
-ANCLA - Plan 3 Tarea T3.1 - importador nacional barato veraz profesional - avance 18/34 -
- NINGUNA LINEA DE CODIGO ANTES DE CERRARLA -
+ANCLA - Plan 3 Tarea T3.2 - importador nacional barato veraz profesional - avance 19/34 -
+ cierra CE1 del plan: una causa CON EVIDENCIA ("podria ser X" no cierra) -
  baseline: python -m pytest tests/  -> 1,193 passed, 2 skipped
 ```
 
-**Lo que T3.0 dejo resuelto y NO hay que rehacer:** los **15 defectos** de agosto (B1-B15)
-listados con su commit **unico** `ae0e1c9` (squash) y **la guarda que vigila cada uno** hoy.
-80 tests. Las dos hipotesis descartadas en agosto tampoco se reabren.
+### Lo que ya esta resuelto y NO se rehace
 
-**Las tres correcciones al plan que T3.0 encontro, y que T3.1/T3.2 necesitan:**
+- **Los 15 defectos de agosto** (B1-B15), su commit unico `ae0e1c9` (squash) y la guarda que
+  vigila cada uno. 80 tests. Mas las dos hipotesis que agosto ya descarto.
+- **H1 (despliegue rancio): DESCARTADA.** El VPS sirve 5 marcadores del fix **y uno posterior**,
+  y su front-end es el de `main` byte a byte salvo CRLF (975 B). Instrumento reutilizable:
+  `tools/huella_despliegue.py`, **verificado en las dos direcciones** contra un doble pre-fix.
+- **El sintoma NO reproduce.** La repro de agosto pasa entera sobre el `main` de hoy, y la
+  pantalla rotula bien: «Nuevos en la hoja» es el recuadro principal; el otro dice «Aprobados
+  por filtros», no «guardados».
 
-1. **`nuevos_en_sheet` se escribe en DOS sitios, no en tres.** `app.py:3417` (normal) y
-   `app.py:3509` (**`presupuesto_agotado`**, que el plan no listaba). Los caminos de parada y
-   error solo **leen**. Los numeros ~5781/~5873/~5918 del plan son **pre-extraccion**.
-2. **`saltados` NO entra en `nuevos_en_sheet`** — va a `encontrados` y `duplicados`. Es lectura
-   de codigo, **no un veredicto**: que el reparto este bien escrito no prueba que `nuevos` valga
-   lo que debe.
-3. **El invariante «el VPS auto-deploya `main`» del Plan 3 es FALSO.** Por eso **H1 (despliegue
-   rancio) es mas plausible de lo que el plan supone**: no hay nada automatico que la impida.
+### EL HALLAZGO QUE ORDENA T3.2
 
-**Y el dato que ordena T3.1:** de los 11 criterios de agosto se cerraron 8. **Los 3 que
-quedaron esperando al owner nunca se cerraron** — corrida real, gunicorn en el VPS y navegador.
-Todo lo verde de agosto se midio **con dobles de prueba**: `reproducir_bugs_importador.py` no
-toca red, ni hoja, ni Places. **El unico criterio que compara la UI contra la hoja de verdad
-jamas se ejecuto.** Mirar ahi antes que cualquier regresion.
+`app.py:3238` devuelve **`len(nuevos)`**: las filas que se **enviaron** a `append_rows`, no las
+que Google **confirmo**. La respuesta trae `updates.updatedRows` y **se tira sin mirarla**. Una
+escritura parcial publicaria de mas **sin lanzar una sola excepcion**.
 
-**Pasos de T3.1:**
-1. **Huella de despliegue.** Un rasgo que solo exista tras `ae0e1c9` —los cuatro contadores
-   separados en `/api/importador/estado`— consultado contra produccion. Sin el rasgo -> **H1**.
-2. Reproducir con `tools/reproducir_bugs_importador.py` sobre el `main` de hoy.
-3. Anotar **que numero mostro la UI y que numero tenia la hoja**, con captura.
+Y es **invisible para los 80 tests**, porque todos los dobles hacen
+`self.escrituras += len(filas)`: bajo ese doble `len(nuevos)` es correcto **por construccion**.
 
-**Criterio de cierre.** Sintoma reproducido con numeros concretos y H1 resuelta con evidencia.
-Si **no** reproduce, decirlo: es un resultado, y el plan pasa a T3.5 sin inventar un bug.
+⚠️ **Si T3.2 escribe el test, el doble TIENE QUE PODER MENTIR** — devolver menos filas de las
+que recibe. Un doble honesto no puede reproducir un fallo de honestidad.
 
-⚠️ **El respaldo de las hojas de Google NO esta hecho** — esta maquina no tiene credenciales.
-No bloquea T3.1-T3.6 (no escriben), pero es **requisito previo de T3.7**, que si escribe.
+### Los dos candidatos de H3, por orden de sospecha
+
+1. **La escritura parcial silenciosa** (`app.py:3231-3238`).
+2. **El camino `presupuesto_agotado`** (`app.py:3509`), que el plan **no listaba** entre las
+   rutas que tocan el contador.
+
+H2 sigue disponible —`ae0e1c9` contra `main` son 24 commits que tocan `app.py`— pero **baja de
+prioridad**: la repro ya pasa en los dos extremos.
+
+**Criterio de cierre (CE1).** Una causa, con evidencia, y las otras dos hipotesis descartadas
+por escrito.
+
+⚠️ **Sin credenciales de Google en esta maquina.** CE1 del plan de agosto —comparar el numero de
+la UI contra la hoja de verdad— **nunca se ejecuto**, y es el unico criterio que habria mirado
+ese eslabon. La corrida real es **requisito de T3.7**, y necesita respaldo de hojas antes.
 
 ---
 

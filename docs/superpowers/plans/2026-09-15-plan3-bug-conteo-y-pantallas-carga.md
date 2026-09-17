@@ -410,7 +410,7 @@ archivos previos. **Nada se borra:** lo retirado vive en
 | # | Tarea | Estado | Evidencia (commit/test/PR) | Fecha |
 |---|---|---|---|---|
 | T3.0 | Tarea Cero: rama, respaldo y expediente de agosto | **HECHO** | `docs/investigacion/2026-09-15-expediente-bug-conteo.md` — **15** defectos (los 13 pedidos + B14/B15) con commit `ae0e1c9` y la guarda que los vigila hoy; baseline **1,193 passed, 2 skipped**; respaldo en `docs/auditoria/respaldos/2026-09-15-plan3/` | 3 correcciones al plan (dos sitios de `nuevos_en_sheet`, no tres; `saltados` no entra en el contador; el invariante de auto-deploy es falso). Respaldo de **hojas** pendiente: sin credenciales aqui, es requisito de T3.7 |
-| T3.1 | Reproducir el síntoma y descartar H1 (despliegue) | PENDIENTE | | |
+| T3.1 | Reproducir el síntoma y descartar H1 (despliegue) | **HECHO** | `docs/investigacion/2026-09-15-reproduccion-sintoma.md` + `tools/huella_despliegue.py` — **H1 DESCARTADA**: 5 marcadores del fix + 1 posterior, front-end idéntico al de `main` (975 B de diferencia = CRLF), instrumento verificado en las dos direcciones contra un doble pre-fix | El síntoma **no reproduce**: la repro de agosto pasa entera sobre el `main` de hoy y la UI rotula bien los dos números. Hallazgo: `_exportar_a_sheets` devuelve filas **enviadas**, no confirmadas por Google, y **ningún doble puede ver ese fallo**. Sin captura de corrida real: sigue siendo el gate CE1 |
 | T3.2 | Diagnóstico diferencial H2 vs H3 | PENDIENTE | | |
 | T3.3 | Test que falla (RED) | PENDIENTE | | |
 | T3.4 | Fix (GREEN) en la estructura final | PENDIENTE | | |
