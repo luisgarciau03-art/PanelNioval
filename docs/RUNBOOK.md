@@ -386,6 +386,63 @@ existe, se marca como interrumpido y se sigue adelante.
 
 Antes, los dos primeros terminaban en ✅ con la hoja intacta.
 
+### El tope de gasto por corrida: cómo se calibra (desde 2026-09-17)
+
+Hay **dos topes**, y sólo uno funciona hoy:
+
+| Variable de entorno | Qué hace | Estado |
+|---|---|---|
+| `PLACES_MAX_LLAMADAS_CORRIDA` | Corta la corrida al llegar a N llamadas | **Es el utilizable**: no necesita tarifas |
+| `PLACES_PRESUPUESTO_CORRIDA` + `PLACES_COSTO_TEXT_SEARCH` + `PLACES_COSTO_DETAILS` | Corta por importe | Necesita las tarifas de la consola. **Sin tarifa no se publica importe** |
+
+**Ninguna tiene valor por defecto.** Si no está en el entorno, `_float_de_entorno` devuelve
+`None` y **el tope no existe**. Eso es deliberado —un tope inventado es peor que ninguno— pero
+tiene una consecuencia incómoda: **un tope que nadie ha confirmado que está puesto no es un
+tope.** Ningún endpoint lo expone, así que la única forma de saberlo es mirar el `.env` del VPS.
+
+**La aritmética para calibrarlo**, con la corrida medida en T2.0 (**13 Text Search + 80 Place
+Details = 93 llamadas** en una ciudad nueva):
+
+| Tope | Ciudades nuevas completas antes de cortar |
+|---:|---|
+| 100 | 1 |
+| 200 | 2 |
+| 500 | 5 |
+
+⚠️ **El catálogo del Plan 1 pasó de 606 a 1,004 ciudades.** El barrido nacional completo son
+**93,372 llamadas**. El tope por corrida **no** limita eso: limita **una** corrida. Protege
+contra una ciudad que se desboque, no contra correr el país entero.
+
+Y una advertencia para el día que se migre a la API New: la corrida pasa de **93 llamadas a 13**.
+Un tope de 120 dejaba pasar una ciudad; después dejaría pasar **nueve**. Recalibrarlo es parte
+del despliegue de la migración, **no un ajuste posterior** — y vive en el `.env` del servidor,
+fuera de git.
+
+### Antes de migrar a Places API (New): la Fase 0 (desde 2026-09-17)
+
+El ADR `2026-09-15-ruta-de-telefono-places` **no autoriza migrar**. Autoriza **trece llamadas que
+no escriben nada**, y que compran los dos números que le faltan a la decisión:
+
+```bash
+GMAPS_API_KEY=<valor> python tools/comparar_places_new.py "Puebla"
+```
+
+Elige una ciudad **ya trabajada**: son las que tienen claves en la hoja contra las que la
+migración tendría que casar. Cuesta **≈ $0.46** y **no toca la hoja, ni la caché, ni el estado**.
+
+| Código de salida | Qué significa | Qué hacer |
+|---:|---|---|
+| **0** | La clave de deduplicación casa **≥ 99 %** | Se cumple la condición (a) del ADR. Falta la (b): sin-teléfono ≥ 30 % |
+| **1** | **Casa por debajo del 99 %** | 🔴 **El ADR cancela la migración.** Migrar llenaría la hoja de duplicados de todo lo ya importado |
+| **3** | Ningún Place ID en común: **no se pudo medir** | No es un veredicto. Repetir con otra ciudad |
+
+**Por qué esto y no migrar directamente.** `_clave_contacto` es `f"{nombre}|{dirección}"` y se
+calcula en **tres sitios que deben coincidir carácter a carácter**. Si la API New formatea el
+nombre o la dirección distinto —un código postal de más, un `S.A. de C.V.`—, la clave nueva no
+casa con ninguna de las viejas y el importador **duplica todo sin lanzar una sola excepción**.
+Hoy **no hay ninguna guarda** que lo detecte; el operador se enteraría marcando teléfonos
+repetidos.
+
 ### Caché de detalles de Places (desde 2026-08-28)
 
 El importador guarda los detalles que pide a Google (teléfono, sitio web, horario)

@@ -5,16 +5,16 @@
 
 **SESIÓN ACTUAL: 2** · **ÚLTIMO RELEVO: 2026-09-16, tras T1.7 ([`RELEVO-actual.md`](RELEVO-actual.md), apuntando a Plan 4 · T4.0)**
 
-**PROGRESO GLOBAL: 2 / 4 planes completados · 25 / 34 tareas (73.5 %)** — Plan 3 en **8 / 9**: todo cerrado salvo **T3.7, BLOQUEADA en CE3** (corrida real: gate del owner). **No se marca 3/4 mientras CE3 siga rojo** — hacerlo repetiría el error de agosto, que cerró 10/10 con tres gates abiertos y el operador siguió viendo el bug tres semanas
+**PROGRESO GLOBAL: 4 / 4 planes ejecutados · 34 / 34 tareas (100 %)** — con **dos criterios abiertos que no se pueden cerrar desde código**: **CE3 del Plan 3** (la corrida real contra la hoja, abierta desde el 2026-08-27) y **CE1 del Plan 2** (la tasa real de sin-teléfono en Google). Los dos necesitan **la misma llave**: una corrida con credenciales del owner. Todo lo demás está cerrado, verificado y —lo del Plan 1 y el Plan 4— **en producción**.
 
 > ✅ **Planes 1 y 4 CERRADOS y EN PRODUCCIÓN.** Los tres PR que llevaban meses abiertos —#42, #43 y #44— están en `main`, y el VPS sirve `edda166`. El operador ve **1,004 ciudades** y el panel rediseñado.
 >
-> **Siguiente: Plan 2 · T2.0** — el gasto de Places. **El bug de conteo está resuelto:** la causa era que el arreglo del 27-ago no llegó a producción hasta el 16-sep. Lo único abierto del Plan 3 es **CE3, la corrida real contra la hoja**, que es gate del owner.
+> **Tanda ejecutada.** Lo que queda no es trabajo de código: es **una corrida real de una ciudad pequeña y ya trabajada**, que cierra CE3, CE1 y de paso la Fase 0 del ADR de migración. Receta en `docs/investigacion/2026-09-15-gate-owner-gasto-en-pesos.md`.
 
 > ✅ **Plan 1 CERRADO y EN PRODUCCIÓN** (2026-09-16). PR #42 mergeado (`main` `8bac782`) y desplegado a mano en el VPS. El operador ve **1,004 ciudades** donde había 606.
 >
 > ⚠️ **HALLAZGO QUE AFECTA A LOS OTROS TRES PLANES:** el invariante «el VPS auto-deploya `main`» **es FALSO** desde el 2026-08-19. No hay auto-deploy: el despliegue es un `ssh` manual. **«Mergeado» y «desplegado» son dos estados distintos**, y los Planes 2, 3 y 4 llevan el invariante falso escrito. Cada uno necesita su paso de despliegue explícito. Detalle: `docs/auditoria/2026-09-15-verificacion-produccion-plan1.md`.
-**Planes 1 y 4: CERRADOS (8/8 y 12/12) y en producción. Plan 3: 8/9, T3.7 BLOQUEADA. Siguiente: Plan 2 · T2.0 · Baseline: 1,208 passed, 2 skipped**
+**Planes 1, 3 y 4 cerrados y verificados · Plan 2 cerrado (7/7). Baseline en `main`: 1,208 passed, 2 skipped.** Dos gates del owner abiertos: CE3 y CE1.
 
 **Biblioteca de herramientas leída en la sesión de diseño:**
 `C:\Users\PC 1\.claude\BIBLIOTECA-HERRAMIENTAS.md` — **653 herramientas (229 agentes + 424

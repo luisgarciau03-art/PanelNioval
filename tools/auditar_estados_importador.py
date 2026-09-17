@@ -264,6 +264,8 @@ LEER_PANTALLA = """(d) => {
     aprobados:      t('s-encontrados'),
     duplicados:     t('s-duplicados'),
     descartados:    t('s-descartados'),
+    medidor_llamadas: t('m-llamadas'),
+    medidor_ahorro:   t('m-ahorro'),
     titulo:         t('result-titulo'),
     detalle:        t('result-detalle'),
     icono:          t('result-icono'),
@@ -280,6 +282,8 @@ LEER_EN_MARCHA = """(d) => {
   return {
     titular_nuevos: t('s-nuevos'), aprobados: t('s-encontrados'),
     duplicados: t('s-duplicados'), descartados: t('s-descartados'),
+    medidor_llamadas: t('m-llamadas'), medidor_ahorro: t('m-ahorro'),
+    medidor_llamadas: t('m-llamadas'), medidor_ahorro: t('m-ahorro'),
     titulo: t('prog-label'), detalle: t('prog-fase'), icono: '',
     clase: caja ? caja.className : '', rol: caja ? caja.getAttribute('role') : '',
   };
@@ -330,6 +334,19 @@ def _veredicto(estado, pantalla, aviso, escenario=""):
                 fallos.append(
                     f"{etiqueta} dice {pantalla[campo]!r} y el backend tiene "
                     f"{clave}={estado[clave]}")
+
+    # T2.5 — el medidor de gasto vivo tras la extraccion del PR #43. Se lee del
+    # backend, asi que si el JS extraido dejo de leer los campos del `medidor`, el
+    # operador ve "0 busquedas" mientras Google factura.
+    med = (estado.get("medidor") or {})
+    if st != "idle" and med:
+        esperado_ts = str(med.get("text_search", 0))
+        esperado_pd = str(med.get("place_details", 0))
+        texto = pantalla.get("medidor_llamadas", "")
+        if esperado_ts not in texto or esperado_pd not in texto:
+            fallos.append(
+                f"el medidor dice {texto!r} y el backend cobro "
+                f"{esperado_ts} busquedas + {esperado_pd} detalles")
 
     celebra = "✅" in pantalla["icono"] or "exito" in pantalla["clase"]
     if celebra and st != "done":
@@ -470,6 +487,7 @@ def _pantalla_en_reposo(arnes, pagina):
       const fila = document.getElementById('stats-row');
       return {titular_nuevos: t('s-nuevos'), aprobados: t('s-encontrados'),
               duplicados: t('s-duplicados'), descartados: t('s-descartados'),
+              medidor_llamadas: t('m-llamadas'), medidor_ahorro: t('m-ahorro'),
               titulo: '', detalle: '', icono: '', rol: '',
               clase: fila && fila.hasAttribute('hidden') ? 'oculta' : 'VISIBLE'};
     }""")
