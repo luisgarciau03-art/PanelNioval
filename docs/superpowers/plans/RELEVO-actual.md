@@ -76,33 +76,48 @@ mediana de 3 por esto. **No reportes una regresión sobre una muestra suelta.**
 
 ## SIGUIENTE PASO EXACTO
 
-**Plan 3, Tarea T3.0 — Tarea Cero: rama, respaldo y recuperación del expediente de agosto.**
+**Plan 3, Tarea T3.1 — Reproducir el sintoma y descartar H1 (despliegue rancio).**
+**T3.0 esta CERRADA.** Rama viva: `fix/conteo-importador-reincidencia` (sin PR aun; el plan
+pide una rama por plan). Expediente: `docs/investigacion/2026-09-15-expediente-bug-conteo.md`.
 
 ```
-ANCLA · Plan 3 Tarea T3.0 · importador nacional barato veraz profesional · avance 17/34 ·
+ANCLA - Plan 3 Tarea T3.1 - importador nacional barato veraz profesional - avance 18/34 -
+ NINGUNA LINEA DE CODIGO ANTES DE CERRARLA -
  baseline: python -m pytest tests/  -> 1,193 passed, 2 skipped
 ```
 
-**El Plan 3 ataca el bug de conteo del importador.** Su T3.0 es **anti-redescubrimiento**: en
-agosto se cerró un plan entero sobre exactamente este bug, y entrar sin leer ese expediente
-garantiza repetir el trabajo.
+**Lo que T3.0 dejo resuelto y NO hay que rehacer:** los **15 defectos** de agosto (B1-B15)
+listados con su commit **unico** `ae0e1c9` (squash) y **la guarda que vigila cada uno** hoy.
+80 tests. Las dos hipotesis descartadas en agosto tampoco se reabren.
 
-1. Rama `fix/conteo-importador-reincidencia` desde `main`.
-2. Baseline. **Anota el número exacto** (debe dar 1,193).
-3. Leer completos: `docs/investigacion/2026-08-27-reproduccion-bugs-importador.md`,
-   `docs/investigacion/2026-08-27-verificacion-plan3.md`, el ADR `2026-08-27` del estado
-   compartido, y la sección «Importador de prospectos» del RUNBOOK.
-4. `claude-mem:mem-search` — ⚠️ **está caído desde el 2026-09-05** (issue #2188). **Declara la
-   sustitución**, como se hizo en T1.1, en vez de saltártelo en silencio.
-5. **Listar los 13 defectos ya cerrados (B1–B13) + B14 y B15 con su commit.** Eso es lo que
-   **NO** hay que volver a diagnosticar.
-6. Respaldo a `docs/auditoria/respaldos/2026-09-15-plan3/`.
+**Las tres correcciones al plan que T3.0 encontro, y que T3.1/T3.2 necesitan:**
 
-**Criterio de cierre.** Los 13 defectos listados con su commit.
+1. **`nuevos_en_sheet` se escribe en DOS sitios, no en tres.** `app.py:3417` (normal) y
+   `app.py:3509` (**`presupuesto_agotado`**, que el plan no listaba). Los caminos de parada y
+   error solo **leen**. Los numeros ~5781/~5873/~5918 del plan son **pre-extraccion**.
+2. **`saltados` NO entra en `nuevos_en_sheet`** — va a `encontrados` y `duplicados`. Es lectura
+   de codigo, **no un veredicto**: que el reparto este bien escrito no prueba que `nuevos` valga
+   lo que debe.
+3. **El invariante «el VPS auto-deploya `main`» del Plan 3 es FALSO.** Por eso **H1 (despliegue
+   rancio) es mas plausible de lo que el plan supone**: no hay nada automatico que la impida.
 
-**Dato que ya tienes:** `_estado_catalogo` (`app.py:895-897`) es una caché de proceso que **no
-se invalida**: un fallo transitorio al arrancar serviría `catalogo_cargado: false` hasta el
-reinicio. No es silencioso —el banner rojo sale— pero es candidato del Plan 3.
+**Y el dato que ordena T3.1:** de los 11 criterios de agosto se cerraron 8. **Los 3 que
+quedaron esperando al owner nunca se cerraron** — corrida real, gunicorn en el VPS y navegador.
+Todo lo verde de agosto se midio **con dobles de prueba**: `reproducir_bugs_importador.py` no
+toca red, ni hoja, ni Places. **El unico criterio que compara la UI contra la hoja de verdad
+jamas se ejecuto.** Mirar ahi antes que cualquier regresion.
+
+**Pasos de T3.1:**
+1. **Huella de despliegue.** Un rasgo que solo exista tras `ae0e1c9` —los cuatro contadores
+   separados en `/api/importador/estado`— consultado contra produccion. Sin el rasgo -> **H1**.
+2. Reproducir con `tools/reproducir_bugs_importador.py` sobre el `main` de hoy.
+3. Anotar **que numero mostro la UI y que numero tenia la hoja**, con captura.
+
+**Criterio de cierre.** Sintoma reproducido con numeros concretos y H1 resuelta con evidencia.
+Si **no** reproduce, decirlo: es un resultado, y el plan pasa a T3.5 sin inventar un bug.
+
+⚠️ **El respaldo de las hojas de Google NO esta hecho** — esta maquina no tiene credenciales.
+No bloquea T3.1-T3.6 (no escriben), pero es **requisito previo de T3.7**, que si escribe.
 
 ---
 
