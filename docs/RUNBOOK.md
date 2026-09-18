@@ -135,6 +135,33 @@ comprueba ninguna ruta nueva**.
 
 Secuencia correcta tras cada merge: **desplegar a mano, y después el smoke.**
 
+## Las rutas de depuración, y la única lista que no se toca a la ligera
+
+El panel tiene tres endpoints de depuración que **vuelcan filas crudas de las hojas**:
+
+| Ruta | Qué devuelve |
+|---|---|
+| `/api/debug` | Todas las hojas de cada spreadsheet, con su conteo de filas |
+| `/api/debug/respuestas` | Encabezados y conteo de cada hoja de respuestas |
+| **`/api/test/<hoja>`** | **Las primeras 3 filas crudas de CUALQUIER hoja**, incluida `contactos` — con nombres y teléfonos |
+
+**Están detrás del token, y así tienen que seguir.** No son una fuga: son herramientas del
+owner. Pero conviene saber que existen antes de compartir una captura de pantalla o un `curl`.
+
+### ⚠️ `_ENDPOINTS_EXENTOS_AUTH` (en `app.py`)
+
+Es **el único sitio del panel donde un descuido convierte datos de clientes en datos públicos**.
+Sólo tiene dos entradas, y cada una con su motivo escrito:
+
+- **`catalogo_heartbeat`** — el worker usa su propio `WORKER_TOKEN`.
+- **`salud`** — el healthcheck de Docker, que no tiene el token del panel. Por eso su cuerpo es
+  un `{'ok': True}` pelado: ni versiones, ni rutas, ni estado.
+
+**Añadir una tercera exige motivo escrito en el código.** Desde el 2026-09-18 hay tests que
+fallan si la lista crece, si alguna ruta `GET` responde algo distinto de **401** sin token, o si
+`/salud` **deja** de estar exenta — lo último también importa: el contenedor se quedaría
+`unhealthy` y Docker lo reiniciaría en bucle.
+
 ## Volver atrás un despliegue (rollback) — escrito el 2026-09-18
 
 **Hasta hoy este procedimiento no existía por escrito**, y una revisión lo marcó como condición
