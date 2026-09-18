@@ -267,3 +267,99 @@ class TestNoSeMUESTRAN_CEROS_CON_LA_HOJA_LLENA:
         monkeypatch.setattr(app, "get_data", lambda _q: filas)
 
         assert cliente.get("/api/prospectos/ventas-dashboard").get_json()["ventas_sin_fecha"] == 0
+
+
+# ═══════ Lo que encontro el gate: arregle UNA ruta y mi propio test decia DOS ═══════
+
+class TestLaOtraRutaTAMBIEN_LO_DICE:
+    """HIGH del gate, y el docstring de arriba ya lo reconocia: "las DOS rutas leen
+    `Fecha`, no la encuentran". Y solo se arreglo una.
+
+    `/api/ventas/stats` no tenia como decir "no encontre la columna de fecha", a
+    diferencia de `montos_ilegibles`/`columna_monto`, que si distinguen.
+    """
+
+    def test_publica_que_columna_de_fecha_uso(self, cliente, monkeypatch):
+        monkeypatch.setattr(app, "get_data", lambda _q: [venta()])
+
+        assert cliente.get("/api/ventas/stats").get_json()["columna_fecha"] == "Fecha"
+
+    def test_sin_columna_de_fecha_lo_dice_en_vez_de_devolver_una_serie_vacia(self, cliente, monkeypatch):
+        """La hoja real: `Cliente`, `MES`, `Monto`... y ninguna `Fecha`."""
+        filas = [{"Cliente": "A", "Monto": "100", "MES": "Julio"},
+                 {"Cliente": "B", "Monto": "200", "MES": "Agosto"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        d = cliente.get("/api/ventas/stats").get_json()
+
+        assert d["por_mes"] == []
+        assert d["columna_fecha"] is None, (
+            "serie vacia sin decir por que: indistinguible de 'no se vendio'")
+        assert d["total_ventas"] == 2, "las filas existen aunque no se puedan ubicar"
+
+
+class TestSIN_CLIENTE_TAMPOCO_SE_DESCARTA_EN_SILENCIO:
+    """HIGH del gate: el mismo patron, por la otra columna.
+
+    Una fila con `Cliente` vacio desaparecia de todos los totales sin contador. Es
+    el mismo sintoma de fondo que motivo el PR -- un total mas bajo que la hoja, sin
+    que nada lo indique -- solo que por otra puerta.
+    """
+
+    def test_se_cuentan_aparte_de_las_que_no_tienen_fecha(self, cliente, monkeypatch):
+        filas = [{"Cliente": "", "Monto": "100", "Fecha": "15/01/2026"},
+                 {"Cliente": "B", "Monto": "200", "MES": "Julio"},
+                 {"Cliente": "C", "Monto": "300", "Fecha": "20/01/2026"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        d = cliente.get("/api/prospectos/ventas-dashboard").get_json()
+
+        assert d["ventas_sin_cliente"] == 1
+        assert d["ventas_sin_fecha"] == 1, "son motivos distintos y se cuentan aparte"
+        assert d["total_pedidos"] == 1, "solo una fila tenia las dos cosas"
+
+
+class TestMontosIlegiblesSOLO_CUENTA_DINERO_QUE_IBA_A_ENTRAR:
+    """MEDIUM del gate: `parse_monto` corria ANTES de los dos `continue`.
+
+    Con la hoja real -- 183 filas sin fecha -- un monto ilegible subia el contador
+    aunque esa fila nunca iba a sumar. Dos explicaciones distintas del mismo cero,
+    mezcladas en un numero.
+    """
+
+    def test_una_fila_ya_descartada_no_ensucia_el_contador(self, cliente, monkeypatch):
+        filas = [{"Cliente": "A", "Monto": "no aplica", "MES": "Julio"},
+                 {"Cliente": "B", "Monto": "400", "Fecha": "15/01/2026"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        d = cliente.get("/api/prospectos/ventas-dashboard").get_json()
+
+        assert d["ventas_sin_fecha"] == 1
+        assert d["montos_ilegibles"] == 0, (
+            "conto un monto ilegible de una fila que ya se descarto por fecha")
+
+    def test_pero_uno_ilegible_QUE_SI_ENTRABA_se_cuenta(self, cliente, monkeypatch):
+        filas = [{"Cliente": "A", "Monto": "pendiente", "Fecha": "15/01/2026"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        assert cliente.get("/api/prospectos/ventas-dashboard").get_json()["montos_ilegibles"] == 1
+
+
+class TestLaCUARTA_COPIA_ERA_LA_MAS_ROTA:
+    """LOW del gate, y merece arreglarse porque es el patron exacto del PR.
+
+    `api_stats` truncaba el FORMATO, no solo el dato: `'%d/%m/%Y %H:%M:%S'[:10]` da
+    `'%d/%m/%Y %'` -- un patron que termina en un `%` suelto y **no puede casar con
+    nada**. Codigo muerto, tapado por un `except: pass` desnudo.
+    """
+
+    def test_una_marca_temporal_con_hora_SI_se_ubica_en_su_semana(self, cliente, monkeypatch):
+        monkeypatch.setattr(app, "get_data", lambda _q: [])
+        monkeypatch.setattr(app, "get_all_respuestas",
+                            lambda: [{"Marca temporal": "15/01/2026 14:30:00",
+                                      "Nombre De la Tienda": "A"}])
+
+        d = cliente.get("/api/prospectos/stats").get_json()
+
+        semanas = d.get("por_semana") or {}
+        assert semanas, f"la respuesta con hora no cayo en ninguna semana: {semanas}"

@@ -205,6 +205,9 @@ def indice_por_fila_respuesta(filas: list, fila_respuesta: int) -> Optional[int]
     return None
 
 
+MESES_LARGOS = ('', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre')
+
 MESES_CORTOS = ('', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
                 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic')
 

@@ -833,14 +833,13 @@ def api_stats():
 
         fecha_str = str_val(r.get('Marca temporal', r.get('Fecha_Hora', '')))
         if fecha_str:
-            for fmt in ('%m/%d/%Y', '%d/%m/%Y %H:%M:%S', '%d/%m/%Y', '%Y-%m-%d'):
-                try:
-                    dt = datetime.strptime(fecha_str[:10], fmt[:10])
-                    semana = f"S{dt.isocalendar()[1]:02d}/{dt.year}"
-                    por_semana[semana] += 1
-                    break
-                except:
-                    pass
+            # `fmt[:10]` truncaba el FORMATO, no solo el dato: de
+            # '%d/%m/%Y %H:%M:%S' salia '%d/%m/%Y %', que acaba en un `%` suelto y
+            # no puede casar con nada. Codigo muerto tapado por un `except: pass`;
+            # funcionaba de rebote por el formato siguiente de la lista.
+            dt = nc.parsear_fecha(fecha_str)
+            if dt:
+                por_semana[f"S{dt.isocalendar()[1]:02d}/{dt.year}"] += 1
 
     semanas_sorted = sorted(por_semana.items())[-12:]
 
@@ -993,14 +992,10 @@ def api_clientes_frecuentes():
         if fecha and fecha > clientes[cliente]['ultimo_pedido']:
             clientes[cliente]['ultimo_pedido'] = fecha
 
-    MESES_ES = {
-        1:'Enero', 2:'Febrero', 3:'Marzo', 4:'Abril', 5:'Mayo', 6:'Junio',
-        7:'Julio', 8:'Agosto', 9:'Septiembre', 10:'Octubre', 11:'Noviembre', 12:'Diciembre'
-    }
 
     def fecha_a_mes(f):
         dt = nc.parsear_fecha(f)
-        return f"{MESES_ES[dt.month]} {dt.year}" if dt else f
+        return f"{nc.MESES_LARGOS[dt.month]} {dt.year}" if dt else f
 
     result = []
     for nombre, d in clientes.items():
@@ -1029,7 +1024,6 @@ def api_ventas_dashboard():
             ilegibles['n'] += 1
         return monto
 
-    parse_fecha = nc.parsear_fecha
 
     meses: dict = defaultdict(lambda: {
         'monto': 0.0, 'pedidos': 0,
@@ -1039,11 +1033,11 @@ def api_ventas_dashboard():
     total_general = 0.0
     total_pedidos = 0
     sin_fecha = 0
+    sin_cliente = 0
 
     for row in ventas:
         cliente = str(row.get('Cliente', '')).strip()
-        monto   = parse_monto(row.get('Monto', 0))
-        fecha   = parse_fecha(row.get('Fecha', ''))
+        fecha   = nc.parsear_fecha(row.get('Fecha', ''))
         esquema = str(row.get('ESQUEMA', '')).strip() or 'Sin esquema'
         factura = str(row.get('Num Factura', '')).strip()
 
@@ -1056,7 +1050,13 @@ def api_ventas_dashboard():
             sin_fecha += 1
             continue
         if not cliente:
+            # Mismo patron, otra columna: sin contador, un total mas bajo que la
+            # hoja no se distingue de "se vendio menos".
+            sin_cliente += 1
             continue
+        # El monto se lee AQUI, no antes: contarlo como ilegible en una fila que ya
+        # se descarto mezcla dos explicaciones del mismo cero en un solo numero.
+        monto = parse_monto(row.get('Monto', 0))
 
         clave = fecha.strftime('%Y-%m')   # para ordenar
         label = f'{nc.MESES_CORTOS[fecha.month]} {fecha.year}'   # para mostrar, en español
@@ -1101,6 +1101,7 @@ def api_ventas_dashboard():
         # Un cero en la grafica con este numero alto significa "no pude leer las
         # fechas", no "no se vendio".
         'ventas_sin_fecha': sin_fecha,
+        'ventas_sin_cliente': sin_cliente,
     })
 
 
@@ -1614,7 +1615,8 @@ def api_ventas_stats():
         # sin comprobar su existencia no puede llevarse un `undefined` aqui.
         return jsonify({'total_ventas': 0, 'clientes': 0, 'por_mes': [],
                         'top_clientes': [], 'columnas': [],
-                        'montos_ilegibles': None, 'columna_monto': None})
+                        'montos_ilegibles': None, 'columna_monto': None,
+                        'columna_fecha': None})
 
     claves = list(ventas[0].keys()) if ventas else []
 
@@ -1673,6 +1675,7 @@ def api_ventas_stats():
         # `None` = no se pudo evaluar (no hay columna de monto). Es distinto de 0.
         'montos_ilegibles': montos_ilegibles if col_monto else None,
         'columna_monto': col_monto,
+        'columna_fecha': col_fecha,
     })
 
 
