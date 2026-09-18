@@ -66,6 +66,42 @@ los deja iguales y la comprobación no prueba nada.
 
 ---
 
+## DESPUÉS DE CERRAR LA TANDA (2026-09-17/18) — 9 PR más, todo en producción
+
+La tanda quedó en 34/34 y **el trabajo siguió**, atacando la deuda anotada. Todo mergeado y
+desplegado: `main` = lo que sirve el VPS. **Baseline: 1,303 passed, 2 skipped.**
+
+| Qué | |
+|---|---|
+| **La PII deja de publicarse** | `sin_clasificar` publicaba 8 teléfonos y 1 correo contra su propio docstring. Saneado en **las dos** rutas (`/api/importador/ciudades` y `/api/prospectos/ciudades`) |
+| **El conteo dice lo que Google confirmó** | `_exportar_a_sheets` devolvía filas **enviadas**. Ahora lee `updates.updatedRows` y avisa en el log de la corrida |
+| **La gráfica de Ventas dice por qué está vacía** | 🔴 **El tablero mostraba 0 con 185 ventas.** Publica `ventas_sin_fecha`, `ventas_sin_cliente`, `montos_ilegibles`, `columna_fecha` |
+| **El rollback, escrito** | En el RUNBOOK. **Escrito, NO ensayado** — el `git checkout` hacia atrás nunca se ha corrido en este servidor |
+| **`app.py` troceado** | **3,799 → 3,599.** Las 3 rutas de Ventas en 2 líneas cada una; su lógica en `metricas_ventas.py` |
+| **Las exenciones de auth, vigiladas** | El único sitio donde un descuido hace públicos los datos de clientes, y nadie lo miraba |
+
+### 🔴 Lo que bloquea la gráfica de Ventas, y es decisión del owner
+
+**La hoja no tiene columna `Fecha`**: tiene `MES` con el nombre del mes **sin año** (`Julio`,
+`Agosto`…). Sin año, sumar dos julios de ejercicios distintos **sería inventar**, así que no se
+agrupó. Dos salidas:
+
+| Opción | Qué implica |
+|---|---|
+| **Añadir una columna `Fecha`** | La gráfica funciona **sin tocar código** |
+| **Poner el año en `MES`** (`Julio 2026`) | Basta con eso; el código se ajusta |
+
+### Deuda anotada tras la tanda (ninguna bloquea)
+
+- **`app.py` en 3,599** con guard en 3,800. Siguientes cortes naturales: Formulario, Catálogo de
+  ciudades. **La palanca es extraer, nunca subir el tope.**
+- **13 de 42 rutas sin test.** Tres son de depuración y ya tienen guarda de auth.
+- **La heurística de columnas de `/api/ventas/stats`** y **el orden de formatos de fecha**
+  (`03/04/2026` casa con `%d/%m/%Y` primero). Las dos necesitan **el esquema real de la hoja**.
+- **El simulacro de rollback**: ~2 min, el panel se reinicia dos veces. Necesita visto bueno.
+
+---
+
 ## QUÉ PASÓ, EN RESULTADOS
 
 | Plan | |
