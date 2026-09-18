@@ -10,7 +10,8 @@ Se saca de `app.py` por dos motivos, y el segundo pesa mas que el primero:
 """
 from collections import defaultdict
 
-from nucleo_catalogo import MESES_CORTOS, parsear_fecha, parsear_monto, str_val
+from nucleo_catalogo import (MESES_CORTOS, MESES_LARGOS, parsear_fecha,
+                             parsear_monto, str_val)
 
 from collections import Counter
 
@@ -192,3 +193,53 @@ def estadisticas(ventas: list[dict]) -> dict:
         'columna_monto': col_monto,
         'columna_fecha': col_fecha,
     }
+
+
+def clientes_frecuentes(ventas: list[dict]) -> list[dict]:
+    """Agrupa ventas por cliente: suma montos, cuenta pedidos, ordena mayor a menor."""
+
+    def parse_monto(v):
+        return parsear_monto(v)[0]
+
+    clientes: dict = defaultdict(lambda: {
+        'total_monto': 0.0,
+        'num_pedidos': 0,
+        'esquema': '',
+        'facturas': [],
+        'ultimo_pedido': '',
+    })
+
+    for row in ventas:
+        cliente = str(row.get('Cliente', '')).strip()
+        if not cliente:
+            continue
+        monto   = parse_monto(row.get('Monto', 0))
+        factura = str(row.get('Num Factura', '')).strip()
+        fecha   = str(row.get('Fecha', '')).strip()
+        esquema = str(row.get('ESQUEMA', '')).strip()
+
+        clientes[cliente]['total_monto']  += monto
+        clientes[cliente]['num_pedidos']  += 1
+        clientes[cliente]['esquema']       = esquema or clientes[cliente]['esquema']
+        if factura:
+            clientes[cliente]['facturas'].append(factura)
+        if fecha and fecha > clientes[cliente]['ultimo_pedido']:
+            clientes[cliente]['ultimo_pedido'] = fecha
+
+
+    def fecha_a_mes(f):
+        dt = parsear_fecha(f)
+        return f"{MESES_LARGOS[dt.month]} {dt.year}" if dt else f
+
+    result = []
+    for nombre, d in clientes.items():
+        result.append({
+            'Cliente':       nombre,
+            'Esquema':       d['esquema'],
+            'Pedidos':       d['num_pedidos'],
+            'Total Monto':   round(d['total_monto'], 2),
+            'Ultimo Pedido': fecha_a_mes(d['ultimo_pedido']) if d['ultimo_pedido'] else '—',
+        })
+
+    result.sort(key=lambda x: x['Total Monto'], reverse=True)
+    return result

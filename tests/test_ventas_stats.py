@@ -363,3 +363,40 @@ class TestLaCUARTA_COPIA_ERA_LA_MAS_ROTA:
 
         semanas = d.get("por_semana") or {}
         assert semanas, f"la respuesta con hora no cayo en ninguna semana: {semanas}"
+
+
+class TestClientesFrecuentes:
+    """La tercera ruta de Ventas, que tampoco tenia ni un test.
+
+    Se extrajo a `metricas_ventas` como las otras dos, y mover codigo sin cobertura
+    es mover a ciegas: el diff normalizado dice que es identico, pero nada lo
+    vigilaria despues. Estos dos fijan lo que hace.
+    """
+
+    def test_agrupa_por_cliente_y_ordena_por_monto(self, cliente, monkeypatch):
+        filas = [{"Cliente": "A", "Monto": "100", "Fecha": "15/01/2026", "ESQUEMA": "X"},
+                 {"Cliente": "A", "Monto": "50", "Fecha": "20/02/2026", "ESQUEMA": "X"},
+                 {"Cliente": "B", "Monto": "300", "Fecha": "10/01/2026", "ESQUEMA": "Y"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        r = cliente.get("/api/prospectos/clientes-frecuentes").get_json()
+
+        assert [c["Cliente"] for c in r] == ["B", "A"], "no ordena de mayor a menor"
+        a = next(c for c in r if c["Cliente"] == "A")
+        assert a["Pedidos"] == 2 and a["Total Monto"] == 150.0
+
+    def test_el_ultimo_pedido_es_el_MAS_RECIENTE_y_en_espanol(self, cliente, monkeypatch):
+        filas = [{"Cliente": "A", "Monto": "10", "Fecha": "15/01/2026", "ESQUEMA": "X"},
+                 {"Cliente": "A", "Monto": "10", "Fecha": "20/02/2026", "ESQUEMA": "X"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        r = cliente.get("/api/prospectos/clientes-frecuentes").get_json()
+
+        assert r[0]["Ultimo Pedido"] == "Febrero 2026"
+
+    def test_sin_fecha_utilizable_lo_dice_con_una_raya(self, cliente, monkeypatch):
+        """La hoja real no tiene columna `Fecha`: esta ruta cae en el mismo sitio."""
+        monkeypatch.setattr(app, "get_data",
+                            lambda _q: [{"Cliente": "A", "Monto": "10", "MES": "Julio"}])
+
+        assert cliente.get("/api/prospectos/clientes-frecuentes").get_json()[0]["Ultimo Pedido"] == "—"
