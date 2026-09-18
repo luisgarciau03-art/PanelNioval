@@ -135,6 +135,72 @@ comprueba ninguna ruta nueva**.
 
 Secuencia correcta tras cada merge: **desplegar a mano, y después el smoke.**
 
+## Volver atrás un despliegue (rollback) — escrito el 2026-09-18
+
+**Hasta hoy este procedimiento no existía por escrito**, y una revisión lo marcó como condición
+innegociable antes de tocar la ruta de Places: *en una caja con despliegue manual por `ssh`, sin
+CI de despliegue, y con precedente de código rancio sirviendo tres semanas, desplegar sin
+rollback escrito no es una decisión de arquitectura: es una apuesta.*
+
+### Antes de desplegar: apunta a dónde volver
+
+```bash
+ssh root@155.138.200.66 'cd /srv/panel/app && git rev-parse --short HEAD'
+```
+
+Ese SHA **es el rollback**. Apúntalo antes de tocar nada — no después.
+
+⚠️ **No hay imagen anterior a la que volver.** `docker images` guarda una sola etiqueta
+(`panel-panel:latest`) y cada despliegue la reconstruye. Así que el rollback es **por git +
+rebuild**, no por imagen.
+
+### El rollback
+
+```bash
+ssh root@155.138.200.66 'cd /srv/panel/app && git checkout <SHA_ANTERIOR> && cd /srv/panel && docker compose up -d --build'
+```
+
+- **`--build` no es opcional**, igual que al desplegar: sin `tzdata` el panel no arranca.
+- Tarda lo mismo que un despliegue normal, ~1 minuto.
+
+### ⚠️ Y lo que hay que deshacer después, o el siguiente despliegue falla
+
+`git checkout <SHA>` deja el repo del servidor en **HEAD desacoplado**. Ese es **exactamente** el
+estado que hizo que el `git pull` del RUNBOOK no funcionara y costó el diagnóstico entero del
+Plan 1 · T1.6. Para volver a la vía normal:
+
+```bash
+ssh root@155.138.200.66 'cd /srv/panel/app && git checkout main && git merge --ff-only origin/main'
+```
+
+### Verificar el rollback, que es un paso aparte
+
+```bash
+ssh root@155.138.200.66 'docker inspect panel --format "Health={{.State.Health.Status}} RestartCount={{.RestartCount}}"'
+PANEL_DASHBOARD_TOKEN=<valor> python tools/smoke_panel.py https://panelnioval.duckdns.org --token "$PANEL_DASHBOARD_TOKEN"
+PANEL_DASHBOARD_TOKEN=<valor> python tools/huella_despliegue.py https://panelnioval.duckdns.org
+```
+
+Y comprueba **el rasgo concreto** que motivó el rollback: el smoke no cubre ninguna ruta del
+importador, así que puede dar verde con el problema intacto.
+
+### 🔴 Lo que un rollback NO deshace
+
+**Lo que se escribió en Google Sheets.** Si el despliegue malo llegó a correr una importación,
+las filas siguen ahí — volver el código atrás no las borra. Para eso está el respaldo de hojas
+(`python tools/respaldar_hojas.py`), que por eso se hace **antes** de una corrida real, no
+después.
+
+Tampoco deshace un cambio en el `.env` del servidor ni en la copia viva de
+`/srv/panel/docker-compose.yml`: los dos viven **fuera de git** y se revierten a mano.
+
+### Estado de este procedimiento
+
+**Escrito, no ensayado.** Los comandos son los mismos que se han ejecutado hoy en cuatro
+despliegues reales —salvo el `git checkout` hacia atrás, que no se ha corrido nunca en este
+servidor—. Un simulacro cuesta ~2 minutos de panel reiniciándose dos veces; hasta que se haga,
+esto es un procedimiento creíble, no uno probado, y conviene decirlo así.
+
 ## Cómo saber qué versión sirve el VPS (desde 2026-09-17)
 
 **El problema que esto resuelve costó tres semanas de operador.** El bug de conteo del
