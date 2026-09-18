@@ -656,8 +656,7 @@ def api_test(key):
         return jsonify({'error': str(e)})
 
 
-def str_val(v) -> str:
-    return str(v).strip() if v is not None else ''
+str_val = nc.str_val   # vive en `nucleo_catalogo`: la usan tambien las metricas
 
 # ─── API ENDPOINTS ───────────────────────────────────────────────────────────
 @app.route('/api/refresh', methods=['POST'])
@@ -1522,74 +1521,8 @@ def api_mensajes_update():
 
 @app.route('/api/ventas/stats')
 def api_ventas_stats():
-    ventas = get_data('ventas')
-    if not ventas:
-        # La forma no cambia con los datos: un cliente que lea `montos_ilegibles`
-        # sin comprobar su existencia no puede llevarse un `undefined` aqui.
-        return jsonify({'total_ventas': 0, 'clientes': 0, 'por_mes': [],
-                        'top_clientes': [], 'columnas': [],
-                        'montos_ilegibles': None, 'columna_monto': None,
-                        'columna_fecha': None})
-
-    claves = list(ventas[0].keys()) if ventas else []
-
-    # Detectar columnas relevantes heurísticamente
-    col_cliente = next((k for k in claves if 'cliente' in k.lower() or 'tienda' in k.lower() or 'nombre' in k.lower()), None)
-    col_monto = next((k for k in claves if 'monto' in k.lower() or 'total' in k.lower() or 'venta' in k.lower() or 'importe' in k.lower()), None)
-    col_fecha = next((k for k in claves if 'fecha' in k.lower() or 'date' in k.lower()), None)
-
-    clientes = Counter()
-    # La clave es (año, mes) y NO la etiqueta: ordenar por la cadena '%b %Y' es
-    # ordenar alfabeticamente — 'Dec' antes que 'Feb' antes que 'Jan' — y el
-    # recorte a 12 tiraba el mes mas reciente conservando uno viejo.
-    por_mes: dict[tuple[int, int], float] = defaultdict(float)
-    montos_ilegibles = 0
-
-    for v in ventas:
-        if col_cliente:
-            cli = str_val(v.get(col_cliente, '')).title()
-            if cli:
-                clientes[cli] += 1
-        if col_fecha:
-            dt = nc.parsear_fecha(str_val(v.get(col_fecha, '')))
-            if dt:
-                monto = None
-                if col_monto:
-                    crudo = str_val(v.get(col_monto, '')).replace(',', '').replace('$', '')
-                    try:
-                        monto = float(crudo)
-                    except ValueError:
-                        monto = None
-                if monto is None:
-                    # Antes sumaba 1. Un peso inventado convierte la serie de dinero
-                    # en un conteo a medias, en la misma grafica y sin decirlo.
-                    #
-                    # Y solo cuenta si la columna EXISTE: sin columna de monto, todas
-                    # las filas caerian aqui y el numero se leeria como "mil ventas
-                    # corruptas" cuando es "no se cual es la columna del dinero".
-                    if col_monto:
-                        montos_ilegibles += 1
-                else:
-                    por_mes[(dt.year, dt.month)] += monto
-                # Se toca la clave aunque el monto no se pueda leer: el mes existio.
-                por_mes.setdefault((dt.year, dt.month), 0.0)
-
-    return jsonify({
-        'total_ventas': len(ventas),
-        'clientes': len(clientes),
-        'columnas': claves,
-        'top_clientes': clientes.most_common(10),
-        # Los 12 meses MAS RECIENTES, en orden cronologico, con la etiqueta en
-        # español: `%b` da 'Dec'/'Jan' en el locale C, y el panel esta en español.
-        'por_mes': [{'mes': f'{nc.MESES_CORTOS[m]} {a}', 'total': por_mes[(a, m)]}
-                    for a, m in sorted(por_mes)[-12:]],
-        # Cuantas ventas cayeron en un mes pero no pudieron sumar dinero. Sin esto,
-        # una grafica baja se lee como "se vendio poco" en vez de "no se pudo leer".
-        # `None` = no se pudo evaluar (no hay columna de monto). Es distinto de 0.
-        'montos_ilegibles': montos_ilegibles if col_monto else None,
-        'columna_monto': col_monto,
-        'columna_fecha': col_fecha,
-    })
+    """Resumen de la hoja de ventas. La logica vive en `metricas_ventas`."""
+    return jsonify(mv.estadisticas(get_data('ventas')))
 
 
 # ─── MAIN HTML ──────────────────────────────────────────────────────────────

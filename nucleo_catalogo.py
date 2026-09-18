@@ -212,6 +212,15 @@ MESES_CORTOS = ('', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
                 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic')
 
 
+def str_val(v) -> str:
+    """El valor de una celda como texto limpio. `None` y vacio son lo mismo aqui.
+
+    Vivia en `app.py` y la necesitan tambien las metricas puras, asi que baja al
+    modulo sin Flask en vez de importarse al reves -- que seria un ciclo.
+    """
+    return str(v).strip() if v is not None else ''
+
+
 def parsear_fecha(valor):
     """La fecha de una celda, o `None` si no se puede leer. Pura, sin Flask.
 
