@@ -205,6 +205,27 @@ def indice_por_fila_respuesta(filas: list, fila_respuesta: int) -> Optional[int]
     return None
 
 
+MESES_CORTOS = ('', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+                'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic')
+
+
+def parsear_monto(valor) -> tuple[float, bool]:
+    """Devuelve `(monto, se_pudo_leer)`. Una celda vacia NO es ilegible.
+
+    Estaba duplicada en dos rutas de `app.py` con comportamientos distintos, y el
+    propio repo lo tenia anotado como deuda. Al unificarla se gana lo que faltaba:
+    **decir si se pudo leer**. Devolver 0.0 a secas hace que "no vendio" y "no pude
+    leerlo" sean el mismo numero en la misma grafica.
+    """
+    crudo = str(valor).replace(',', '').replace('$', '').strip()
+    if not crudo:
+        return 0.0, True
+    try:
+        return float(crudo), True
+    except ValueError:
+        return 0.0, False
+
+
 def sanear_etiqueta_ciudad(valor: str) -> str:
     """Enmascara lo que no es un nombre de ciudad antes de publicarlo.
 
@@ -238,6 +259,7 @@ def sanear_etiqueta_ciudad(valor: str) -> str:
         digitos = re.sub(r'\D', '', racha.group())
         return f'…{digitos[-4:]} (teléfono en la columna CIUDAD)'
     return crudo
+
 
 def enmascarar_telefono(tel: str) -> str:
     """Enmascara para logs: deja solo los últimos 4 dígitos. Dato personal."""

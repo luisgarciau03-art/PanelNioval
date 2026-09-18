@@ -966,10 +966,7 @@ def api_clientes_frecuentes():
     ventas = get_data('ventas')
 
     def parse_monto(v):
-        try:
-            return float(str(v).replace(',', '').replace('$', '').strip() or 0)
-        except:
-            return 0.0
+        return nc.parsear_monto(v)[0]
 
     clientes: dict = defaultdict(lambda: {
         'total_monto': 0.0,
@@ -1029,11 +1026,13 @@ def api_ventas_dashboard():
     """Métricas de ventas agrupadas por mes, con desglose por esquema y top clientes."""
     ventas = get_data('ventas')
 
+    ilegibles = {'n': 0}
+
     def parse_monto(v):
-        try:
-            return float(str(v).replace(',', '').replace('$', '').strip() or 0)
-        except:
-            return 0.0
+        monto, ok = nc.parsear_monto(v)
+        if not ok:
+            ilegibles['n'] += 1
+        return monto
 
     def parse_fecha(f):
         for fmt in ('%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d'):
@@ -1062,7 +1061,7 @@ def api_ventas_dashboard():
             continue
 
         clave = fecha.strftime('%Y-%m')   # para ordenar
-        label = fecha.strftime('%b %Y')    # para mostrar
+        label = f'{nc.MESES_CORTOS[fecha.month]} {fecha.year}'   # para mostrar, en español
 
         meses[clave]['label']    = label
         meses[clave]['monto']   += monto
@@ -1096,6 +1095,10 @@ def api_ventas_dashboard():
         'promedio_mes':   round(total_general / len(resultado), 2) if resultado else 0,
         'mejor_mes':      mejor_mes.get('mes', '—'),
         'mejor_mes_monto': mejor_mes.get('monto', 0),
+        # Cuantos montos no se pudieron leer. Sin este numero, una grafica baja se
+        # lee como "se vendio poco" en vez de "no se pudo leer" -- y `parse_monto`
+        # devuelve 0.0 en ese caso, asi que la diferencia es invisible.
+        'montos_ilegibles': ilegibles['n'],
     })
 
 
@@ -1233,6 +1236,7 @@ def _explicar_ciudad(reg: dict, metricas: dict, saturacion: float) -> str:
 # Vive en `nucleo_catalogo`, junto a `enmascarar_telefono`, cuya convencion sigue:
 # es higiene de datos pura, sin Flask. Aqui queda el nombre que usan las rutas.
 _sanear_etiqueta_ciudad = nc.sanear_etiqueta_ciudad
+
 
 @app.route('/api/importador/ciudades')
 def api_importador_ciudades():
@@ -1600,15 +1604,15 @@ def api_mensajes_update():
         return jsonify({'error': str(e)}), 500
 
 
-MESES_CORTOS = ('', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-                'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic')
-
-
 @app.route('/api/ventas/stats')
 def api_ventas_stats():
     ventas = get_data('ventas')
     if not ventas:
-        return jsonify({'total_ventas': 0, 'clientes': 0, 'por_mes': [], 'top_clientes': []})
+        # La forma no cambia con los datos: un cliente que lea `montos_ilegibles`
+        # sin comprobar su existencia no puede llevarse un `undefined` aqui.
+        return jsonify({'total_ventas': 0, 'clientes': 0, 'por_mes': [],
+                        'top_clientes': [], 'columnas': [],
+                        'montos_ilegibles': None, 'columna_monto': None})
 
     claves = list(ventas[0].keys()) if ventas else []
 
@@ -1621,7 +1625,7 @@ def api_ventas_stats():
     # La clave es (año, mes) y NO la etiqueta: ordenar por la cadena '%b %Y' es
     # ordenar alfabeticamente — 'Dec' antes que 'Feb' antes que 'Jan' — y el
     # recorte a 12 tiraba el mes mas reciente conservando uno viejo.
-    por_mes: dict = defaultdict(float)
+    por_mes: dict[tuple[int, int], float] = defaultdict(float)
     montos_ilegibles = 0
 
     for v in ventas:
@@ -1646,7 +1650,12 @@ def api_ventas_stats():
                 if monto is None:
                     # Antes sumaba 1. Un peso inventado convierte la serie de dinero
                     # en un conteo a medias, en la misma grafica y sin decirlo.
-                    montos_ilegibles += 1
+                    #
+                    # Y solo cuenta si la columna EXISTE: sin columna de monto, todas
+                    # las filas caerian aqui y el numero se leeria como "mil ventas
+                    # corruptas" cuando es "no se cual es la columna del dinero".
+                    if col_monto:
+                        montos_ilegibles += 1
                 else:
                     por_mes[(dt.year, dt.month)] += monto
                 # Se toca la clave aunque el monto no se pueda leer: el mes existio.
@@ -1660,11 +1669,13 @@ def api_ventas_stats():
         'top_clientes': clientes.most_common(10),
         # Los 12 meses MAS RECIENTES, en orden cronologico, con la etiqueta en
         # español: `%b` da 'Dec'/'Jan' en el locale C, y el panel esta en español.
-        'por_mes': [{'mes': f'{MESES_CORTOS[m]} {a}', 'total': por_mes[(a, m)]}
+        'por_mes': [{'mes': f'{nc.MESES_CORTOS[m]} {a}', 'total': por_mes[(a, m)]}
                     for a, m in sorted(por_mes)[-12:]],
         # Cuantas ventas cayeron en un mes pero no pudieron sumar dinero. Sin esto,
         # una grafica baja se lee como "se vendio poco" en vez de "no se pudo leer".
-        'montos_ilegibles': montos_ilegibles,
+        # `None` = no se pudo evaluar (no hay columna de monto). Es distinto de 0.
+        'montos_ilegibles': montos_ilegibles if col_monto else None,
+        'columna_monto': col_monto,
     })
 
 

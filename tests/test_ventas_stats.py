@@ -31,7 +31,8 @@ class TestSinDatosNoInventa:
 
         d = cliente.get("/api/ventas/stats").get_json()
 
-        assert d == {"total_ventas": 0, "clientes": 0, "por_mes": [], "top_clientes": []}
+        assert d["total_ventas"] == 0 and d["clientes"] == 0
+        assert d["por_mes"] == [] and d["top_clientes"] == []
 
 
 class TestLoQueSI_FUNCIONA:
@@ -129,3 +130,98 @@ class TestUnaVentaSIN_MONTO_NO_VALE_UN_PESO:
 
         assert d.get("montos_ilegibles") == 2, (
             "la grafica no dice cuantas ventas no pudo sumar")
+
+
+# ═══════════ Lo que encontro el gate: arregle el endpoint EQUIVOCADO ═══════════
+
+class TestLaGraficaQUE_DE_VERDAD_SE_VE:
+    """El gate lo busco y yo no: `dashboard.js` NO llama a `/api/ventas/stats`.
+
+    `loadVentasDash()` pide `/api/prospectos/ventas-dashboard`, que es otra funcion
+    con su propia agrupacion por mes. O sea que los arreglos de arriba estaban en una
+    ruta que el tablero no invoca. Yo habia afirmado que era "la que alimenta la
+    grafica del tablero" sin comprobarlo.
+
+    Esa si ordenaba bien -- su clave es '%Y-%m' -- pero conserva las otras dos:
+    etiqueta en ingles, y montos ilegibles contados como 0.0 sin avisar.
+    """
+
+    def test_las_etiquetas_van_en_espanol(self, cliente, monkeypatch):
+        # La clave del payload es `mes`, no `label`, y la columna del dinero es
+        # `Monto`: las dos me las invente y las dos costaron un rojo. El endpoint
+        # lee encabezados fijos (VENTAS_COLS), no la heuristica de `/stats`.
+        filas = [{"Cliente": "A", "Monto": "100", "Fecha": "15/01/2026"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        d = cliente.get("/api/prospectos/ventas-dashboard").get_json()
+
+        etiquetas = [m["mes"] for m in d["por_mes"]]
+        assert etiquetas == ["Ene 2026"], f"la grafica del tablero dice: {etiquetas}"
+
+    def test_dice_cuantos_montos_no_pudo_leer(self, cliente, monkeypatch):
+        filas = [{"Cliente": "A", "Monto": "100", "Fecha": "15/01/2026"},
+                 {"Cliente": "B", "Monto": "no aplica", "Fecha": "16/01/2026"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        d = cliente.get("/api/prospectos/ventas-dashboard").get_json()
+
+        assert d.get("montos_ilegibles") == 1, (
+            "un monto ilegible se sumo como 0 y nadie se entera")
+
+
+class TestMontosIlegiblesNO_MIENTE_SOBRE_SU_CAUSA:
+    """MEDIUM del gate: "no encontre la columna" y "la celda es ilegible" no son
+    lo mismo, y el contador los mezclaba.
+
+    Con una hoja sin columna de monto, el endpoint respondia
+    `montos_ilegibles == todas las filas`, que se lee como "mil ventas corruptas"
+    cuando en realidad es "no se cual es la columna del dinero".
+    """
+
+    def test_sin_columna_de_monto_se_dice_ESO_y_no_que_son_ilegibles(self, cliente, monkeypatch):
+        filas = [{"Cliente": "A", "Fecha": "15/01/2026"},
+                 {"Cliente": "B", "Fecha": "16/01/2026"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        d = cliente.get("/api/ventas/stats").get_json()
+
+        assert d["montos_ilegibles"] is None, (
+            f"con la columna ausente no se puede evaluar; dijo {d['montos_ilegibles']!r}")
+        assert d["columna_monto"] is None
+
+
+class TestLaFORMA_DE_LA_RESPUESTA_NO_CAMBIA_CON_LOS_DATOS:
+    """MEDIUM del gate: los campos nuevos solo existian cuando habia datos."""
+
+    def test_la_hoja_vacia_trae_las_mismas_claves(self, cliente, monkeypatch):
+        monkeypatch.setattr(app, "get_data", lambda _q: [])
+        vacia = set(cliente.get("/api/ventas/stats").get_json())
+
+        monkeypatch.setattr(app, "get_data", lambda _q: [venta()])
+        con_datos = set(cliente.get("/api/ventas/stats").get_json())
+
+        assert vacia == con_datos, f"faltan en la vacia: {con_datos - vacia}"
+
+
+class TestUnaCeldaVACIA_NO_ES_ILEGIBLE:
+    """Lo destapo la mutacion: ninguna guarda cubria la diferencia.
+
+    Una venta con el monto en blanco es una venta de importe desconocido, no un
+    dato corrupto. Contarla como ilegible inflaria la alarma y haria que el numero
+    dejara de significar "hay celdas que arreglar".
+    """
+
+    def test_vacio_no_suma_al_contador(self, cliente, monkeypatch):
+        filas = [{"Cliente": "A", "Monto": "", "Fecha": "15/01/2026"},
+                 {"Cliente": "B", "Monto": "   ", "Fecha": "16/01/2026"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        d = cliente.get("/api/prospectos/ventas-dashboard").get_json()
+
+        assert d["montos_ilegibles"] == 0, "una celda vacia no es un dato corrupto"
+
+    def test_pero_un_texto_SI(self, cliente, monkeypatch):
+        filas = [{"Cliente": "A", "Monto": "pendiente", "Fecha": "15/01/2026"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        assert cliente.get("/api/prospectos/ventas-dashboard").get_json()["montos_ilegibles"] == 1
