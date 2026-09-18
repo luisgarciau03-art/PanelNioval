@@ -225,3 +225,45 @@ class TestUnaCeldaVACIA_NO_ES_ILEGIBLE:
         monkeypatch.setattr(app, "get_data", lambda _q: filas)
 
         assert cliente.get("/api/prospectos/ventas-dashboard").get_json()["montos_ilegibles"] == 1
+
+
+class TestNoSeMUESTRAN_CEROS_CON_LA_HOJA_LLENA:
+    """Hallazgo en PRODUCCION, no en el fixture.
+
+    La hoja de ventas trae **183 filas** y **no tiene columna `Fecha`**: tiene `MES`
+    con el nombre del mes en español ("Julio", "Agosto"), sin año. Las dos rutas
+    leen `Fecha`, no la encuentran, y `if not fecha: continue` descarta TODAS las
+    filas. El tablero lleva mostrando **0 en todo** con 183 ventas en la hoja.
+
+    El cero no es el defecto: el defecto es que no se distingue de "no vendiste
+    nada". Agrupar por `MES` es una decision de producto -- no hay año, y mezclar
+    ejercicios seria inventar -- pero **decir cuantas filas no se pudieron ubicar en
+    el tiempo no lo es**.
+    """
+
+    def test_dice_cuantas_ventas_no_pudo_ubicar_en_el_tiempo(self, cliente, monkeypatch):
+        filas = [{"Cliente": "A", "Monto": "100", "MES": "Julio"},
+                 {"Cliente": "B", "Monto": "200", "MES": "Agosto"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        d = cliente.get("/api/prospectos/ventas-dashboard").get_json()
+
+        assert d["por_mes"] == [], "sin fecha no se puede construir la serie"
+        assert d["ventas_sin_fecha"] == 2, (
+            "el tablero muestra ceros y no dice que no pudo leer NINGUNA fecha")
+
+    def test_con_fecha_utilizable_el_contador_queda_en_cero(self, cliente, monkeypatch):
+        filas = [{"Cliente": "A", "Monto": "100", "Fecha": "15/01/2026"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        d = cliente.get("/api/prospectos/ventas-dashboard").get_json()
+
+        assert d["ventas_sin_fecha"] == 0
+        assert len(d["por_mes"]) == 1
+
+    def test_una_fila_sin_cliente_no_cuenta_como_sin_fecha(self, cliente, monkeypatch):
+        """Son dos motivos distintos de descarte y confundirlos da un numero falso."""
+        filas = [{"Cliente": "", "Monto": "100", "Fecha": "15/01/2026"}]
+        monkeypatch.setattr(app, "get_data", lambda _q: filas)
+
+        assert cliente.get("/api/prospectos/ventas-dashboard").get_json()["ventas_sin_fecha"] == 0

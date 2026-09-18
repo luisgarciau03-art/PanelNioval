@@ -209,6 +209,25 @@ MESES_CORTOS = ('', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
                 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic')
 
 
+def parsear_fecha(valor):
+    """La fecha de una celda, o `None` si no se puede leer. Pura, sin Flask.
+
+    Estaba escrita dos veces en `app.py` con el mismo repertorio de formatos y
+    ordenes distintos. ⚠️ El orden importa y no es inocuo: `03/04/2026` casa con
+    `%d/%m/%Y` primero, asi que una hoja capturada en formato americano asignaria
+    meses equivocados **sin ningun aviso**. Se conserva el orden que ya usaba el
+    tablero; cambiarlo exige saber como se captura la hoja de verdad.
+    """
+    from datetime import datetime
+    crudo = str(valor).strip()[:10]
+    for fmt in ('%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(crudo, fmt)
+        except ValueError:
+            continue
+    return None
+
+
 def parsear_monto(valor) -> tuple[float, bool]:
     """Devuelve `(monto, se_pudo_leer)`. Una celda vacia NO es ilegible.
 

@@ -999,13 +999,8 @@ def api_clientes_frecuentes():
     }
 
     def fecha_a_mes(f):
-        for fmt in ('%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d'):
-            try:
-                dt = datetime.strptime(f[:10], fmt)
-                return f"{MESES_ES[dt.month]} {dt.year}"
-            except:
-                pass
-        return f
+        dt = nc.parsear_fecha(f)
+        return f"{MESES_ES[dt.month]} {dt.year}" if dt else f
 
     result = []
     for nombre, d in clientes.items():
@@ -1034,13 +1029,7 @@ def api_ventas_dashboard():
             ilegibles['n'] += 1
         return monto
 
-    def parse_fecha(f):
-        for fmt in ('%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d'):
-            try:
-                return datetime.strptime(str(f).strip()[:10], fmt)
-            except:
-                pass
-        return None
+    parse_fecha = nc.parsear_fecha
 
     meses: dict = defaultdict(lambda: {
         'monto': 0.0, 'pedidos': 0,
@@ -1049,6 +1038,7 @@ def api_ventas_dashboard():
 
     total_general = 0.0
     total_pedidos = 0
+    sin_fecha = 0
 
     for row in ventas:
         cliente = str(row.get('Cliente', '')).strip()
@@ -1057,7 +1047,15 @@ def api_ventas_dashboard():
         esquema = str(row.get('ESQUEMA', '')).strip() or 'Sin esquema'
         factura = str(row.get('Num Factura', '')).strip()
 
-        if not fecha or not cliente:
+        if not fecha:
+            # La hoja real NO tiene columna `Fecha`: tiene `MES` con el nombre del
+            # mes en español y sin año. Estas filas se descartaban en silencio y el
+            # tablero mostraba 0 en todo con 183 ventas cargadas. Agrupar por `MES`
+            # es decision de producto -- sin año, mezclar ejercicios seria inventar
+            # --, pero DECIR cuantas no se pudieron ubicar en el tiempo no lo es.
+            sin_fecha += 1
+            continue
+        if not cliente:
             continue
 
         clave = fecha.strftime('%Y-%m')   # para ordenar
@@ -1099,6 +1097,10 @@ def api_ventas_dashboard():
         # lee como "se vendio poco" en vez de "no se pudo leer" -- y `parse_monto`
         # devuelve 0.0 en ese caso, asi que la diferencia es invisible.
         'montos_ilegibles': ilegibles['n'],
+        # Ventas que existen en la hoja pero no se pudieron ubicar en el tiempo.
+        # Un cero en la grafica con este numero alto significa "no pude leer las
+        # fechas", no "no se vendio".
+        'ventas_sin_fecha': sin_fecha,
     })
 
 
@@ -1634,12 +1636,8 @@ def api_ventas_stats():
             if cli:
                 clientes[cli] += 1
         if col_fecha:
-            fecha_str = str_val(v.get(col_fecha, ''))
-            for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%m/%d/%Y'):
-                try:
-                    dt = datetime.strptime(fecha_str[:10], fmt)
-                except ValueError:
-                    continue
+            dt = nc.parsear_fecha(str_val(v.get(col_fecha, '')))
+            if dt:
                 monto = None
                 if col_monto:
                     crudo = str_val(v.get(col_monto, '')).replace(',', '').replace('$', '')
@@ -1660,7 +1658,6 @@ def api_ventas_stats():
                     por_mes[(dt.year, dt.month)] += monto
                 # Se toca la clave aunque el monto no se pueda leer: el mes existio.
                 por_mes.setdefault((dt.year, dt.month), 0.0)
-                break
 
     return jsonify({
         'total_ventas': len(ventas),
