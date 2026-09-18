@@ -8,12 +8,12 @@ Se saca de `app.py` por dos motivos, y el segundo pesa mas que el primero:
    que recibe filas y devuelve un dict es mas barato que levantar un cliente HTTP, y
    la ruta se queda en dos lineas que no esconden nada.
 """
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 from nucleo_catalogo import MESES_CORTOS, parsear_fecha, parsear_monto
 
 
-def resumen_dashboard(ventas: list) -> dict:
+def resumen_dashboard(ventas: list[dict]) -> dict:
     """Metricas de ventas por mes, con desglose por esquema y top clientes.
 
     Vive fuera de `app.py` porque no necesita Flask: recibe las filas y devuelve el
@@ -47,6 +47,9 @@ def resumen_dashboard(ventas: list) -> dict:
         cliente = str(row.get('Cliente', '')).strip()
         fecha   = parsear_fecha(row.get('Fecha', ''))
         esquema = str(row.get('ESQUEMA', '')).strip() or 'Sin esquema'
+        # `factura` se asigna y no se lee: cruft que ya venia de `app.py`. Se
+        # conserva a proposito -- esta extraccion se vende como IDENTICA, y
+        # limpiar de paso haria imposible afirmarlo. Toca en un commit aparte.
         factura = str(row.get('Num Factura', '')).strip()
 
         if not fecha:
