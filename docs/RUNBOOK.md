@@ -177,6 +177,29 @@ en `tools/huella_despliegue.py`. `tests/test_huella_despliegue.py` **falla si un
 de existir en el endpoint**, que es el modo en que esta guarda se pudre en silencio: vigilando
 un campo renombrado y dando rancio un panel que está al día.
 
+## La gráfica de Ventas muestra ceros (hallazgo del 2026-09-17)
+
+**El tablero lleva mostrando 0 en todo con 183 ventas cargadas en la hoja.** No es que no se
+haya vendido: es que el código busca una columna **`Fecha`** que **la hoja no tiene**.
+
+Lo que la hoja tiene es **`MES`**, con el nombre del mes en español y **sin año**: `Julio`,
+`Agosto`, `Enero`… Doce valores distintos sobre 183 filas. Sin fecha utilizable, todas las filas
+se descartaban **en silencio** y la gráfica salía vacía.
+
+Desde hoy el endpoint publica **`ventas_sin_fecha`**: un cero en la gráfica con ese número alto
+significa *«no pude leer las fechas»*, no *«no se vendió»*.
+
+**Lo que NO se hizo, y es decisión del owner:** agrupar por `MES`. Sin año, dos julios de
+ejercicios distintos se sumarían en la misma barra — eso es inventar, no arreglar. Las salidas
+razonables son dos, y hay que elegir una:
+
+| Opción | Qué implica |
+|---|---|
+| **Añadir una columna `Fecha`** a la hoja de ventas | La gráfica funciona sin tocar código. Es la más limpia |
+| **Añadir el año a `MES`** (`Julio 2026`) | Basta con eso; el código puede agrupar con año |
+
+Mientras tanto la gráfica seguirá vacía, pero **ya no en silencio**.
+
 ## Verificar la hoja de contactos (antes de capturar correos)
 
 ```bash
