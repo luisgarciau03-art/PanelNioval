@@ -145,6 +145,32 @@ memoria y tumbaba el panel **para todos**.
 Verificado contra el código de Werkzeug instalado: con `Content-Length` presente —lo normal en
 cualquier subida— **rechaza antes de leer un solo byte** del cuerpo.
 
+### ⚠️ Pero por red el operador NO ve ese mensaje: ve una conexión cortada
+
+Medido contra producción con 10.2 MB y con 12 MB: **el cliente no recibe respuesta**, recibe un
+`ConnectionError`. El panel responde el 413 y cierra la conexión **mientras el navegador sigue
+subiendo**, así que el cliente ve un *reset* antes de poder leer la respuesta.
+
+**Lo que sí funciona —y es lo que motivó el cambio— es la protección**: tras las dos pruebas el
+contenedor siguió `healthy`, con `RestartCount=0` y el smoke en verde. Antes de esto, un archivo
+así tumbaba el panel.
+
+**Lo que no funciona es el mensaje.** En el navegador se verá un error de red genérico, no
+*«el archivo supera el tope de 10 MB»*.
+
+**La pieza que falta está en Caddy, no en el panel.** Hoy Caddy **no limita el cuerpo**
+(comprobado en su configuración). Un tope ahí devuelve el 413 correctamente porque el proxy sabe
+cerrar la conversación sin cortarla en seco:
+
+```
+request_body {
+    max_size 10MB
+}
+```
+
+⚠️ **Es un cambio en infraestructura compartida con Bruce**, así que va aparte y con decisión del
+owner. Mientras tanto: el panel está protegido, el mensaje bonito sólo se ve desde dentro.
+
 ⚠️ Si pones `PANEL_MAX_SUBIDA_BYTES=0` bloqueas la subida para todos, y con un valor no numérico
 **la app no arranca**. Los dos fallan de forma ruidosa, a propósito.
 
