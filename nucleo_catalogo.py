@@ -205,6 +205,40 @@ def indice_por_fila_respuesta(filas: list, fila_respuesta: int) -> Optional[int]
     return None
 
 
+def sanear_etiqueta_ciudad(valor: str) -> str:
+    """Enmascara lo que no es un nombre de ciudad antes de publicarlo.
+
+    La columna CIUDAD de la hoja a veces trae un telefono o un correo tecleado por
+    error. Esos valores caian en `sin_clasificar` y salian **verbatim** por
+    `/api/importador/ciudades` y por `/api/prospectos/ciudades`, que prometen que
+    ningun telefono ni nombre de contacto sale de ahi. Medido en produccion el
+    2026-09-16: 8 telefonos y 1 correo de 32 entradas.
+
+    Enmascarar NO es borrar, y esa es la mitad que importa: el aviso existe para que
+    el operador ARREGLE esas celdas, asi que se conservan los ultimos digitos para
+    poder encontrarlas. Un saneador que enmascare de mas esconde el problema.
+
+    Tres decisiones que salieron de la revision de seguridad, y que no son obvias:
+
+    1. **Basta una arroba.** Exigir un punto detras dejaba pasar `juan@gmail`, que
+       es un dominio truncado al teclear y sigue siendo un nombre de contacto.
+    2. **Solo los ultimos 4 digitos**, como `nucleo_catalogo.enmascarar_telefono`.
+       Dos funciones del mismo repo con el mismo proposito no pueden dar garantias
+       distintas, y la lada no hacia falta para localizar la fila.
+    3. **Una RACHA contigua de digitos, no la suma de los dispersos.** Sumarlos
+       enmascaraba direcciones legitimas como "Manzana 3 Lote 25 CP 31125", y perder
+       de vista una celda arreglable es el fallo contrario al que esto evita.
+    """
+    crudo = (valor or '').strip()
+    if re.search(r'\S@\S', crudo):
+        return '…@… (correo en la columna CIUDAD)'
+    # Una racha de 8+ digitos admitiendo solo separadores de telefono entre medias.
+    racha = re.search(r'\d[\d\s().+-]{6,}\d', crudo)
+    if racha and len(re.sub(r'\D', '', racha.group())) >= 8:
+        digitos = re.sub(r'\D', '', racha.group())
+        return f'…{digitos[-4:]} (teléfono en la columna CIUDAD)'
+    return crudo
+
 def enmascarar_telefono(tel: str) -> str:
     """Enmascara para logs: deja solo los últimos 4 dígitos. Dato personal."""
     digitos = re.sub(r"\D", "", tel or "")
