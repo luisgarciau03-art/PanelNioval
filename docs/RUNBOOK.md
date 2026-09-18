@@ -135,6 +135,37 @@ comprueba ninguna ruta nueva**.
 
 Secuencia correcta tras cada merge: **desplegar a mano, y después el smoke.**
 
+## Subir el comprobante de pago: el tope, y a dónde va la foto
+
+**Tope: 10 MB por petición** (`PANEL_MAX_SUBIDA_BYTES` lo cambia). Por encima, el panel responde
+un **413** en JSON diciendo qué pasó — no un error genérico, y sobre todo **no un contenedor
+caído**: antes no había tope, y subir un vídeo en vez de una foto cargaba el archivo entero en
+memoria y tumbaba el panel **para todos**.
+
+Verificado contra el código de Werkzeug instalado: con `Content-Length` presente —lo normal en
+cualquier subida— **rechaza antes de leer un solo byte** del cuerpo.
+
+⚠️ Si pones `PANEL_MAX_SUBIDA_BYTES=0` bloqueas la subida para todos, y con un valor no numérico
+**la app no arranca**. Los dos fallan de forma ruidosa, a propósito.
+
+### 🔴 A dónde va la foto, que conviene saber
+
+**El comprobante se sube a ImgBB**, un hosting **público** de terceros. Está así desde antes y
+tiene su motivo escrito en el código —*«evita límite de cuota de Drive»*—, pero implica que:
+
+- La imagen puede llevar **datos financieros del cliente** (número de cuenta o tarjeta visible en
+  una foto de transferencia, nombre, a veces teléfono).
+- Sale **en claro** a un servicio gratuito, **sin acuerdo de tratamiento de datos**, con **URL
+  pública** y **sin forma de borrarla desde el panel**.
+
+**No es un fallo del código: es una decisión de arquitectura que merece revisarse.** Las dos
+alternativas razonables son un bucket propio con URL firmada de vida corta, o volver a Drive con
+la cuota gestionada. Queda como decisión del owner.
+
+*(Y lo que hoy no se valida: que el archivo sea de verdad una imagen. Con el tope puesto el daño
+está acotado, pero quien tenga el token puede usar la ruta para subir cualquier cosa de ≤10 MB a
+un host público.)*
+
 ## Las rutas de depuración, y la única lista que no se toca a la ligera
 
 El panel tiene tres endpoints de depuración que **vuelcan filas crudas de las hojas**:

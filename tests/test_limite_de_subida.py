@@ -61,6 +61,12 @@ class TestUnCuerpoENORME_SE_RECHAZA_LIMPIO:
 
         assert r.status_code == 413, (
             f"respondio {r.status_code}: el cuerpo entero llego a memoria")
+        # Cerrar el lazo: que sea 413 no basta. Sin el `errorhandler`, Werkzeug
+        # devuelve su pagina HTML por defecto, y el front de este panel espera
+        # JSON -- se quedaria sin saber que decirle al operador.
+        assert r.content_type == "application/json", (
+            f"413 servido como {r.content_type}: el manejador no se aplico")
+        assert "tope" in r.get_json().get("error", "").lower()
 
 
 class TestUNA_FOTO_NORMAL_SIGUE_PASANDO:

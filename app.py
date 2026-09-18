@@ -825,9 +825,12 @@ def _archivo_demasiado_grande(_e):
     tope = app.config['MAX_CONTENT_LENGTH']
     return jsonify({
         'ok': False,
-        'error': f'El archivo supera el tope de {tope // (1024 * 1024)} MB. '
-                 f'Si es una foto de comprobante, vuelve a tomarla o reducela; '
-                 f'si es un video, no es lo que espera esta pantalla.',
+        # El mensaje es GENERICO a proposito: este manejador es global y lo ven
+        # tambien las rutas que reciben JSON. Hablar de "foto" o "video" aqui
+        # seria falso para quien mande un cuerpo grande a otra ruta.
+        'error': f'El cuerpo de la peticion supera el tope de '
+                 f'{tope // (1024 * 1024)} MB. Si estabas subiendo un comprobante, '
+                 f'vuelve a tomar la foto o reducela.',
     }), 413
 
 
