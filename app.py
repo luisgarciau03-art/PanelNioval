@@ -961,54 +961,8 @@ def api_frecuentes():
 
 @app.route('/api/prospectos/clientes-frecuentes')
 def api_clientes_frecuentes():
-    """Agrupa ventas por cliente: suma montos, cuenta pedidos, ordena mayor a menor."""
-    ventas = get_data('ventas')
-
-    def parse_monto(v):
-        return nc.parsear_monto(v)[0]
-
-    clientes: dict = defaultdict(lambda: {
-        'total_monto': 0.0,
-        'num_pedidos': 0,
-        'esquema': '',
-        'facturas': [],
-        'ultimo_pedido': '',
-    })
-
-    for row in ventas:
-        cliente = str(row.get('Cliente', '')).strip()
-        if not cliente:
-            continue
-        monto   = parse_monto(row.get('Monto', 0))
-        factura = str(row.get('Num Factura', '')).strip()
-        fecha   = str(row.get('Fecha', '')).strip()
-        esquema = str(row.get('ESQUEMA', '')).strip()
-
-        clientes[cliente]['total_monto']  += monto
-        clientes[cliente]['num_pedidos']  += 1
-        clientes[cliente]['esquema']       = esquema or clientes[cliente]['esquema']
-        if factura:
-            clientes[cliente]['facturas'].append(factura)
-        if fecha and fecha > clientes[cliente]['ultimo_pedido']:
-            clientes[cliente]['ultimo_pedido'] = fecha
-
-
-    def fecha_a_mes(f):
-        dt = nc.parsear_fecha(f)
-        return f"{nc.MESES_LARGOS[dt.month]} {dt.year}" if dt else f
-
-    result = []
-    for nombre, d in clientes.items():
-        result.append({
-            'Cliente':       nombre,
-            'Esquema':       d['esquema'],
-            'Pedidos':       d['num_pedidos'],
-            'Total Monto':   round(d['total_monto'], 2),
-            'Ultimo Pedido': fecha_a_mes(d['ultimo_pedido']) if d['ultimo_pedido'] else '—',
-        })
-
-    result.sort(key=lambda x: x['Total Monto'], reverse=True)
-    return jsonify(result)
+    """Ventas agrupadas por cliente. La logica vive en `metricas_ventas`."""
+    return jsonify(mv.clientes_frecuentes(get_data('ventas')))
 
 
 @app.route('/api/prospectos/ventas-dashboard')
