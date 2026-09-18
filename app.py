@@ -10,6 +10,7 @@ Deploy: VPS Vultr (Docker + Caddy)  |  Auth: GOOGLE_CREDENTIALS_JSON env var o a
 from flask import Flask, jsonify, render_template, request, session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 from limits import parse as limits_parse
 from limits.strategies import MovingWindowRateLimiter
@@ -35,6 +36,18 @@ import nucleo_catalogo as nc  # lógica pura de la cola de envíos de catálogo 
 import metricas_ventas as mv  # metricas de la superficie de Ventas, sin Flask
 
 app = Flask(__name__)
+
+# Tope del cuerpo de una peticion. `/api/ventas/upload-pago` hace `archivo.read()`
+# -- el cuerpo ENTERO en memoria -- y luego lo pasa a base64, que anade otro 33 %.
+# Sin tope, subir un video en vez de una foto (un descuido corriente desde el
+# movil) tumba el contenedor por OOM, y se cae para todos.
+#
+# Con tope, Flask responde **413** antes de leer nada. 10 MB deja pasar cualquier
+# foto de comprobante y corta lo que no lo es. Se puede subir por entorno sin tocar
+# codigo; aqui SI hay valor por defecto, porque un limite ausente es peor que uno
+# conservador -- al reves que los gates de autenticacion, que fallan cerrados.
+app.config['MAX_CONTENT_LENGTH'] = int(
+    os.environ.get('PANEL_MAX_SUBIDA_BYTES') or 10 * 1024 * 1024)
 app.json.sort_keys = False
 
 # ─── GUARDAS DE ARRANQUE (fail-closed) ───────────────────────────────────────
@@ -796,9 +809,29 @@ def upload_pago():
             'fila': fila_actualizada,
         })
 
+    except HTTPException:
+        # El tope de tamaño lo lanza Werkzeug AL PARSEAR el cuerpo, o sea dentro de
+        # este `try`. Tragarselo devolvia 500 -- "algo se rompio" -- cuando lo
+        # cierto es "el archivo es muy grande". Se deja pasar para que responda su
+        # 413 con su motivo.
+        raise
     except Exception as e:
         traceback.print_exc()
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.errorhandler(413)
+def _archivo_demasiado_grande(_e):
+    tope = app.config['MAX_CONTENT_LENGTH']
+    return jsonify({
+        'ok': False,
+        # El mensaje es GENERICO a proposito: este manejador es global y lo ven
+        # tambien las rutas que reciben JSON. Hablar de "foto" o "video" aqui
+        # seria falso para quien mande un cuerpo grande a otra ruta.
+        'error': f'El cuerpo de la peticion supera el tope de '
+                 f'{tope // (1024 * 1024)} MB. Si estabas subiendo un comprobante, '
+                 f'vuelve a tomar la foto o reducela.',
+    }), 413
 
 
 @app.route('/api/prospectos/stats')
