@@ -966,10 +966,7 @@ def api_clientes_frecuentes():
     ventas = get_data('ventas')
 
     def parse_monto(v):
-        try:
-            return float(str(v).replace(',', '').replace('$', '').strip() or 0)
-        except:
-            return 0.0
+        return nc.parsear_monto(v)[0]
 
     clientes: dict = defaultdict(lambda: {
         'total_monto': 0.0,
@@ -1029,11 +1026,13 @@ def api_ventas_dashboard():
     """Métricas de ventas agrupadas por mes, con desglose por esquema y top clientes."""
     ventas = get_data('ventas')
 
+    ilegibles = {'n': 0}
+
     def parse_monto(v):
-        try:
-            return float(str(v).replace(',', '').replace('$', '').strip() or 0)
-        except:
-            return 0.0
+        monto, ok = nc.parsear_monto(v)
+        if not ok:
+            ilegibles['n'] += 1
+        return monto
 
     def parse_fecha(f):
         for fmt in ('%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d'):
@@ -1062,7 +1061,7 @@ def api_ventas_dashboard():
             continue
 
         clave = fecha.strftime('%Y-%m')   # para ordenar
-        label = fecha.strftime('%b %Y')    # para mostrar
+        label = f'{nc.MESES_CORTOS[fecha.month]} {fecha.year}'   # para mostrar, en español
 
         meses[clave]['label']    = label
         meses[clave]['monto']   += monto
@@ -1096,6 +1095,10 @@ def api_ventas_dashboard():
         'promedio_mes':   round(total_general / len(resultado), 2) if resultado else 0,
         'mejor_mes':      mejor_mes.get('mes', '—'),
         'mejor_mes_monto': mejor_mes.get('monto', 0),
+        # Cuantos montos no se pudieron leer. Sin este numero, una grafica baja se
+        # lee como "se vendio poco" en vez de "no se pudo leer" -- y `parse_monto`
+        # devuelve 0.0 en ese caso, asi que la diferencia es invisible.
+        'montos_ilegibles': ilegibles['n'],
     })
 
 
@@ -1230,39 +1233,9 @@ def _explicar_ciudad(reg: dict, metricas: dict, saturacion: float) -> str:
     return ' - '.join(partes)
 
 
-def _sanear_etiqueta_ciudad(valor: str) -> str:
-    """Enmascara lo que no es un nombre de ciudad antes de publicarlo.
-
-    La columna CIUDAD de la hoja a veces trae un telefono o un correo tecleado por
-    error. Esos valores caian en `sin_clasificar` y salian **verbatim** por
-    `/api/importador/ciudades` y por `/api/prospectos/ciudades`, que prometen que
-    ningun telefono ni nombre de contacto sale de ahi. Medido en produccion el
-    2026-09-16: 8 telefonos y 1 correo de 32 entradas.
-
-    Enmascarar NO es borrar, y esa es la mitad que importa: el aviso existe para que
-    el operador ARREGLE esas celdas, asi que se conservan los ultimos digitos para
-    poder encontrarlas. Un saneador que enmascare de mas esconde el problema.
-
-    Tres decisiones que salieron de la revision de seguridad, y que no son obvias:
-
-    1. **Basta una arroba.** Exigir un punto detras dejaba pasar `juan@gmail`, que
-       es un dominio truncado al teclear y sigue siendo un nombre de contacto.
-    2. **Solo los ultimos 4 digitos**, como `nucleo_catalogo.enmascarar_telefono`.
-       Dos funciones del mismo repo con el mismo proposito no pueden dar garantias
-       distintas, y la lada no hacia falta para localizar la fila.
-    3. **Una RACHA contigua de digitos, no la suma de los dispersos.** Sumarlos
-       enmascaraba direcciones legitimas como "Manzana 3 Lote 25 CP 31125", y perder
-       de vista una celda arreglable es el fallo contrario al que esto evita.
-    """
-    crudo = (valor or '').strip()
-    if re.search(r'\S@\S', crudo):
-        return '…@… (correo en la columna CIUDAD)'
-    # Una racha de 8+ digitos admitiendo solo separadores de telefono entre medias.
-    racha = re.search(r'\d[\d\s().+-]{6,}\d', crudo)
-    if racha and len(re.sub(r'\D', '', racha.group())) >= 8:
-        digitos = re.sub(r'\D', '', racha.group())
-        return f'…{digitos[-4:]} (teléfono en la columna CIUDAD)'
-    return crudo
+# Vive en `nucleo_catalogo`, junto a `enmascarar_telefono`, cuya convencion sigue:
+# es higiene de datos pura, sin Flask. Aqui queda el nombre que usan las rutas.
+_sanear_etiqueta_ciudad = nc.sanear_etiqueta_ciudad
 
 
 @app.route('/api/importador/ciudades')
@@ -1635,7 +1608,11 @@ def api_mensajes_update():
 def api_ventas_stats():
     ventas = get_data('ventas')
     if not ventas:
-        return jsonify({'total_ventas': 0, 'clientes': 0, 'por_mes': [], 'top_clientes': []})
+        # La forma no cambia con los datos: un cliente que lea `montos_ilegibles`
+        # sin comprobar su existencia no puede llevarse un `undefined` aqui.
+        return jsonify({'total_ventas': 0, 'clientes': 0, 'por_mes': [],
+                        'top_clientes': [], 'columnas': [],
+                        'montos_ilegibles': None, 'columna_monto': None})
 
     claves = list(ventas[0].keys()) if ventas else []
 
@@ -1645,7 +1622,11 @@ def api_ventas_stats():
     col_fecha = next((k for k in claves if 'fecha' in k.lower() or 'date' in k.lower()), None)
 
     clientes = Counter()
-    por_mes: dict = defaultdict(float)
+    # La clave es (año, mes) y NO la etiqueta: ordenar por la cadena '%b %Y' es
+    # ordenar alfabeticamente — 'Dec' antes que 'Feb' antes que 'Jan' — y el
+    # recorte a 12 tiraba el mes mas reciente conservando uno viejo.
+    por_mes: dict[tuple[int, int], float] = defaultdict(float)
+    montos_ilegibles = 0
 
     for v in ventas:
         if col_cliente:
@@ -1657,24 +1638,44 @@ def api_ventas_stats():
             for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%m/%d/%Y'):
                 try:
                     dt = datetime.strptime(fecha_str[:10], fmt)
-                    mes = dt.strftime('%b %Y')
-                    monto = 0
+                except ValueError:
+                    continue
+                monto = None
+                if col_monto:
+                    crudo = str_val(v.get(col_monto, '')).replace(',', '').replace('$', '')
+                    try:
+                        monto = float(crudo)
+                    except ValueError:
+                        monto = None
+                if monto is None:
+                    # Antes sumaba 1. Un peso inventado convierte la serie de dinero
+                    # en un conteo a medias, en la misma grafica y sin decirlo.
+                    #
+                    # Y solo cuenta si la columna EXISTE: sin columna de monto, todas
+                    # las filas caerian aqui y el numero se leeria como "mil ventas
+                    # corruptas" cuando es "no se cual es la columna del dinero".
                     if col_monto:
-                        try:
-                            monto = float(str_val(v.get(col_monto, '0')).replace(',', '').replace('$', ''))
-                        except:
-                            monto = 1
-                    por_mes[mes] += monto or 1
-                    break
-                except:
-                    pass
+                        montos_ilegibles += 1
+                else:
+                    por_mes[(dt.year, dt.month)] += monto
+                # Se toca la clave aunque el monto no se pueda leer: el mes existio.
+                por_mes.setdefault((dt.year, dt.month), 0.0)
+                break
 
     return jsonify({
         'total_ventas': len(ventas),
         'clientes': len(clientes),
         'columnas': claves,
         'top_clientes': clientes.most_common(10),
-        'por_mes': [{'mes': k, 'total': v} for k, v in sorted(por_mes.items())[-12:]],
+        # Los 12 meses MAS RECIENTES, en orden cronologico, con la etiqueta en
+        # español: `%b` da 'Dec'/'Jan' en el locale C, y el panel esta en español.
+        'por_mes': [{'mes': f'{nc.MESES_CORTOS[m]} {a}', 'total': por_mes[(a, m)]}
+                    for a, m in sorted(por_mes)[-12:]],
+        # Cuantas ventas cayeron en un mes pero no pudieron sumar dinero. Sin esto,
+        # una grafica baja se lee como "se vendio poco" en vez de "no se pudo leer".
+        # `None` = no se pudo evaluar (no hay columna de monto). Es distinto de 0.
+        'montos_ilegibles': montos_ilegibles if col_monto else None,
+        'columna_monto': col_monto,
     })
 
 
